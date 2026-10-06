@@ -1,0 +1,27 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "lsp": true,
+  "permission": {
+    "read": {
+      "*": "allow",
+      "osc_docs/config/**": "deny"
+    },
+    "edit": {
+      "osc_docs/config/**": "deny"
+    },
+    "glob": {
+      "osc_docs/config/**": "deny"
+    },
+    "grep": {
+      "osc_docs/config/**": "deny"
+    },
+    "bash": {
+      "cat *osc_docs/config*": "deny",
+      "ls *osc_docs/config/*": "deny",
+      "dir *osc_docs/config/*": "deny",
+      "Get-ChildItem *osc_docs/config/*": "deny",
+      "type *osc_docs/config/*": "deny"
+    }
+  },
+  "snapshot": false
+}

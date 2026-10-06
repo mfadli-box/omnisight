@@ -1,0 +1,279 @@
+model app_module {
+  id          String        @id @default(uuid())
+  parent_id   String?
+  code        String
+  name        String
+  path        String
+  is_page     Boolean       @default(true)
+  is_active   Boolean       @default(true)
+  created_at  DateTime      @default(now())
+  updated_at  DateTime      @default(now())
+
+  parent      app_module?   @relation("modular", fields: [parent_id], references: [id])
+  children    app_module[]  @relation("modular")
+  companies   app_company_module[]
+  privileges  app_user_privilege[]
+
+  @@unique([code])
+}
+
+model app_company {
+  id          String     @id @default(uuid())
+  code        String
+  name        String
+  valuta      String     @default("IDR")
+  vat_id      String?
+  reg_no      String?
+  address     String?
+  tax_office  String?
+  hris_link   String?
+  is_active   Boolean    @default(false)
+  created_at  DateTime   @default(now())
+  updated_at  DateTime   @default(now())
+
+  modules     app_company_module[]
+  areas       app_company_area[]
+  users       app_user_company[]
+
+  @@unique([code])
+}
+
+model app_company_module {
+  id          String       @id @default(uuid())
+  company_id  String
+  module_id   String
+  is_active   Boolean      @default(false)
+  created_at  DateTime     @default(now())
+  updated_at  DateTime     @default(now())
+
+  company     app_company  @relation(fields: [company_id], references: [id])
+  module      app_module   @relation(fields: [module_id], references: [id])
+
+  @@unique([company_id, module_id])
+}
+
+model app_company_area {
+  id           String       @id @default(uuid())
+  company_id   String
+  code         String
+  name         String
+  description  String?
+  is_active    Boolean      @default(true)
+  created_at   DateTime     @default(now())
+  updated_at   DateTime     @default(now())
+
+  company      app_company  @relation(fields: [company_id], references: [id])
+  users        app_user_area[]
+
+  @@unique([company_id, code])
+  @@index([company_id])
+}
+
+model app_user {
+  id                  String     @id @default(uuid())
+  username            String
+  email               String
+  password            String
+  fullname            String
+  phone               String?
+  company_id          String     @default("")
+  employee_id         String?
+  location_id         String?
+  department_id       String?
+  division_id         String?
+  role                String     @default("staff")
+  job                 String     @default("")
+  key                 String     @default("")
+  is_admin            Boolean    @default(false)
+  is_hris             Boolean    @default(false)
+  is_active           Boolean    @default(false)
+  is_totp_enabled     Boolean    @default(false)
+  totp_secret         String?
+  locked_until        DateTime?
+  failed_attempts     Int        @default(0)
+  created_at          DateTime   @default(now())
+  updated_at          DateTime   @default(now())
+
+  companies           app_user_company[]
+  areas               app_user_area[]
+  actions             app_user_action[]
+  tokens              app_user_token[]
+  approval_signs      app_approval_sign[]
+  signature_flags     app_signature_flag[]
+
+  @@unique([company_id, username])
+}
+
+model app_user_company {
+  id          String       @id @default(uuid())
+  user_id     String
+  company_id  String
+  is_active   Boolean      @default(false)
+  created_at  DateTime     @default(now())
+  updated_at  DateTime     @default(now())
+
+  user        app_user     @relation(fields: [user_id], references: [id])
+  company     app_company  @relation(fields: [company_id], references: [id])
+  privileges  app_user_privilege[]
+
+  @@unique([user_id, company_id])
+}
+
+model app_user_area {
+  id               String            @id @default(uuid())
+  user_id          String
+  company_area_id  String
+  is_active        Boolean           @default(false)
+  created_at       DateTime          @default(now())
+  updated_at       DateTime          @default(now())
+
+  user             app_user          @relation(fields: [user_id], references: [id])
+  company_area     app_company_area  @relation(fields: [company_area_id], references: [id])
+
+  @@unique([user_id, company_area_id])
+}
+
+model app_user_privilege {
+  id               String            @id @default(uuid())
+  user_company_id  String
+  module_id        String
+  level            String            @default("HIDE")
+  created_at       DateTime          @default(now())
+  updated_at       DateTime          @default(now())
+
+  user_company     app_user_company  @relation(fields: [user_company_id], references: [id])
+  module           app_module        @relation(fields: [module_id], references: [id])
+
+  @@unique([user_company_id, module_id])
+}
+
+model app_user_session {
+  id            String    @id @default(uuid())
+  user_id       String
+  session_token String    @db.VarChar(512)
+  ip_address    String?   @db.VarChar(45)
+  user_agent    String?   @db.Text
+  started_at    DateTime  @default(now())
+  last_active   DateTime  @default(now())
+  ended_at      DateTime?
+  status        String    @default("ACTIVE") @db.VarChar(20)
+  policy_id     String?
+
+  @@index([user_id])
+  @@index([session_token])
+  @@index([status])
+}
+
+model app_user_action {
+  id           String    @id @default(uuid())
+  user_id      String
+  company_id   String?
+  module_code  String?
+  action       String
+  path         String
+  ip_address   String?
+  user_agent   String?
+  created_at   DateTime  @default(now())
+  user         app_user  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([company_id])
+}
+
+model app_user_token {
+  id                  String     @id @default(uuid())
+  user_id             String
+  token_type          String     @default("JWT") @db.VarChar(20)
+  token               String
+  refresh_token       String?
+  fingerprint         String?    @db.VarChar(128)
+  ip_address          String?    @db.VarChar(45)
+  user_agent          String?    @db.Text
+  device_id           String?    @db.VarChar(100)
+  issued_at           DateTime   @default(now())
+  access_expires_at   DateTime
+  refresh_expires_at  DateTime?
+  last_activity_at    DateTime?
+  is_blocked          Boolean    @default(false)
+  blocked_reason      String?    @db.Text
+  impersonated_by     String?
+  revoked_at          DateTime?
+  revoked_reason      String?    @db.Text
+  created_at          DateTime   @default(now())
+
+  user                app_user   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@unique([refresh_token])
+  @@index([user_id, revoked_at])
+  @@index([token_type])
+  @@index([refresh_expires_at])
+}
+
+model app_approval_step {
+  id         String              @id @default(uuid())
+  type_id    String
+  step       Int
+  condition  String              @default("ANY_APPROVED")
+
+  type       app_signature_type  @relation(fields: [type_id], references: [id], onDelete: Cascade)
+  signature  app_approval_sign[]
+
+  @@unique([type_id, step])
+}
+
+model app_approval_sign {
+  id       String             @id @default(uuid())
+  step_id  String
+  user_id  String
+
+  step     app_approval_step  @relation(fields: [step_id], references: [id], onDelete: Cascade)
+  user     app_user           @relation(fields: [user_id], references: [id])
+
+  @@unique([step_id, user_id])
+}
+
+model app_signature_type {
+  id          String    @id @default(uuid())
+  code        String
+  name        String
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @default(now())
+
+  steps       app_approval_step[]
+  forms       app_signature_form[]
+
+  @@unique([code])
+}
+
+model app_signature_form {
+  id                 String               @id @default(uuid())
+  signature_type_id  String?
+  step               Int
+  request_id         String
+  condition          String               @default("ANY_APPROVED")
+  status             String               @default("PENDING")
+  created_at         DateTime             @default(now())
+  updated_at         DateTime             @default(now())
+
+  type               app_signature_type?  @relation(fields: [signature_type_id], references: [id])
+  signature_flags    app_signature_flag[]
+
+  @@unique([request_id, step])
+  @@index([signature_type_id])
+}
+
+model app_signature_flag {
+  id          String              @id @default(uuid())
+  form_id     String
+  user_id     String
+  status      String              @default("PENDING")
+  comment     String?
+  created_at  DateTime            @default(now())
+  updated_at  DateTime            @default(now())
+
+  form        app_signature_form  @relation(fields: [form_id], references: [id], onDelete: Cascade)
+  user        app_user            @relation(fields: [user_id], references: [id])
+
+  @@unique([form_id, user_id])
+}

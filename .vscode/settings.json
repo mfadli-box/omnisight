@@ -1,0 +1,19 @@
+{
+  "files.exclude": {
+    "osc_base/config/": true
+  },
+  "search.exclude": {
+    "osc_base/config/": true
+  },
+  "files.watcherExclude": {
+    "osc_base/config/": true
+  },
+  "github.copilot.enable": {
+    "osc_base/config/**": false,
+    "*": false,
+    "plaintext": false,
+    "markdown": false,
+    "scminput": false,
+    "go": false
+  }
+}

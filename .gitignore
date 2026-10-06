@@ -1,0 +1,5 @@
+notes.txt
+*.env
+*.env.pub
+*.env.dev
+*.exe

@@ -1,0 +1,41 @@
+networks:
+  blackbox:
+    external:
+      name: blackbox
+
+volumes:
+  xbase:
+    driver: local
+
+services:
+  # ─── Database (Prisma + Postgresql) ─────────────────────────
+  osc_base:
+    image: postgres:18-alpine
+    container_name: osc_base
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+    environment:
+      - TZ=${TZ:-Asia/Jakarta}
+      - POSTGRES_DB=${PG_DATA:-osc}
+      - POSTGRES_BACKUP=${PG_BACK:-osc_back}
+      - POSTGRES_USER=${PG_USER:-dbe}
+      - POSTGRES_PASSWORD=${PG_PASS:-rahasia}
+      - POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256 --auth-local=scram-sha-256
+    ports:
+      - "37771:5432"
+    volumes:
+      - xbase:/var/lib/postgresql
+      - ./osc_base/pgbouncer.sh:/docker-entrypoint-initdb.d/init.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-dbe} -d ${PG_DATA:-osc}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+    networks:
+      blackbox:
+        ipv4_address: 172.99.66.1
+  # ─── Backend  (Go) ──────────────────────────────────────────
+  # ─── Frontend (Next.js) ─────────────────────────────────────
