@@ -32,6 +32,9 @@ osc_site/
 │   │   │   ├── model/        # modul navigasi dinamis (dari /APP00/module)
 │   │   │   ├── widget/       # sidebar, nav, breadcrumb, company, dashboard, error
 │   │   │   ├── pages/        # halaman modul terpasang
+│   │   │   │   ├── APP/   # halaman application-admin
+│   │   │   │   │   ├── APP01/      # module admin (module-table + module-form)
+│   │   │   │   │   └── APP02/      # company admin (draft, folder kosong)
 │   │   │   │   └── SYS/   # halaman session-profile
 │   │   │   │       ├── SYS01/    # profil (profile-card)
 │   │   │   │       ├── SYS02/    # ganti password (password-form)
@@ -54,7 +57,7 @@ osc_site/
 Konfigurasi disatukan di `src/lib/backend.ts`:
 
 ```ts
-export const BE_POOL = process.env.BE_POOL ?? "http://osc_rest:37775";
+export const BE_POOL = process.env.BE_POOL ?? "http://osc_rest:37772";
 export const WS_POOL  = ...;   // dari NEXT_PUBLIC_WS_POOL / BE_POOL (http→ws)
 ```
 
@@ -95,8 +98,9 @@ Semua proxy meneruskan `X-Request-ID` dan format error backend.
 - memetakan kode modul (`APP`, `AMM`, `BOT`, `DOC`, `JMS`, `NET`, `OBS`, `POD`,
   `SYS`, `VMS`, `WAF`, `WEB`) → ikon `lucide-react`;
 - `is_page` → link; non-page → grup dengan submenu;
-- menu statis: admin mendapat group `Application` (APP01–11), user login mendapat
-  `Session Profile` (SYS01–SYS03); modul dinamis ditambahkan di atasnya.
+- menu statis: admin mendapat group `Application` (APP01–05: Module, Company,
+  User, Signature, Session), user login mendapat `Session Profile`
+  (SYS01–SYS03); modul dinamis ditambahkan di atasnya.
 
 Komponen sidebar (`src/app/board/widget/`):
 - `sidebar.tsx` — `AppSidebar`: avatar, menu, company, logout.

@@ -1,3 +1,6 @@
+osc_docs/config
+osc_docs/testing/__pycache__
+
 osc_base/config
 osc_base/node_modules
 osc_base/prisma/migrations

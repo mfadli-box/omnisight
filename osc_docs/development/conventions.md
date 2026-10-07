@@ -12,7 +12,7 @@ Backend (`osc_rest`) membagi route menjadi area berdasarkan kebutuhan otentikasi
 |---|---|---|
 | `/rest/guest` | — | Publik: login `PUB00`, daftar company |
 | `/rest/pages` | `USAuth()` / `USLoad()` | Halaman terautentikasi |
-| `/rest/pages` (admin) | `USAuth(), USLock()` | Hanya admin |
+| `/rest/pages/*` (admin) | `USAuth(), USLock()` | Hanya admin (CRUD `APP01/modules`, `APP02/companies` & turunannya) |
 | `/rest/agent` | `USBots()` | Worker/robot (service account) |
 | `/rest/hook` | (rencana) | Webhook |
 
@@ -83,7 +83,8 @@ Frontend memetakan prefix ini ke ikon via `src/app/board/model/module.ts`.
 ## 5. Database — Konvensi Model
 
 - ID: `String @id @default(uuid())`.
-- Setiap model punya kolom audit `created_at/updated_at` + `created_by/updated_by`.
+- Setiap model punya kolom audit `created_at`/`updated_at` (tanpa
+  `created_by`/`updated_by`).
 - `is_active` untuk soft state (hindari hard-delete).
 - Prefix model per cluster: `app_*`; cluster lain akan memakai prefix berbeda
   (mis. `net_*`, `sec_*`, `obs_*`, `pod_*`, `jms_*`) sesuai daftar retensi di

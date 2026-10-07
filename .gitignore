@@ -3,3 +3,5 @@ notes.txt
 *.env.pub
 *.env.dev
 *.exe
+osc_docs/config
+osc_docs/testing/__pycache__

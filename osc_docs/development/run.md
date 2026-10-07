@@ -2,7 +2,7 @@
 
 > Panduan menjalankan seluruh komponen (database, backend, frontend) di
 > lingkungan lokal. Prasyarat: Docker + Docker Compose, Node.js ≥ 20.19,
-> Go ≥ 1.26.6, Python (opsional untuk tooling).
+> Go ≥ 1.26.6, Python (opsional untuk tooling & testing).
 
 ## 1. Persiapan Environment
 
@@ -126,7 +126,36 @@ Untuk merevisi `docker-compose.yml` (tambah service `osc_rest`, `osc_site`),
 ikuti pola service `osc_base` yang sudah ada: definisikan service, env dari
 `.env`, network `blackbox`, port mapping, healthcheck.
 
-## 6. Troubleshooting Cepat
+## 6. Unit Test (Python) — `osc_docs/testing`
+
+Test kontrak ditulis Python (unittest, stdlib, tanpa dependensi tambahan):
+
+| File | Yang diuji |
+|---|---|
+| `test_backend_api.py` | REST API `osc_rest` via HTTP: guest, login sukses/gagal, proteksi auth (401), profil, APP01 modules (admin), pagination default |
+| `test_frontend_logic.py` | Logika TS asli `osc_site` (`grid.ts`, `utility.ts`, `backend.ts`) dieksekusi via Node `--experimental-strip-types` → `buildParams`, `toGridResult`, `parseSession`, `isSessionExpired`, `getInitials`, `formatDateTime`, `BE_POOL`/`WS_POOL` default |
+
+Menjalankan (backend harus aktif di `:37772` agar `test_backend_api` lulus):
+
+```bash
+cd osc_docs/testing
+python3 -m unittest discover -s . -p 'test_*.py' -v
+```
+
+Jalankan hanya satu modul:
+
+```bash
+python3 -m unittest -v test_frontend_logic   # tidak butuh server/db
+```
+
+Catatan:
+- Base URL backend via env `OSC_BACKEND_URL` (default `http://localhost:37772`);
+  username/password via `OSC_TEST_USER`/`OSC_TEST_PASS` (fallback ke `root` +
+  `AD_PASS` dari `osc_base/.env`).
+- `test_backend_api` **skip** otomatis bila server/DB tidak aktif.
+- `test_frontend_logic` **skip** bila Node < 22.6 (tanpa `--experimental-strip-types`).
+
+## 7. Troubleshooting Cepat
 
 | Gejala | Kemungkinan Penyebab | Solusi |
 |---|---|---|
@@ -138,10 +167,12 @@ ikuti pola service `osc_base` yang sudah ada: definisikan service, env dari
 | Frontend 502 | `BE_POOL` salah | Perbaiki `BE_POOL` (`:37772`); pastikan backend jalan |
 | Seed `P2002` (duplikat) | Username `where` vs `create` beda | Gunakan `username: "root"` di kedua blok `upsert` |
 
-## 7. Verifikasi End-to-End
+## 8. Verifikasi End-to-End
 
 1. DB up + migrasi + seed → login admin.
 2. Backend `curl` guest (`/rest/guest/PUB00`), login, lalu dengan token akses
-   `/rest/pages/SYS01/profile`, `/rest/pages/SYS03/history`.
+   `/rest/pages/SYS01/profile`, `/rest/pages/SYS03/history`, dan (admin)
+   `/rest/pages/APP01/modules`.
 3. Frontend login → `/board` → sidebar memuat modul dari `/APP00/module`,
-   halaman SYS01–SYS03 memuat data.
+   halaman SYS01–SYS03 memuat data; APP01 (admin) CRUD module bekerja.
+4. Unit test Python: `cd osc_docs/testing && python3 -m unittest discover -s . -v`.

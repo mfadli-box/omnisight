@@ -36,9 +36,7 @@ type appUser struct {
 	TOTPSecret     *string
 	LockedUntil    *time.Time
 	FailedAttempts int
-	CreatedBy      *string
 	CreatedAt      time.Time
-	UpdatedBy      *string
 	UpdatedAt      time.Time
 }
 
@@ -46,7 +44,7 @@ const appUserCols = `
 	id, username, email, password, fullname, phone, company_id,
 	employee_id, location_id, department_id, division_id, role, job,
 	key, is_admin, is_hris, is_active, is_totp_enabled, totp_secret,
-	locked_until, failed_attempts, created_by, created_at, updated_by, updated_at
+	locked_until, failed_attempts, created_at, updated_at
 `
 
 func scanAppUser(r pgx.Row) (appUser, error) {
@@ -55,7 +53,7 @@ func scanAppUser(r pgx.Row) (appUser, error) {
 		&m.ID, &m.Username, &m.Email, &m.Password, &m.Fullname, &m.Phone, &m.CompanyID,
 		&m.EmployeeID, &m.LocationID, &m.DepartmentID, &m.DivisionID, &m.Role, &m.Job,
 		&m.Key, &m.IsAdmin, &m.IsHris, &m.IsActive, &m.IsTOTPEnabled, &m.TOTPSecret,
-		&m.LockedUntil, &m.FailedAttempts, &m.CreatedBy, &m.CreatedAt, &m.UpdatedBy, &m.UpdatedAt,
+		&m.LockedUntil, &m.FailedAttempts, &m.CreatedAt, &m.UpdatedAt,
 	)
 	return m, err
 }

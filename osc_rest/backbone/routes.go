@@ -4,8 +4,10 @@ import (
 	"net/http"
 	"time"
 
+	app00 "osc_rest/skeleton/app/app00"
+	app01 "osc_rest/skeleton/app/app01"
+	app02 "osc_rest/skeleton/app/app02"
 	"osc_rest/skeleton/pub"
-	"osc_rest/skeleton/app/app00"
 	"osc_rest/skeleton/sys"
 
 	"github.com/gin-contrib/cors"
@@ -44,7 +46,9 @@ func SetRouter() *gin.Engine {
 	admin.Use(USAuth(), USLock())
 	pages.GET("/", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"message": "pages"}) })
 	pub.Use(PgSQL)
-	app.Use(PgSQL)
+	app00.Use(PgSQL)
+	app01.Use(PgSQL)
+	app02.Use(PgSQL)
 	sys.Use(PgSQL)
 
 	agent := rest.Group("/rest/agent")
@@ -54,12 +58,32 @@ func SetRouter() *gin.Engine {
 	guest.GET("/PUB00", pub.PUB00Company)
 	guest.POST("/PUB00", pub.PUB00Login)
 
-	auths.DELETE("/APP00", app.APP00Logout)
-	auths.GET("/APP00/company", app.APP00Company)
-	auths.GET("/APP00/module", app.APP00Module)
+	auths.DELETE("/APP00", app00.APP00Logout)
+	auths.GET("/APP00/company", app00.APP00Company)
+	auths.GET("/APP00/module", app00.APP00Module)
 	auths.GET("/SYS01/profile", sys.SYS01Profile)
 	auths.PUT("/SYS02/password", sys.SYS02Password)
 	auths.GET("/SYS03/history", sys.SYS03History)
+
+	admin.GET("/APP01/modules", app01.APP01ModulesList)
+	admin.POST("/APP01/modules", app01.APP01ModulesCreate)
+	admin.GET("/APP01/modules/:id", app01.APP01ModulesGet)
+	admin.PUT("/APP01/modules/:id", app01.APP01ModulesUpdate)
+	admin.DELETE("/APP01/modules/:id", app01.APP01ModulesDelete)
+
+	admin.GET("/APP02/companies", app02.APP02CompaniesList)
+	admin.POST("/APP02/companies", app02.APP02CompaniesCreate)
+	admin.GET("/APP02/companies/:id", app02.APP02CompaniesGet)
+	admin.PUT("/APP02/companies/:id", app02.APP02CompaniesUpdate)
+	admin.DELETE("/APP02/companies/:id", app02.APP02CompaniesDelete)
+	admin.GET("/APP02/companies/:id/modules", app02.APP02CompaniesModulesList)
+	admin.POST("/APP02/companies/:id/modules", app02.APP02CompaniesModulesCreate)
+	admin.PUT("/APP02/companies/:id/modules/:uid", app02.APP02CompaniesModulesUpdate)
+	admin.DELETE("/APP02/companies/:id/modules/:uid", app02.APP02CompaniesModulesDelete)
+	admin.GET("/APP02/companies/:id/areas", app02.APP02CompaniesAreasList)
+	admin.POST("/APP02/companies/:id/areas", app02.APP02CompaniesAreasCreate)
+	admin.PUT("/APP02/companies/:id/areas/:uid", app02.APP02CompaniesAreasUpdate)
+	admin.DELETE("/APP02/companies/:id/areas/:uid", app02.APP02CompaniesAreasDelete)
 
 	return rest
 }

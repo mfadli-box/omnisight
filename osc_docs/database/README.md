@@ -68,12 +68,11 @@ Setiap model pada semua cluster mengikuti aturan berikut:
 ```prisma
 created_at  DateTime @default(now())
 updated_at  DateTime @default(now())
-created_by  String   @default("")
-updated_by  String   @default("")
 ```
 
 - ID: `String @id @default(uuid())`.
 - `is_active` untuk soft state (hindari hard-delete).
+- Setiap model hanya menyimpan `created_at`/`updated_at` (tanpa `created_by`/`updated_by`).
 - Unique: `@@unique` eksplisit (mis. `@@unique([code])`,
   `@@unique([company_id, code])`).
 - Prefix model: `app_*` untuk cluster aplikasi; `net_*`, `obs_*`, `sec_*`,
@@ -90,21 +89,25 @@ npx prisma migrate deploy         # terapkan ke environment lain
 npx prisma db seed                # seed admin + modul
 ```
 
-Migrasi terakhir saat penulisan: `20260918033109_init` (membuat seluruh model
+Migrasi terakhir saat penulisan: `20261006024400_init` (membuat seluruh model
 `cluster_app`).
 
 ## 6. Seed
 
 `prisma/seed.ts` (dijalankan via `tsx`):
-- Admin: username `root`, email `AD_MAIL`, password `AD_PASS` (bcrypt, salt 10).
-- Modul: dari array `moduleGroups` (kosong untuk saat ini — diisi bertahap).
+- Admin: username `root`, email `AD_MAIL` (default `admin@localhost`),
+  password `AD_PASS` (default `rahasia`, bcrypt salt 10) — di-`upsert`.
+- Modul: `seedDatModule()` membaca array `moduleGroups` (kosong saat ini —
+  diisi bertahap); group di-root (`parent_id: null`), halaman menunjuk ke group.
 - Gunakan `upsert` agar idempoten — aman dijalankan ulang.
+- Dipanggil `seedAdmin()` lalu `seedDatModule()`.
 
 > **Penting (Prisma 7 + `prisma-client-js`):** setelah instalasi baru jalankan
 > `npx prisma generate` agar client ter-generate (tidak otomatis).
 > Import `PrismaClient` dari `@prisma/client` (bukan `@prisma/client/extension`
 > — entry itu untuk generator `prisma-client` baru, dan `generate` legacy tidak
-> menghasilkan file `extension.js`).
+> menghasilkan file `extension.js`). `seed.ts` memakai `@prisma/adapter-pg`
+> (`PrismaPg`) dengan pool `pg` dari `DATABASE_URL`.
 
 ## 7. Keamanan & Kepatuhan
 

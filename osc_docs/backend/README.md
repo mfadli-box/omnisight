@@ -24,14 +24,17 @@ osc_rest/
 ├── backbone/             # inti HTTP: router, middleware, db, upload, retention
 │   ├── routes.go         # daftar semua route & grup middleware
 │   ├── memory.go         # middleware auth: session, role, privilege, bot
-│   ├── logger.go ,recovery.go  # request id, logging, panic recovery
+│   ├── logger.go         # request id, logging, panic recovery
+│   ├── recovery.go       # request id, panic recovery
 │   ├── database.go       # koneksi pgxpool dari env PG_* (export `PgSQL`)
 │   ├── upload.go         # upload file (kategori id, whitelist ekstensi) — belum terdaftar
 │   ├── retention.go      # hapus data telemetri/log berdasarkan umur (RE_*)
-│   └── cleanup.go        # cleanup sesi EXPIRED + placeholder cluster status
+│   └── cleanup.go        # cleanup sesi EXPIRED (scheduler)
 ├── skeleton/             # modul domain (pola handler → usecase → repository → template)
 │   ├── pub/pub00_*.go    # PUB00: daftar company & login
 │   ├── app/app00/…        # APP00: logout, company user, pohon modul
+│   ├── app/app01/…        # APP01: CRUD module (admin)
+│   ├── app/app02/…        # APP02: CRUD company + module per company + area (admin)
 │   └── sys/sys00_*.go    # SYS01–SYS03: profil, ganti password, riwayat login
 ├── mechanic/             # helper & paket utilitas
 │   ├── helper.go         # AppError, respon error JSON, pagination, filter
@@ -44,7 +47,7 @@ osc_rest/
 ### Pola `skeleton/` (layering)
 
 Setiap modul `XYZnn` mengikuti empat file di sebuah package `skeleton/<area>/`
-(`pub/pub00_*`, `app/app00/*`, `sys/sys00_*`):
+(`pub/pub00_*`, `app/app00/*`, `app/app01/*`, `app/app02/*`, `sys/sys00_*`):
 
 | File | Peran |
 |---|---|
@@ -53,7 +56,9 @@ Setiap modul `XYZnn` mengikuti empat file di sebuah package `skeleton/<area>/`
 | `xyz00_usecase.go` | Logika bisnis & validasi; export `Use(pool)` untuk inject pool |
 | `xyz00_handler.go` | HTTP handler Gin; format error via `mechanic` |
 
-Inject pool di `routes.go`: `pub.Use(PgSQL)`, `app.Use(PgSQL)`, `sys.Use(PgSQL)`.
+Inject pool di `routes.go` (package `app00`/`app01`/`app02` di-alias saat import):
+`pub.Use(PgSQL)`, `app00.Use(PgSQL)`, `app01.Use(PgSQL)`, `app02.Use(PgSQL)`,
+`sys.Use(PgSQL)`.
 
 ## 3. Middleware Otentikasi & Otorisasi
 
@@ -95,21 +100,40 @@ Didefinisikan di `backbone/routes.go`. Middleware global: `RequestID()`,
 | `/rest/guest` | — | Endpoint publik (login, info company). |
 | `/rest/pages` (root) | `USLoad()` | Halaman terautentikasi (company wajib sudah dipilih). |
 | `/rest/pages` (auths) | `USAuth()` | Data user sendiri (tanpa pengecekan company). |
-| `/rest/pages` (admin) | `USAuth(), USLock()` | Hanya admin (grup ada, route belum terdaftar). |
+| `/rest/pages` (admin) | `USAuth(), USLock()` | Hanya admin (CRUD module/company/area). |
 | `/rest/agent` | `USBots()` | Worker otomasi (service account). |
 
-Daftar route terdaftar saat ini (`skeleton/pub`, `skeleton/app`, `skeleton/sys`):
+Daftar route terdaftar saat ini (`skeleton/pub`, `skeleton/app/app00`,
+`skeleton/app/app01`, `skeleton/app/app02`, `skeleton/sys`):
 
 | Method | Path | Handler | Middleware |
 |---|---|---|---|
 | GET | `/rest/guest/PUB00` | `pub.PUB00Company` | — |
 | POST | `/rest/guest/PUB00` | `pub.PUB00Login` | — |
-| DELETE | `/rest/pages/APP00` | `app.APP00Logout` | `USAuth()` |
-| GET | `/rest/pages/APP00/company` | `app.APP00Company` | `USAuth()` |
-| GET | `/rest/pages/APP00/module` | `app.APP00Module` | `USAuth()` |
+| DELETE | `/rest/pages/APP00` | `app00.APP00Logout` | `USAuth()` |
+| GET | `/rest/pages/APP00/company` | `app00.APP00Company` | `USAuth()` |
+| GET | `/rest/pages/APP00/module` | `app00.APP00Module` | `USAuth()` |
 | GET | `/rest/pages/SYS01/profile` | `sys.SYS01Profile` | `USAuth()` |
 | PUT | `/rest/pages/SYS02/password` | `sys.SYS02Password` | `USAuth()` |
 | GET | `/rest/pages/SYS03/history` | `sys.SYS03History` | `USAuth()` |
+| GET | `/rest/pages/APP01/modules` | `app01.APP01ModulesList` | `USAuth(), USLock()` |
+| POST | `/rest/pages/APP01/modules` | `app01.APP01ModulesCreate` | `USAuth(), USLock()` |
+| GET | `/rest/pages/APP01/modules/:id` | `app01.APP01ModulesGet` | `USAuth(), USLock()` |
+| PUT | `/rest/pages/APP01/modules/:id` | `app01.APP01ModulesUpdate` | `USAuth(), USLock()` |
+| DELETE | `/rest/pages/APP01/modules/:id` | `app01.APP01ModulesDelete` | `USAuth(), USLock()` |
+| GET | `/rest/pages/APP02/companies` | `app02.APP02CompaniesList` | `USAuth(), USLock()` |
+| POST | `/rest/pages/APP02/companies` | `app02.APP02CompaniesCreate` | `USAuth(), USLock()` |
+| GET | `/rest/pages/APP02/companies/:id` | `app02.APP02CompaniesGet` | `USAuth(), USLock()` |
+| PUT | `/rest/pages/APP02/companies/:id` | `app02.APP02CompaniesUpdate` | `USAuth(), USLock()` |
+| DELETE | `/rest/pages/APP02/companies/:id` | `app02.APP02CompaniesDelete` | `USAuth(), USLock()` |
+| GET | `/rest/pages/APP02/companies/:id/modules` | `app02.APP02CompaniesModulesList` | `USAuth(), USLock()` |
+| POST | `/rest/pages/APP02/companies/:id/modules` | `app02.APP02CompaniesModulesCreate` | `USAuth(), USLock()` |
+| PUT | `/rest/pages/APP02/companies/:id/modules/:uid` | `app02.APP02CompaniesModulesUpdate` | `USAuth(), USLock()` |
+| DELETE | `/rest/pages/APP02/companies/:id/modules/:uid` | `app02.APP02CompaniesModulesDelete` | `USAuth(), USLock()` |
+| GET | `/rest/pages/APP02/companies/:id/areas` | `app02.APP02CompaniesAreasList` | `USAuth(), USLock()` |
+| POST | `/rest/pages/APP02/companies/:id/areas` | `app02.APP02CompaniesAreasCreate` | `USAuth(), USLock()` |
+| PUT | `/rest/pages/APP02/companies/:id/areas/:uid` | `app02.APP02CompaniesAreasUpdate` | `USAuth(), USLock()` |
+| DELETE | `/rest/pages/APP02/companies/:id/areas/:uid` | `app02.APP02CompaniesAreasDelete` | `USAuth(), USLock()` |
 
 Endpoint status/placeholder: `/`, `/rest`, `/hook`, `/rest/guest/`,
 `/rest/agent/` (balasan `message` saja).
@@ -126,7 +150,44 @@ Contoh kombinasi yang sudah digunakan di frontend:
 /proxy/guest/PUB00 →  /rest/guest/PUB00        (login, list company)
 /proxy/pages/...   →  /rest/pages/APP00/...    (profil/modul/company)
 /proxy/pages/...   →  /rest/pages/SYS01..03/.. (profil, password, history)
+/proxy/pages/...   →  /rest/pages/APP01/...    (CRUD module, admin)
+/proxy/pages/...   →  /rest/pages/APP02/...    (company + module/area, admin)
 ```
+
+Contoh command (curl) untuk APP01 — butuh token admin (login dulu):
+
+```bash
+# 1. Login → simpan token
+TOKEN=$(curl -s -X POST http://localhost:37772/rest/guest/PUB00 \
+  -H "Content-Type: application/json" \
+  --data-binary '{"company_id":"","username":"root","password":"AD_PASS"}' \
+  | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>console.log(JSON.parse(d).data.token))')
+
+# 2. List module (grid) — tanpa auth akan 401
+curl -s "http://localhost:37772/rest/pages/APP01/modules?page=1&page_size=10" \
+  -H "Authorization: Bearer $TOKEN"
+
+# 3. Detail module
+curl -s http://localhost:37772/rest/pages/APP01/modules/<id> \
+  -H "Authorization: Bearer $TOKEN"
+
+# 4. Tambah module
+curl -s -X POST http://localhost:37772/rest/pages/APP01/modules \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  --data-binary '{"code":"APP02","name":"Module Baru","path":"/board/pages/APP/APP02","is_page":true,"is_active":true}'
+
+# 5. Ubah module (partial update)
+curl -s -X PUT http://localhost:37772/rest/pages/APP01/modules/<id> \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  --data-binary '{"name":"Module Diubah"}'
+
+# 6. Hapus module
+curl -s -X DELETE http://localhost:37772/rest/pages/APP01/modules/<id> \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+> `Bearer $TOKEN` memakai `Authorization`; untuk akses langsung via browser
+> CORS mengharuskan origin `localhost:37771`/`172.99.77.1:37771`.
 
 ## 5. Format Response & Error
 

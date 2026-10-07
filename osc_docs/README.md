@@ -25,6 +25,7 @@ osc_docs/
 ├── backend/           # dokumen teknis osc_rest
 ├── database/          # dokumen teknis osc_base
 ├── development/       # panduan pengembangan (run, konvensi)
+├── testing/           # unit test Python (backend API + logika frontend)
 ├── config/            # rahasia & konfigurasi sensitif (dilindungi)
 └── media/             # aset gambar/logo
 ```
@@ -38,3 +39,4 @@ osc_docs/
 | Memahami auth & error API | [development/conventions.md](development/conventions.md) |
 | Menambah model database | [database/README.md](database/README.md) |
 | Menambah endpoint backend | [backend/README.md](backend/README.md) |
+| Menjalankan unit test | [development/run.md](development/run.md#6-unit-test-python--osc_docs-testing)

@@ -78,7 +78,38 @@ kontrol akses berbasis modul/area, sesi/token aman, dan audit trail.
 - Indeks: `user_id, revoked_at`, `token_type`, `refresh_expires_at`.
 - `onDelete: Cascade` dari `app_user`.
 
+### 2.12 `app_signature_type` — Jenis Tanda Tangan
+
+- `code` unik; induk dari `steps` (alur) dan `forms` (dokumen/form yang diproses).
+
+### 2.13 `app_approval_step` — Langkah Persetujuan per Jenis
+
+- `@@unique([type_id, step])` — urutan `step` unik per `app_signature_type`.
+- `condition` default `ANY_APPROVED` (aturan untuk lolos langkah).
+- `onDelete: Cascade` dari `app_signature_type`.
+
+### 2.14 `app_approval_sign` — Penanda Antrean Persetujuan (Signer per Step)
+
+- `@@unique([step_id, user_id])` — satu user hanya satu baris per step.
+- `onDelete: Cascade` dari `app_approval_step`.
+
+### 2.15 `app_signature_form` — Pengajuan Tanda Tangan (Form)
+
+- `@@unique([request_id, step])` — satu form hanya satu baris per step.
+- `status` default `PENDING`; `condition` default `ANY_APPROVED`.
+- Indeks `signature_type_id`; relasi opsional ke `app_signature_type`.
+
+### 2.16 `app_signature_flag` — Tanda/Sikap Signer dalam Form
+
+- `@@unique([form_id, user_id])`; `status` default `PENDING`.
+- `comment` opsional; `onDelete: Cascade` dari `app_signature_form`.
+
 ## 3. Relasi Inti
+
+```text
+app_signature_type (1) ──► (N) app_approval_step ──► (N) app_approval_sign ──► app_user
+      └──► app_signature_form ──► app_signature_flag ──► app_user
+```
 
 ```text
 app_company (1) ──► (N) app_company_area
@@ -104,8 +135,8 @@ app_user ──► app_user_session · app_user_token · app_user_action (audit)
 
 ## 5. Konvensi Tambahan
 
-- Prefix: `app_`; seluruh model memiliki kolom audit default
-  (`created_at/updated_at/created_by/updated_by`).
+- Prefix: `app_`; model menyimpan `created_at`/`updated_at`
+  (tanpa `created_by`/`updated_by`).
 - Cookie sesi frontend `OmniSightMemory` menyimpan token dari tabel ini;
   backend membaca token via `app_user_token` di middleware `USLoad/USAuth`.
 - Cluster baru jangan memakai prefix `app_` (ganti `net_`, `obs_`, dst.) — lihat

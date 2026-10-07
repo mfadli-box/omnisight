@@ -56,9 +56,9 @@ const staticAppItem: NavMainParentItem = {
   title: "Application",
   icon: AppWindow,
   subItems: [
-    { id: "APP01", title: "User", url: "/board/pages/APP/APP01", newTab: false },
+    { id: "APP01", title: "Module", url: "/board/pages/APP/APP01", newTab: false },
     { id: "APP02", title: "Company", url: "/board/pages/APP/APP02", newTab: false },
-    { id: "APP03", title: "Module", url: "/board/pages/APP/APP03", newTab: false },
+    { id: "APP03", title: "User", url: "/board/pages/APP/APP03", newTab: false },
     { id: "APP04", title: "Signature", url: "/board/pages/APP/APP04", newTab: false },
     { id: "APP05", title: "Session", url: "/board/pages/APP/APP05", newTab: false },
   ],
