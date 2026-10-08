@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"osc_rest/mechanic"
+	"osc_rest/skeleton/app/applink"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -84,8 +85,13 @@ func companyGet(ctx context.Context, db *pgxpool.Pool, id string) (CompanyRespon
 }
 
 func companyCreate(ctx context.Context, db *pgxpool.Pool, in CompanyCreate) (CompanyResponse, error) {
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return CompanyResponse{}, err
+	}
+	defer tx.Rollback(ctx)
 	var id string
-	err := db.QueryRow(ctx, `
+	err = tx.QueryRow(ctx, `
 		INSERT INTO app_company (
 			id, code, name, vat_id, reg_no, tax_office, address, valuta, hris_link, is_active
 		) VALUES (
@@ -94,6 +100,15 @@ func companyCreate(ctx context.Context, db *pgxpool.Pool, in CompanyCreate) (Com
 		in.Code, in.Name, in.VatID, in.RegNo, in.TaxOffice, in.Address, in.Valuta, in.HrisLink,
 		in.IsActive).Scan(&id)
 	if err != nil {
+		return CompanyResponse{}, err
+	}
+	if err := applink.SyncCompanyModulesForCompany(ctx, tx, id); err != nil {
+		return CompanyResponse{}, err
+	}
+	if err := applink.SyncUserCompaniesForCompany(ctx, tx, id); err != nil {
+		return CompanyResponse{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
 		return CompanyResponse{}, err
 	}
 	return companyGet(ctx, db, id)
@@ -166,8 +181,26 @@ func companyUpdate(ctx context.Context, db *pgxpool.Pool, id string, in CompanyU
 }
 
 func companyDelete(ctx context.Context, db *pgxpool.Pool, id string) error {
-	_, err := db.Exec(ctx, "DELETE FROM app_company WHERE id = $1", id)
-	return err
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, `
+		DELETE FROM app_user_privilege
+		WHERE user_company_id IN (SELECT id FROM app_user_company WHERE company_id = $1)`, id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, "DELETE FROM app_user_company WHERE company_id = $1", id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, "DELETE FROM app_company_module WHERE company_id = $1", id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, "DELETE FROM app_company WHERE id = $1", id); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 func companyModuleList(ctx context.Context, db *pgxpool.Pool, companyID string) ([]CompanyModuleResponse, error) {

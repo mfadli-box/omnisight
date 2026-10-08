@@ -54,8 +54,20 @@ class BackendApiTest(unittest.TestCase):
         cls.env = _read_env([ROOT / "osc_base/.env", ROOT / "osc_rest/.env"])
         cls.password = os.environ.get("OSC_TEST_PASS") or cls.env.get("AD_PASS") or cls.env.get("PG_PASS")
         cls.company_id = os.environ.get("OSC_TEST_COMPANY", "")
+        cls.username = os.environ.get("OSC_TEST_USER", USERNAME)
         if not cls.password:
             raise unittest.SkipTest("password login tidak tersedia di env")
+        if not cls.company_id:
+            try:
+                with urllib.request.urlopen(f"{BACKEND_URL}/rest/guest/PUB00", timeout=4) as r:
+                    public = json.loads(r.read() or "null")
+                companies = public.get("data") or []
+                if companies:
+                    cls.company_id = companies[0].get("company_id", "")
+            except Exception:
+                pass
+        if not cls.company_id:
+            raise unittest.SkipTest("company_id tidak tersedia (set OSC_TEST_COMPANY)")
 
         cls.token = None
 

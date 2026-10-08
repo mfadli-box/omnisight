@@ -98,12 +98,14 @@ export function deleteCompanyArea(companyId: string, uid: string) {
 }
 
 export async function fetchModuleOptions() {
-  const res = await clientApi<{ data: { Rows: Array<{ id: string; code: string; name: string }> } }>(
+  const res = await clientApi<{ data: { Rows: Array<{ id: string; code: string; name: string; parent_id?: string | null }> } }>(
     "/APP01/modules",
     { params: { page: "1", page_size: "500", sort: "code", order: "asc" } },
   );
-  return (res.data?.Rows ?? []).map((m) => ({
-    id: m.id,
-    name: `${m.code} - ${m.name}`,
-  }));
+  return (res.data?.Rows ?? [])
+    .filter((m) => Boolean(m.parent_id))
+    .map((m) => ({
+      id: m.id,
+      name: `${m.code} - ${m.name}`,
+    }));
 }

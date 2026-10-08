@@ -12,7 +12,7 @@ Backend (`osc_rest`) membagi route menjadi area berdasarkan kebutuhan otentikasi
 |---|---|---|
 | `/rest/guest` | — | Publik: login `PUB00`, daftar company |
 | `/rest/pages` | `USAuth()` / `USLoad()` | Halaman terautentikasi |
-| `/rest/pages/*` (admin) | `USAuth(), USLock()` | Hanya admin (CRUD `APP01/modules`, `APP02/companies` & turunannya) |
+| `/rest/pages/*` (admin) | `USAuth(), USLock()` | Hanya admin (CRUD `APP01/modules`, `APP02/companies`, `APP03/users`, `APP04/signature`) |
 | `/rest/agent` | `USBots()` | Worker/robot (service account) |
 | `/rest/hook` | (rencana) | Webhook |
 

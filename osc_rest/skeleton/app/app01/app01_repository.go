@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"osc_rest/mechanic"
+	"osc_rest/skeleton/app/applink"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -85,8 +86,13 @@ func moduleGet(ctx context.Context, db *pgxpool.Pool, id string) (ModuleResponse
 }
 
 func moduleCreate(ctx context.Context, db *pgxpool.Pool, in ModuleCreate) (ModuleResponse, error) {
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return ModuleResponse{}, err
+	}
+	defer tx.Rollback(ctx)
 	var id string
-	err := db.QueryRow(ctx, `
+	err = tx.QueryRow(ctx, `
 		INSERT INTO app_module (
 			id, parent_id, code, name, path, is_page, is_active
 		) VALUES (
@@ -94,6 +100,15 @@ func moduleCreate(ctx context.Context, db *pgxpool.Pool, in ModuleCreate) (Modul
 		) RETURNING id`,
 		in.ParentID, in.Code, in.Name, in.Path, in.IsPage, in.IsActive).Scan(&id)
 	if err != nil {
+		return ModuleResponse{}, err
+	}
+	if err := applink.SyncCompanyModulesForModule(ctx, tx, id); err != nil {
+		return ModuleResponse{}, err
+	}
+	if err := applink.SyncPrivilegesForModule(ctx, tx, id); err != nil {
+		return ModuleResponse{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
 		return ModuleResponse{}, err
 	}
 	return moduleGet(ctx, db, id)
@@ -151,6 +166,19 @@ func moduleUpdate(ctx context.Context, db *pgxpool.Pool, id string, in ModuleUpd
 }
 
 func moduleDelete(ctx context.Context, db *pgxpool.Pool, id string) error {
-	_, err := db.Exec(ctx, "DELETE FROM app_module WHERE id = $1", id)
-	return err
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, "DELETE FROM app_user_privilege WHERE module_id = $1", id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, "DELETE FROM app_company_module WHERE module_id = $1", id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, "DELETE FROM app_module WHERE id = $1", id); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }

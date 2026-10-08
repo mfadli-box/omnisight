@@ -7,6 +7,9 @@ import (
 	app00 "osc_rest/skeleton/app/app00"
 	app01 "osc_rest/skeleton/app/app01"
 	app02 "osc_rest/skeleton/app/app02"
+	app03 "osc_rest/skeleton/app/app03"
+	app04 "osc_rest/skeleton/app/app04"
+	app05 "osc_rest/skeleton/app/app05"
 	"osc_rest/skeleton/pub"
 	"osc_rest/skeleton/sys"
 
@@ -49,6 +52,9 @@ func SetRouter() *gin.Engine {
 	app00.Use(PgSQL)
 	app01.Use(PgSQL)
 	app02.Use(PgSQL)
+	app03.Use(PgSQL)
+	app04.Use(PgSQL)
+	app05.Use(PgSQL)
 	sys.Use(PgSQL)
 
 	agent := rest.Group("/rest/agent")
@@ -84,6 +90,59 @@ func SetRouter() *gin.Engine {
 	admin.POST("/APP02/companies/:id/areas", app02.APP02CompaniesAreasCreate)
 	admin.PUT("/APP02/companies/:id/areas/:uid", app02.APP02CompaniesAreasUpdate)
 	admin.DELETE("/APP02/companies/:id/areas/:uid", app02.APP02CompaniesAreasDelete)
+
+	admin.GET("/APP03/users", app03.APP03UsersList)
+	admin.POST("/APP03/users", app03.APP03UsersCreate)
+	admin.GET("/APP03/users/:id", app03.APP03UsersGet)
+	admin.PUT("/APP03/users/:id", app03.APP03UsersUpdate)
+	admin.DELETE("/APP03/users/:id", app03.APP03UsersDelete)
+	admin.GET("/APP03/users/:id/companies", app03.APP03UsersCompaniesList)
+	admin.POST("/APP03/users/:id/companies", app03.APP03UsersCompaniesCreate)
+	admin.PUT("/APP03/users/:id/companies/:uid", app03.APP03UsersCompaniesUpdate)
+	admin.DELETE("/APP03/users/:id/companies/:uid", app03.APP03UsersCompaniesDelete)
+	admin.GET("/APP03/users/:id/companies/:uid/privileges", app03.APP03UsersCompaniesPrivilegesList)
+	admin.POST("/APP03/users/:id/companies/:uid/privileges", app03.APP03UsersCompaniesPrivilegesCreate)
+	admin.PUT("/APP03/users/:id/companies/:uid/privileges/:pid", app03.APP03UsersCompaniesPrivilegesUpdate)
+	admin.DELETE("/APP03/users/:id/companies/:uid/privileges/:pid", app03.APP03UsersCompaniesPrivilegesDelete)
+	admin.GET("/APP03/users/:id/areas", app03.APP03UsersAreasList)
+	admin.POST("/APP03/users/:id/areas", app03.APP03UsersAreasCreate)
+	admin.PUT("/APP03/users/:id/areas/:uid", app03.APP03UsersAreasUpdate)
+	admin.DELETE("/APP03/users/:id/areas/:uid", app03.APP03UsersAreasDelete)
+
+	admin.GET("/APP04/types", app04.APP04TypesList)
+	admin.POST("/APP04/types", app04.APP04TypesCreate)
+	admin.GET("/APP04/types/:id", app04.APP04TypesGet)
+	admin.PUT("/APP04/types/:id", app04.APP04TypesUpdate)
+	admin.DELETE("/APP04/types/:id", app04.APP04TypesDelete)
+	admin.GET("/APP04/types/:id/steps", app04.APP04TypesStepsList)
+	admin.POST("/APP04/types/:id/steps", app04.APP04TypesStepsCreate)
+	admin.GET("/APP04/types/:id/steps/:sid", app04.APP04TypesStepsGet)
+	admin.PUT("/APP04/types/:id/steps/:sid", app04.APP04TypesStepsUpdate)
+	admin.DELETE("/APP04/types/:id/steps/:sid", app04.APP04TypesStepsDelete)
+	admin.GET("/APP04/types/:id/steps/:sid/signers", app04.APP04TypesStepsSignersList)
+	admin.POST("/APP04/types/:id/steps/:sid/signers", app04.APP04TypesStepsSignersCreate)
+	admin.PUT("/APP04/types/:id/steps/:sid/signers/:uid", app04.APP04TypesStepsSignersUpdate)
+	admin.DELETE("/APP04/types/:id/steps/:sid/signers/:uid", app04.APP04TypesStepsSignersDelete)
+	admin.GET("/APP04/forms", app04.APP04FormsList)
+	admin.POST("/APP04/forms", app04.APP04FormsCreate)
+	admin.GET("/APP04/forms/:id", app04.APP04FormsGet)
+	admin.PUT("/APP04/forms/:id", app04.APP04FormsUpdate)
+	admin.DELETE("/APP04/forms/:id", app04.APP04FormsDelete)
+	admin.GET("/APP04/forms/:id/flags", app04.APP04FormsFlagsList)
+	admin.POST("/APP04/forms/:id/flags", app04.APP04FormsFlagsCreate)
+	admin.PUT("/APP04/forms/:id/flags/:uid", app04.APP04FormsFlagsUpdate)
+	admin.DELETE("/APP04/forms/:id/flags/:uid", app04.APP04FormsFlagsDelete)
+
+	admin.GET("/APP05/sessions", app05.APP05SessionsList)
+	admin.POST("/APP05/sessions", app05.APP05SessionsCreate)
+	admin.GET("/APP05/sessions/:id", app05.APP05SessionsGet)
+	admin.PUT("/APP05/sessions/:id", app05.APP05SessionsUpdate)
+	admin.DELETE("/APP05/sessions/:id", app05.APP05SessionsDelete)
+	admin.GET("/APP05/tokens", app05.APP05TokensList)
+	admin.POST("/APP05/tokens", app05.APP05TokensCreate)
+	admin.GET("/APP05/tokens/:id", app05.APP05TokensGet)
+	admin.PUT("/APP05/tokens/:id", app05.APP05TokensUpdate)
+	admin.DELETE("/APP05/tokens/:id", app05.APP05TokensDelete)
 
 	return rest
 }

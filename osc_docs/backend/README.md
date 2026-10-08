@@ -35,6 +35,10 @@ osc_rest/
 │   ├── app/app00/…        # APP00: logout, company user, pohon modul
 │   ├── app/app01/…        # APP01: CRUD module (admin)
 │   ├── app/app02/…        # APP02: CRUD company + module per company + area (admin)
+│   ├── app/app03/…        # APP03: CRUD user + company & privilege & area per user (admin)
+│   ├── app/app04/…        # APP04: CRUD signature type + step/signer & form/flag (admin)
+│   ├── app/app05/…        # APP05: CRUD sesi login & token otentikasi (admin)
+│   ├── app/applink/…      # sinkronisasi otomatis tautan admin (company_module/user_company/user_privilege)
 │   └── sys/sys00_*.go    # SYS01–SYS03: profil, ganti password, riwayat login
 ├── mechanic/             # helper & paket utilitas
 │   ├── helper.go         # AppError, respon error JSON, pagination, filter
@@ -47,7 +51,8 @@ osc_rest/
 ### Pola `skeleton/` (layering)
 
 Setiap modul `XYZnn` mengikuti empat file di sebuah package `skeleton/<area>/`
-(`pub/pub00_*`, `app/app00/*`, `app/app01/*`, `app/app02/*`, `sys/sys00_*`):
+(`pub/pub00_*`, `app/app00/*`, `app/app01/*`, `app/app02/*`, `app/app03/*`,
+`app/app04/*`, `app/app05/*`, `sys/sys00_*`):
 
 | File | Peran |
 |---|---|
@@ -56,9 +61,10 @@ Setiap modul `XYZnn` mengikuti empat file di sebuah package `skeleton/<area>/`
 | `xyz00_usecase.go` | Logika bisnis & validasi; export `Use(pool)` untuk inject pool |
 | `xyz00_handler.go` | HTTP handler Gin; format error via `mechanic` |
 
-Inject pool di `routes.go` (package `app00`/`app01`/`app02` di-alias saat import):
-`pub.Use(PgSQL)`, `app00.Use(PgSQL)`, `app01.Use(PgSQL)`, `app02.Use(PgSQL)`,
-`sys.Use(PgSQL)`.
+Inject pool di `routes.go` (package `app00`..`app05` di-alias saat
+import): `pub.Use(PgSQL)`, `app00.Use(PgSQL)`, `app01.Use(PgSQL)`,
+`app02.Use(PgSQL)`, `app03.Use(PgSQL)`, `app04.Use(PgSQL)`,
+`app05.Use(PgSQL)`, `sys.Use(PgSQL)`.
 
 ## 3. Middleware Otentikasi & Otorisasi
 
@@ -100,11 +106,12 @@ Didefinisikan di `backbone/routes.go`. Middleware global: `RequestID()`,
 | `/rest/guest` | — | Endpoint publik (login, info company). |
 | `/rest/pages` (root) | `USLoad()` | Halaman terautentikasi (company wajib sudah dipilih). |
 | `/rest/pages` (auths) | `USAuth()` | Data user sendiri (tanpa pengecekan company). |
-| `/rest/pages` (admin) | `USAuth(), USLock()` | Hanya admin (CRUD module/company/area). |
+| `/rest/pages` (admin) | `USAuth(), USLock()` | Hanya admin (CRUD module/company/user). |
 | `/rest/agent` | `USBots()` | Worker otomasi (service account). |
 
 Daftar route terdaftar saat ini (`skeleton/pub`, `skeleton/app/app00`,
-`skeleton/app/app01`, `skeleton/app/app02`, `skeleton/sys`):
+`skeleton/app/app01`, `skeleton/app/app02`, `skeleton/app/app03`,
+`skeleton/app/app04`, `skeleton/sys`):
 
 | Method | Path | Handler | Middleware |
 |---|---|---|---|
@@ -134,6 +141,84 @@ Daftar route terdaftar saat ini (`skeleton/pub`, `skeleton/app/app00`,
 | POST | `/rest/pages/APP02/companies/:id/areas` | `app02.APP02CompaniesAreasCreate` | `USAuth(), USLock()` |
 | PUT | `/rest/pages/APP02/companies/:id/areas/:uid` | `app02.APP02CompaniesAreasUpdate` | `USAuth(), USLock()` |
 | DELETE | `/rest/pages/APP02/companies/:id/areas/:uid` | `app02.APP02CompaniesAreasDelete` | `USAuth(), USLock()` |
+| GET | `/rest/pages/APP03/users` | `app03.APP03UsersList` | `USAuth(), USLock()` |
+| POST | `/rest/pages/APP03/users` | `app03.APP03UsersCreate` | `USAuth(), USLock()` |
+| GET | `/rest/pages/APP03/users/:id` | `app03.APP03UsersGet` | `USAuth(), USLock()` |
+| PUT | `/rest/pages/APP03/users/:id` | `app03.APP03UsersUpdate` | `USAuth(), USLock()` |
+| DELETE | `/rest/pages/APP03/users/:id` | `app03.APP03UsersDelete` | `USAuth(), USLock()` |
+| GET | `/rest/pages/APP03/users/:id/companies` | `app03.APP03UsersCompaniesList` | `USAuth(), USLock()` |
+| POST | `/rest/pages/APP03/users/:id/companies` | `app03.APP03UsersCompaniesCreate` | `USAuth(), USLock()` |
+| PUT | `/rest/pages/APP03/users/:id/companies/:uid` | `app03.APP03UsersCompaniesUpdate` | `USAuth(), USLock()` |
+| DELETE | `/rest/pages/APP03/users/:id/companies/:uid` | `app03.APP03UsersCompaniesDelete` | `USAuth(), USLock()` |
+| GET | `/rest/pages/APP03/users/:id/companies/:uid/privileges` | `app03.APP03UsersCompaniesPrivilegesList` | `USAuth(), USLock()` |
+| POST | `/rest/pages/APP03/users/:id/companies/:uid/privileges` | `app03.APP03UsersCompaniesPrivilegesCreate` | `USAuth(), USLock()` |
+| PUT | `/rest/pages/APP03/users/:id/companies/:uid/privileges/:pid` | `app03.APP03UsersCompaniesPrivilegesUpdate` | `USAuth(), USLock()` |
+| DELETE | `/rest/pages/APP03/users/:id/companies/:uid/privileges/:pid` | `app03.APP03UsersCompaniesPrivilegesDelete` | `USAuth(), USLock()` |
+| GET | `/rest/pages/APP03/users/:id/areas` | `app03.APP03UsersAreasList` | `USAuth(), USLock()` |
+| POST | `/rest/pages/APP03/users/:id/areas` | `app03.APP03UsersAreasCreate` | `USAuth(), USLock()` |
+| PUT | `/rest/pages/APP03/users/:id/areas/:uid` | `app03.APP03UsersAreasUpdate` | `USAuth(), USLock()` |
+| DELETE | `/rest/pages/APP03/users/:id/areas/:uid` | `app03.APP03UsersAreasDelete` | `USAuth(), USLock()` |
+
+### Sinkronisasi otomatis tautan admin (`applink`)
+
+Package `osc_rest/skeleton/app/applink` membuat baris tautan otomatis
+(default non-aktif / HIDE) di dalam transaksi `Create` yang sama:
+
+| Saat insert | Otomatis dibuat |
+| --- | --- |
+| `app_company` | `app_company_module` (semua module) + `app_user_company` (semua user) |
+| `app_module` | `app_company_module` (semua company) + `app_user_privilege` (semua user-company) |
+| `app_user` | `app_user_company` (semua company) |
+| `app_user_company` | `app_user_privilege` (semua module) |
+
+`app_company_module.is_active` & `app_user_company.is_active` = `false`;
+`app_user_privilege.level` = `HIDE`. Semua memakai
+`INSERT ... SELECT ... ON CONFLICT DO NOTHING` (idempoten). Karena setiap
+entitas kini punya baris anak, `DELETE` pada module/company/user/user-company
+ikut menghapus baris tautan & privilege terkait dalam satu transaksi.
+| GET | `/rest/pages/APP04/types` | `app04.APP04TypesList` | `USAuth(), USLock()` |
+| POST | `/rest/pages/APP04/types` | `app04.APP04TypesCreate` | `USAuth(), USLock()` |
+| GET | `/rest/pages/APP04/types/:id` | `app04.APP04TypesGet` | `USAuth(), USLock()` |
+| PUT | `/rest/pages/APP04/types/:id` | `app04.APP04TypesUpdate` | `USAuth(), USLock()` |
+| DELETE | `/rest/pages/APP04/types/:id` | `app04.APP04TypesDelete` | `USAuth(), USLock()` |
+| GET | `/rest/pages/APP04/types/:id/steps` | `app04.APP04TypesStepsList` | `USAuth(), USLock()` |
+| POST | `/rest/pages/APP04/types/:id/steps` | `app04.APP04TypesStepsCreate` | `USAuth(), USLock()` |
+| GET | `/rest/pages/APP04/types/:id/steps/:sid` | `app04.APP04TypesStepsGet` | `USAuth(), USLock()` |
+| PUT | `/rest/pages/APP04/types/:id/steps/:sid` | `app04.APP04TypesStepsUpdate` | `USAuth(), USLock()` |
+| DELETE | `/rest/pages/APP04/types/:id/steps/:sid` | `app04.APP04TypesStepsDelete` | `USAuth(), USLock()` |
+| GET | `/rest/pages/APP04/types/:id/steps/:sid/signers` | `app04.APP04TypesStepsSignersList` | `USAuth(), USLock()` |
+| POST | `/rest/pages/APP04/types/:id/steps/:sid/signers` | `app04.APP04TypesStepsSignersCreate` | `USAuth(), USLock()` |
+| PUT | `/rest/pages/APP04/types/:id/steps/:sid/signers/:uid` | `app04.APP04TypesStepsSignersUpdate` | `USAuth(), USLock()` |
+| DELETE | `/rest/pages/APP04/types/:id/steps/:sid/signers/:uid` | `app04.APP04TypesStepsSignersDelete` | `USAuth(), USLock()` |
+| GET | `/rest/pages/APP04/forms` | `app04.APP04FormsList` | `USAuth(), USLock()` |
+| POST | `/rest/pages/APP04/forms` | `app04.APP04FormsCreate` | `USAuth(), USLock()` |
+| GET | `/rest/pages/APP04/forms/:id` | `app04.APP04FormsGet` | `USAuth(), USLock()` |
+| PUT | `/rest/pages/APP04/forms/:id` | `app04.APP04FormsUpdate` | `USAuth(), USLock()` |
+| DELETE | `/rest/pages/APP04/forms/:id` | `app04.APP04FormsDelete` | `USAuth(), USLock()` |
+| GET | `/rest/pages/APP04/forms/:id/flags` | `app04.APP04FormsFlagsList` | `USAuth(), USLock()` |
+| POST | `/rest/pages/APP04/forms/:id/flags` | `app04.APP04FormsFlagsCreate` | `USAuth(), USLock()` |
+| PUT | `/rest/pages/APP04/forms/:id/flags/:uid` | `app04.APP04FormsFlagsUpdate` | `USAuth(), USLock()` |
+| DELETE | `/rest/pages/APP04/forms/:id/flags/:uid` | `app04.APP04FormsFlagsDelete` | `USAuth(), USLock()` |
+
+### APP05 — Session (admin)
+
+| Method | Path | Handler | Middleware |
+|---|---|---|---|
+| GET | `/rest/pages/APP05/sessions` | `app05.APP05SessionsList` | `USAuth(), USLock()` |
+| POST | `/rest/pages/APP05/sessions` | `app05.APP05SessionsCreate` | `USAuth(), USLock()` |
+| GET | `/rest/pages/APP05/sessions/:id` | `app05.APP05SessionsGet` | `USAuth(), USLock()` |
+| PUT | `/rest/pages/APP05/sessions/:id` | `app05.APP05SessionsUpdate` | `USAuth(), USLock()` |
+| DELETE | `/rest/pages/APP05/sessions/:id` | `app05.APP05SessionsDelete` | `USAuth(), USLock()` |
+| GET | `/rest/pages/APP05/tokens` | `app05.APP05TokensList` | `USAuth(), USLock()` |
+| POST | `/rest/pages/APP05/tokens` | `app05.APP05TokensCreate` | `USAuth(), USLock()` |
+| GET | `/rest/pages/APP05/tokens/:id` | `app05.APP05TokensGet` | `USAuth(), USLock()` |
+| PUT | `/rest/pages/APP05/tokens/:id` | `app05.APP05TokensUpdate` | `USAuth(), USLock()` |
+| DELETE | `/rest/pages/APP05/tokens/:id` | `app05.APP05TokensDelete` | `USAuth(), USLock()` |
+
+> `app_user_session` tidak punya FK ke `app_user` (JOIN kiri untuk username);
+> `app_user_token` punya FK `onDelete: Cascade`. Update token menerima
+> `revoke: true/false` untuk mengisi/mengosongkan `revoked_at`; update sesi
+> menerima `end: true` untuk `status='ENDED'` + `ended_at=now()`.
 
 Endpoint status/placeholder: `/`, `/rest`, `/hook`, `/rest/guest/`,
 `/rest/agent/` (balasan `message` saja).
@@ -152,6 +237,9 @@ Contoh kombinasi yang sudah digunakan di frontend:
 /proxy/pages/...   →  /rest/pages/SYS01..03/.. (profil, password, history)
 /proxy/pages/...   →  /rest/pages/APP01/...    (CRUD module, admin)
 /proxy/pages/...   →  /rest/pages/APP02/...    (company + module/area, admin)
+/proxy/pages/...   →  /rest/pages/APP03/...    (user + company/privilege/area, admin)
+/proxy/pages/...   →  /rest/pages/APP04/...    (signature type + step/signer & form/flag, admin)
+/proxy/pages/...   →  /rest/pages/APP05/...    (sesi login + token otentikasi, admin)
 ```
 
 Contoh command (curl) untuk APP01 — butuh token admin (login dulu):

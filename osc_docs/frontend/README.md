@@ -34,7 +34,10 @@ osc_site/
 │   │   │   ├── pages/        # halaman modul terpasang
 │   │   │   │   ├── APP/   # halaman application-admin
 │   │   │   │   │   ├── APP01/      # module admin (module-table + module-form)
-│   │   │   │   │   └── APP02/      # company admin (draft, folder kosong)
+│   │   │   │   │   ├── APP02/      # company admin (company-table + modules-tab + areas-tab)
+│   │   │   │   │   ├── APP03/      # user admin (user-table + companies-tab + privileges-tab + areas-tab)
+│   │   │   │   │   ├── APP04/      # signature admin (types-table + steps-tab + signers-tab + forms-table + flags-tab)
+│   │   │   │   │   └── APP05/      # session admin (sessions-table + session-form + tokens-table + token-form)
 │   │   │   │   └── SYS/   # halaman session-profile
 │   │   │   │       ├── SYS01/    # profil (profile-card)
 │   │   │   │       ├── SYS02/    # ganti password (password-form)

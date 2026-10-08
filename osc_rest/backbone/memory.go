@@ -251,9 +251,16 @@ func USLock() gin.HandlerFunc {
 }
 
 func USLogs(moduleCode string) gin.HandlerFunc {
+	var db = PgSQL
 	return func(c *gin.Context) {
 		c.Next()
 		if c.Writer.Status() >= http.StatusBadRequest {
+			return
+		}
+		action := strings.TrimSpace(c.Request.Method)
+		switch action {
+		case "POST", "PUT", "PATCH", "DELETE":
+		default:
 			return
 		}
 		userID := c.GetString("userId")
@@ -261,9 +268,8 @@ func USLogs(moduleCode string) gin.HandlerFunc {
 			return
 		}
 		companyID := c.GetString("companyId")
-		action := strings.TrimSpace(c.Request.Method)
-		if action == "" {
-			action = "ACTION"
+		if companyID == "" {
+			companyID = strings.TrimSpace(c.GetHeader("X-Company-ID"))
 		}
 		module := strings.TrimSpace(moduleCode)
 		path := strings.TrimSpace(c.Request.URL.Path)
@@ -275,7 +281,7 @@ func USLogs(moduleCode string) gin.HandlerFunc {
 				id, user_id, company_id, module_code, action, path, ip_address, user_agent, created_at
 			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
 		`
-		_, err := PgSQL.Exec(context.Background(), queryP,
+		_, err := db.Exec(context.Background(), queryP,
 			auditID,
 			userID,
 			companyID,
@@ -292,7 +298,7 @@ func USLogs(moduleCode string) gin.HandlerFunc {
 				id, user_id, company_id, module_code, action, path, created_at
 			) VALUES ($1, $2, $3, $4, $5, $6, NOW())
 		`
-		_, err = PgSQL.Exec(context.Background(), queryF,
+		_, err = db.Exec(context.Background(), queryF,
 			auditID,
 			userID,
 			companyID,
@@ -307,7 +313,7 @@ func USLogs(moduleCode string) gin.HandlerFunc {
 				user_id, action, path
 			) VALUES ($1, $2, $3)
 		`
-		if _, err = PgSQL.Exec(context.Background(), queryM,
+		if _, err = db.Exec(context.Background(), queryM,
 			userID,
 			action,
 			path); err != nil {
@@ -318,6 +324,11 @@ func USLogs(moduleCode string) gin.HandlerFunc {
 
 func USRole(moduleCode string, requiredLevel string) gin.HandlerFunc {
 	var db = PgSQL
+	rank := map[string]int{"HIDE": 0, "VIEW": 1, "BOOK": 2, "POST": 3}
+	requiredInt, known := rank[requiredLevel]
+	if !known {
+		requiredInt = rank["POST"]
+	}
 	return func(c *gin.Context) {
 		isAdmin, exists := c.Get("isAdmin")
 		if exists && isAdmin.(bool) {
@@ -326,6 +337,9 @@ func USRole(moduleCode string, requiredLevel string) gin.HandlerFunc {
 		}
 		userID := c.GetString("userId")
 		companyID := c.GetString("companyId")
+		if companyID == "" {
+			companyID = strings.TrimSpace(c.GetHeader("X-Company-ID"))
+		}
 		if userID == "" || companyID == "" {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
 				"code":       "FORBIDDEN",
@@ -356,43 +370,13 @@ func USRole(moduleCode string, requiredLevel string) gin.HandlerFunc {
 			return
 		}
 		level = strings.TrimSpace(level)
-		if level == "HIDE" || level == "" {
+		if rank[level] < requiredInt {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 				"code":       "UNAUTHORIZED",
-				"error":      "Access restricted",
+				"error":      "Insufficient privilege",
 				"request_id": c.GetString("request_id"),
 			})
 			return
-		}
-		if requiredLevel == "VIEW" {
-			if level != "VIEW" && level != "BOOK" && level != "POST" {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-					"code":       "UNAUTHORIZED",
-					"error":      "Insufficient privilege — view required",
-					"request_id": c.GetString("request_id"),
-				})
-				return
-			}
-		}
-		if requiredLevel == "BOOK" {
-			if level != "BOOK" && level != "POST" {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-					"code":       "UNAUTHORIZED",
-					"error":      "Insufficient privilege — book required",
-					"request_id": c.GetString("request_id"),
-				})
-				return
-			}
-		}
-		if requiredLevel == "POST" {
-			if level != "POST" {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-					"code":       "UNAUTHORIZED",
-					"error":      "Insufficient privilege — post required",
-					"request_id": c.GetString("request_id"),
-				})
-				return
-			}
 		}
 		c.Next()
 	}

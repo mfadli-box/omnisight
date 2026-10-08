@@ -20,16 +20,18 @@ export default function APP02Page() {
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <div className="flex flex-col gap-2 text-sm">
-          <span className="text-muted-foreground">Selected company:</span>
-          {selectedCompany ? (
-            <Badge variant="default" className="w-fit">
-              {selectedCompany.code} - {selectedCompany.name}
-            </Badge>
-          ) : (
-            <Badge variant="secondary" className="w-fit">
-              None - pick a row to manage modules/areas
-            </Badge>
-          )}
+          <span className="text-muted-foreground">
+            Selected company:{" "}
+            {selectedCompany ? (
+              <Badge variant="default" className="w-fit">
+                {selectedCompany.code} - {selectedCompany.name}
+              </Badge>
+            ) : (
+              <Badge variant="secondary" className="w-fit">
+                None - pick a row to manage modules/areas
+              </Badge>
+            )}
+          </span>
         </div>
         <Tabs value={tab} onValueChange={(v) => setTab(v)}>
           <TabsList variant="line">

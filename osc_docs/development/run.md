@@ -174,5 +174,8 @@ Catatan:
    `/rest/pages/SYS01/profile`, `/rest/pages/SYS03/history`, dan (admin)
    `/rest/pages/APP01/modules`.
 3. Frontend login → `/board` → sidebar memuat modul dari `/APP00/module`,
-   halaman SYS01–SYS03 memuat data; APP01 (admin) CRUD module bekerja.
+   halaman SYS01–SYS03 memuat data; APP01 (admin) CRUD module bekerja;
+   APP02 (admin) CRUD company + module/area bekerja; APP03 (admin) CRUD user +
+   company/privilege/area bekerja; APP04 (admin) CRUD signature type +
+   step/signer & form/flag bekerja.
 4. Unit test Python: `cd osc_docs/testing && python3 -m unittest discover -s . -v`.
