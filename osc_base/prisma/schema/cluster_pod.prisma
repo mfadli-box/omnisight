@@ -210,3 +210,123 @@ model pod_env_var {
 
   @@index([service_id])
 }
+
+model pod_registry {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  url        String
+  auth       String?  @default("NONE") // NONE | BASIC | TOKEN
+  username   String?
+  password_enc String? @db.Text
+  token_enc  String?  @db.Text
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model pod_build {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  repo_url   String?
+  dockerfile String?  @default("Dockerfile")
+  context    String?  @default(".")
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model pod_backup {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  kind       String   @default("STACK") // STACK | VOLUME | SYSTEM
+  target_id  String?
+  path       String?  @db.Text
+  size_bytes Int?
+  checksum   String?
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model pod_scan {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  target     String
+  status     String   @default("PENDING") // PENDING | RUNNING | DONE | FAILED
+  started_at DateTime?
+  finished_at DateTime?
+  report     String?  @db.Text
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  findings   pod_scan_finding[]
+
+  @@index([company_id])
+}
+
+model pod_scan_finding {
+  id          String   @id @default(uuid())
+  scan_id     String
+  cve         String?
+  severity    String   @default("UNKNOWN") // LOW | MEDIUM | HIGH | CRITICAL | UNKNOWN
+  package     String?
+  version     String?
+  fixed       String?
+  description String?  @db.Text
+  created_at  DateTime @default(now())
+
+  scan        pod_scan @relation(fields: [scan_id], references: [id], onDelete: Cascade)
+
+  @@index([scan_id])
+}
+
+model pod_template {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  code       String
+  name       String
+  content    String   @db.Text
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@unique([company_id, code])
+  @@index([company_id])
+}
+
+model pod_git_credential {
+  id           String   @id @default(uuid())
+  company_id   String   @default("")
+  name         String
+  auth_type    String   @default("HTTPS") // HTTPS | SSH
+  username     String?
+  password_enc String?  @db.Text
+  key_enc      String?  @db.Text
+  is_active    Boolean  @default(true)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model pod_git_sync {
+  id           String   @id @default(uuid())
+  stack_id     String?
+  company_id   String   @default("")
+  repo_url     String
+  branch       String   @default("main")
+  last_synced  DateTime?
+  status       String   @default("IDLE") // IDLE | SYNCING | ERROR
+  created_at   DateTime @default(now())
+  updated_at   DateTime @default(now())
+
+  @@index([company_id])
+}
