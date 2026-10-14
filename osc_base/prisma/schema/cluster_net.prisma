@@ -15,7 +15,7 @@ model net_subnet {
   created_at  DateTime @default(now())
   updated_at  DateTime @default(now())
 
-  devices     net_device[]
+  devices net_device[]
 
   @@unique([company_id, code])
   @@index([company_id])
@@ -41,8 +41,8 @@ model net_device {
   created_at  DateTime  @default(now())
   updated_at  DateTime  @default(now())
 
-  subnet      net_subnet?     @relation(fields: [subnet_id], references: [id])
-  interfaces  net_interface[]
+  subnet     net_subnet?     @relation(fields: [subnet_id], references: [id])
+  interfaces net_interface[]
 
   @@unique([company_id, code])
   @@index([company_id])
@@ -62,7 +62,7 @@ model net_interface {
   created_at  DateTime @default(now())
   updated_at  DateTime @default(now())
 
-  device      net_device @relation(fields: [device_id], references: [id], onDelete: Cascade)
+  device net_device @relation(fields: [device_id], references: [id], onDelete: Cascade)
 
   @@unique([device_id, name])
   @@index([device_id])

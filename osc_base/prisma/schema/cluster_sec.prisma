@@ -16,7 +16,7 @@ model sec_waf_rule {
   created_at DateTime @default(now())
   updated_at DateTime @default(now())
 
-  events     sec_waf_event[]
+  events sec_waf_event[]
 
   @@unique([company_id, code])
   @@index([company_id])
@@ -34,7 +34,7 @@ model sec_waf_event {
   occurred_at DateTime @default(now())
   created_at  DateTime @default(now())
 
-  rule        sec_waf_rule? @relation(fields: [rule_id], references: [id])
+  rule sec_waf_rule? @relation(fields: [rule_id], references: [id])
 
   @@index([company_id])
   @@index([rule_id])

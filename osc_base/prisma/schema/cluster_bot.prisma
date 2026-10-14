@@ -36,7 +36,7 @@ model bot_heartbeat {
   uptime_s   Int?
   created_at DateTime @default(now())
 
-  agent      bot_agent @relation(fields: [agent_id], references: [id], onDelete: Cascade)
+  agent bot_agent @relation(fields: [agent_id], references: [id], onDelete: Cascade)
 
   @@index([agent_id])
   @@index([created_at])
@@ -58,7 +58,7 @@ model bot_task {
   created_at   DateTime  @default(now())
   updated_at   DateTime  @default(now())
 
-  agent        bot_agent @relation(fields: [agent_id], references: [id], onDelete: Cascade)
+  agent bot_agent @relation(fields: [agent_id], references: [id], onDelete: Cascade)
 
   @@index([agent_id])
   @@index([status])

@@ -14,7 +14,7 @@ model dso_pipeline {
   created_at DateTime @default(now())
   updated_at DateTime @default(now())
 
-  builds     dso_build[]
+  builds dso_build[]
 
   @@unique([company_id, code])
   @@index([company_id])
@@ -34,8 +34,8 @@ model dso_build {
   created_at   DateTime  @default(now())
   updated_at   DateTime  @default(now())
 
-  pipeline     dso_pipeline @relation(fields: [pipeline_id], references: [id], onDelete: Cascade)
-  deploys      dso_deploy[]
+  pipeline dso_pipeline @relation(fields: [pipeline_id], references: [id], onDelete: Cascade)
+  deploys  dso_deploy[]
 
   @@unique([pipeline_id, number])
   @@index([pipeline_id])
@@ -53,7 +53,7 @@ model dso_deploy {
   created_at  DateTime  @default(now())
   updated_at  DateTime  @default(now())
 
-  build       dso_build @relation(fields: [build_id], references: [id], onDelete: Cascade)
+  build dso_build @relation(fields: [build_id], references: [id], onDelete: Cascade)
 
   @@index([build_id])
   @@index([environment])

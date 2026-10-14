@@ -12,7 +12,7 @@ model amm_asset_type {
   created_at DateTime @default(now())
   updated_at DateTime @default(now())
 
-  assets     amm_asset[]
+  assets amm_asset[]
 
   @@unique([company_id, code])
   @@index([company_id])
@@ -35,12 +35,12 @@ model amm_asset {
   created_at   DateTime @default(now())
   updated_at   DateTime @default(now())
 
-  type         amm_asset_type?     @relation(fields: [type_id], references: [id])
-  devices      amm_asset_device[]
-  signage      amm_digital_signage[]
-  accounts     amm_store_account[]
-  edcs         amm_store_edc[]
-  tags         amm_asset_tag[]
+  type     amm_asset_type?       @relation(fields: [type_id], references: [id])
+  devices  amm_asset_device[]
+  signage  amm_digital_signage[]
+  accounts amm_store_account[]
+  edcs     amm_store_edc[]
+  tags     amm_asset_tag[]
 
   @@unique([company_id, code])
   @@index([company_id])
@@ -54,7 +54,7 @@ model amm_asset_tag {
   tag        String
   created_at DateTime @default(now())
 
-  asset      amm_asset @relation(fields: [asset_id], references: [id], onDelete: Cascade)
+  asset amm_asset @relation(fields: [asset_id], references: [id], onDelete: Cascade)
 
   @@unique([asset_id, tag])
   @@index([asset_id])
@@ -74,7 +74,7 @@ model amm_asset_device {
   created_at    DateTime @default(now())
   updated_at    DateTime @default(now())
 
-  asset         amm_asset @relation(fields: [asset_id], references: [id], onDelete: Cascade)
+  asset amm_asset @relation(fields: [asset_id], references: [id], onDelete: Cascade)
 
   @@unique([asset_id, role])
   @@index([asset_id])
@@ -92,7 +92,7 @@ model amm_digital_signage {
   created_at  DateTime @default(now())
   updated_at  DateTime @default(now())
 
-  asset       amm_asset @relation(fields: [asset_id], references: [id], onDelete: Cascade)
+  asset amm_asset @relation(fields: [asset_id], references: [id], onDelete: Cascade)
 
   @@unique([asset_id, device_type, position])
   @@index([asset_id])
@@ -113,7 +113,7 @@ model amm_store_account {
   created_at    DateTime @default(now())
   updated_at    DateTime @default(now())
 
-  asset         amm_asset @relation(fields: [asset_id], references: [id], onDelete: Cascade)
+  asset amm_asset @relation(fields: [asset_id], references: [id], onDelete: Cascade)
 
   @@index([asset_id])
   @@index([account_type])
@@ -132,7 +132,7 @@ model amm_store_edc {
   created_at   DateTime @default(now())
   updated_at   DateTime @default(now())
 
-  asset        amm_asset @relation(fields: [asset_id], references: [id], onDelete: Cascade)
+  asset amm_asset @relation(fields: [asset_id], references: [id], onDelete: Cascade)
 
   @@index([asset_id])
 }

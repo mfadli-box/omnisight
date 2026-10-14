@@ -14,8 +14,8 @@ model doc_document {
   created_at  DateTime @default(now())
   updated_at  DateTime @default(now())
 
-  versions    doc_version[]
-  signs       doc_sign[]
+  versions doc_version[]
+  signs    doc_sign[]
 
   @@unique([company_id, code])
   @@index([company_id])
@@ -32,8 +32,8 @@ model doc_version {
   change_note String?
   created_at  DateTime @default(now())
 
-  document    doc_document @relation(fields: [document_id], references: [id], onDelete: Cascade)
-  signs       doc_sign[]
+  document doc_document @relation(fields: [document_id], references: [id], onDelete: Cascade)
+  signs    doc_sign[]
 
   @@unique([document_id, version])
   @@index([document_id])
@@ -50,8 +50,8 @@ model doc_sign {
   created_at  DateTime  @default(now())
   updated_at  DateTime  @default(now())
 
-  document    doc_document @relation(fields: [document_id], references: [id], onDelete: Cascade)
-  version     doc_version? @relation(fields: [version_id], references: [id])
+  document doc_document @relation(fields: [document_id], references: [id], onDelete: Cascade)
+  version  doc_version? @relation(fields: [version_id], references: [id])
 
   @@index([document_id])
   @@index([version_id])
