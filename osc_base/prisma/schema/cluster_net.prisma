@@ -41,8 +41,10 @@ model net_device {
   created_at  DateTime  @default(now())
   updated_at  DateTime  @default(now())
 
-  subnet     net_subnet?     @relation(fields: [subnet_id], references: [id])
-  interfaces net_interface[]
+  subnet          net_subnet?          @relation(fields: [subnet_id], references: [id])
+  interfaces      net_interface[]
+  config_backups  net_config_backup[]
+  changes         net_change[]
 
   @@unique([company_id, code])
   @@index([company_id])
@@ -66,4 +68,57 @@ model net_interface {
 
   @@unique([device_id, name])
   @@index([device_id])
+}
+
+model net_device_group {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  code       String
+  name       String
+  rules      Json?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@unique([company_id, code])
+  @@index([company_id])
+}
+
+model net_config_backup {
+  id           String   @id @default(uuid())
+  device_id    String
+  kind         String   @default("EXPORT") // EXPORT | BACKUP
+  name         String
+  content      String?  @db.Text
+  content_hash String?
+  ros_version  String?
+  size_bytes   Int?
+  created_by   String?
+  created_at   DateTime @default(now())
+  updated_at   DateTime @default(now())
+
+  device       net_device @relation(fields: [device_id], references: [id], onDelete: Cascade)
+
+  @@index([device_id, created_at])
+}
+
+model net_change {
+  id           String   @id @default(uuid())
+  company_id   String   @default("")
+  device_id    String
+  user_id      String?
+  action       String   @default("UPDATE") // CREATE | UPDATE | DELETE | ENABLE | DISABLE | MOVE | IMPORT
+  target_type  String
+  target_ref   String?
+  before       Json?
+  after        Json?
+  status       String   @default("PENDING") // PENDING | APPLIED | FAILED | ROLLBACK
+  message      String?  @db.Text
+  created_at   DateTime @default(now())
+  updated_at   DateTime @default(now())
+
+  device       net_device @relation(fields: [device_id], references: [id], onDelete: Cascade)
+
+  @@index([company_id, created_at])
+  @@index([device_id, created_at])
 }
