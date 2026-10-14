@@ -14,7 +14,9 @@ model web_vhost {
   created_at  DateTime @default(now())
   updated_at  DateTime @default(now())
 
-  upstreams web_upstream[]
+  server_id   String?
+  server      web_server? @relation(fields: [server_id], references: [id])
+  upstreams   web_upstream[]
 
   @@unique([company_id, server_name])
   @@index([company_id])
@@ -51,4 +53,37 @@ model web_upstream {
   vhost web_vhost? @relation(fields: [vhost_id], references: [id], onDelete: Cascade)
 
   @@index([vhost_id])
+}
+
+model web_server {
+  id           String   @id @default(uuid())
+  company_id   String   @default("")
+  code         String
+  name         String
+  hostname     String?
+  ip_address   String?
+  is_active    Boolean  @default(true)
+  last_synced  DateTime?
+  created_at   DateTime @default(now())
+  updated_at   DateTime @default(now())
+
+  vhosts       web_vhost[]
+
+  @@unique([company_id, code])
+  @@index([company_id])
+}
+
+model web_domain {
+  id           String   @id @default(uuid())
+  company_id   String   @default("")
+  domain       String
+  registrar    String?
+  expires_at   DateTime?
+  auto_renew   Boolean  @default(false)
+  is_active    Boolean  @default(true)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @default(now())
+
+  @@unique([domain])
+  @@index([company_id])
 }
