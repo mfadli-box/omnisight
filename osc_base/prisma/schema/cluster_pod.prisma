@@ -15,8 +15,8 @@ model pod_cluster {
   created_at   DateTime @default(now())
   updated_at   DateTime @default(now())
 
-  nodes        pod_node[]
-  workloads    pod_workload[]
+  nodes     pod_node[]
+  workloads pod_workload[]
 
   @@unique([company_id, code])
   @@index([company_id])
@@ -35,7 +35,7 @@ model pod_node {
   created_at      DateTime  @default(now())
   updated_at      DateTime  @default(now())
 
-  cluster         pod_cluster @relation(fields: [cluster_id], references: [id], onDelete: Cascade)
+  cluster pod_cluster @relation(fields: [cluster_id], references: [id], onDelete: Cascade)
 
   @@unique([cluster_id, name])
   @@index([cluster_id])
@@ -54,8 +54,159 @@ model pod_workload {
   created_at     DateTime @default(now())
   updated_at     DateTime @default(now())
 
-  cluster        pod_cluster @relation(fields: [cluster_id], references: [id], onDelete: Cascade)
+  cluster pod_cluster @relation(fields: [cluster_id], references: [id], onDelete: Cascade)
 
   @@unique([cluster_id, namespace, name, kind])
   @@index([cluster_id])
+}
+
+model pod_engine {
+  id           String   @id @default(uuid())
+  company_id   String   @default("")
+  code         String
+  name         String
+  kind         String   @default("DOCKER") // DOCKER | PODMAN
+  host         String?
+  port         Int?
+  api_version  String?
+  tls_enabled  Boolean  @default(false)
+  ca_cert_enc  String?  @db.Text
+  cert_enc     String?  @db.Text
+  key_enc      String?  @db.Text
+  context_name String?
+  is_active    Boolean  @default(true)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @default(now())
+
+  stacks       pod_stack[]
+
+  @@unique([company_id, code])
+  @@index([company_id])
+}
+
+model pod_stack {
+  id         String   @id @default(uuid())
+  engine_id  String
+  code       String
+  name       String
+  repo_url   String?
+  workdir    String?
+  file       String?  @default("compose.yaml")
+  status     String   @default("IDLE") // IDLE | UP | DOWN | ERROR
+  git_sync_enabled Boolean @default(false)
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  engine     pod_engine @relation(fields: [engine_id], references: [id], onDelete: Cascade)
+  revisions  pod_stack_revision[]
+  services   pod_service[]
+
+  @@unique([engine_id, code])
+  @@index([engine_id])
+}
+
+model pod_stack_revision {
+  id         String   @id @default(uuid())
+  stack_id   String
+  sha        String
+  message    String?  @db.Text
+  created_by String?
+  created_at DateTime @default(now())
+
+  stack      pod_stack @relation(fields: [stack_id], references: [id], onDelete: Cascade)
+
+  @@index([stack_id])
+}
+
+model pod_service {
+  id         String   @id @default(uuid())
+  stack_id   String
+  name       String
+  image      String?
+  scale      Int      @default(1)
+  status     String   @default("UNKNOWN") // UNKNOWN | RUNNING | STOPPED
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  stack      pod_stack @relation(fields: [stack_id], references: [id], onDelete: Cascade)
+  containers pod_container[]
+  envs       pod_env_var[]
+
+  @@unique([stack_id, name])
+  @@index([stack_id])
+}
+
+model pod_container {
+  id           String    @id @default(uuid())
+  service_id   String?
+  stack_id     String?
+  name         String
+  container_id String?
+  image        String
+  status       String    @default("UNKNOWN")
+  ip           String?
+  ports        Json?
+  started_at   DateTime?
+  stopped_at   DateTime?
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @default(now())
+
+  service      pod_service? @relation(fields: [service_id], references: [id], onDelete: Cascade)
+  images       pod_image[]
+
+  @@index([service_id])
+}
+
+model pod_image {
+  id         String   @id @default(uuid())
+  container_id String?
+  repo       String
+  tag        String
+  digest     String?
+  size_bytes Int?
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  container  pod_container? @relation(fields: [container_id], references: [id], onDelete: Cascade)
+
+  @@index([container_id])
+}
+
+model pod_volume {
+  id         String   @id @default(uuid())
+  engine_id  String
+  name       String
+  driver     String   @default("local")
+  scope      String   @default("LOCAL") // LOCAL | NAMED
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([engine_id])
+}
+
+model pod_network {
+  id         String   @id @default(uuid())
+  engine_id  String
+  name       String
+  driver     String   @default("bridge")
+  internal   Boolean  @default(false)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([engine_id])
+}
+
+model pod_env_var {
+  id         String   @id @default(uuid())
+  service_id String?
+  key        String
+  value_enc  String?  @db.Text
+  is_secret  Boolean  @default(false)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  service    pod_service? @relation(fields: [service_id], references: [id], onDelete: Cascade)
+
+  @@index([service_id])
 }
