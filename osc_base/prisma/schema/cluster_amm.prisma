@@ -136,3 +136,25 @@ model amm_store_edc {
 
   @@index([asset_id])
 }
+
+model amm_manufacturer {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model amm_asset_model {
+  id             String   @id @default(uuid())
+  manufacturer_id String?
+  name           String
+  is_active      Boolean  @default(true)
+  created_at     DateTime @default(now())
+  updated_at     DateTime @default(now())
+
+  @@index([manufacturer_id])
+}
