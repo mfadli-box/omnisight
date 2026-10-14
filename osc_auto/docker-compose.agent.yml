@@ -1,0 +1,44 @@
+version: "3.9"
+
+networks:
+  agent-net:
+    name: agent-net
+
+services:
+  agent_vm:
+    build:
+      context: ./agent_vm
+    container_name: agent_vm
+    restart: always
+    privileged: false
+    environment:
+      - TZ=Asia/Jakarta
+      - OSC_REST_URL=http://host.docker.internal:37772/rest/agent
+      - OSC_AGENT_TOKEN=${OSC_AGENT_TOKEN:-}
+      - OSC_AGENT_ID=${OSC_AGENT_ID:-agent-vm-01}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /etc/os-release:/etc/os-release:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+    networks:
+      - agent-net
+
+  agent_ci:
+    build:
+      context: ./agent_ci
+    container_name: agent_ci
+    restart: always
+    environment:
+      - TZ=Asia/Jakarta
+      - OSC_REST_URL=http://host.docker.internal:37772/rest/agent
+      - OSC_AGENT_TOKEN=${OSC_AGENT_TOKEN:-}
+      - OSC_AGENT_ID=${OSC_AGENT_ID:-agent-ci-01}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./agent_ci/workspace:/workspace
+    networks:
+      - agent-net

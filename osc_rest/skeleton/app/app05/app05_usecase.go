@@ -96,3 +96,13 @@ func UpdateToken(ctx context.Context, id string, in TokenUpdate) (TokenResponse,
 func DeleteToken(ctx context.Context, id string) error {
 	return tokenDelete(ctx, pg, id)
 }
+
+// --- User Action ---
+
+func ListActions(ctx context.Context, p mechanic.GridParams) (mechanic.Page[ActionResponse], error) {
+	return actionList(ctx, pg, p)
+}
+
+func GetAction(ctx context.Context, id string) (ActionResponse, error) {
+	return actionGet(ctx, pg, id)
+}

@@ -1,25 +1,15 @@
-import { parseSession, storageKey } from "@/lib/utility";
-
-function getToken(): string | null {
-  if (typeof document === "undefined") return null;
-  const raw = document.cookie
-    .split("; ")
-    .find((c) => c.startsWith(`${storageKey}=`));
-  if (!raw) return null;
-  try {
-    const session = parseSession(
-      decodeURIComponent(raw.split("=").slice(1).join("=")),
-    );
-    return session?.token ?? null;
-  } catch {
-    return null;
-  }
-}
-
 function getCompanyId(): string | null {
   if (typeof window === "undefined") return null;
   const id = window.localStorage.getItem("OmniSightCompany")?.trim();
   return id || null;
+}
+
+function clearServerSession() {
+  try {
+    void fetch("/proxy/guest/PUB00", { method: "DELETE", credentials: "same-origin" });
+  } catch {
+    /* ignore */
+  }
 }
 
 export class ClientApiError extends Error {
@@ -40,7 +30,6 @@ export async function clientApi<T = unknown>(
   options: { method?: string; body?: unknown; params?: Record<string, string> } = {},
 ): Promise<T> {
   const { method = "GET", body, params } = options;
-  const token = getToken();
 
   let url = `/proxy/pages${path}`;
   if (params) {
@@ -49,7 +38,6 @@ export async function clientApi<T = unknown>(
   }
 
   const headers: Record<string, string> = {};
-  if (token) headers["Authorization"] = `Bearer ${token}`;
   const companyId = getCompanyId();
   if (companyId) headers["X-Company-ID"] = companyId;
 
@@ -60,6 +48,7 @@ export async function clientApi<T = unknown>(
     method,
     headers,
     body: isFormData ? (body as FormData) : body ? JSON.stringify(body) : undefined,
+    credentials: "same-origin",
     cache: "no-store",
   });
 
@@ -68,7 +57,7 @@ export async function clientApi<T = unknown>(
 
   if (!res.ok) {
     if (res.status === 401) {
-      document.cookie = `${storageKey}=; path=/; max-age=0`;
+      clearServerSession();
       window.location.href = "/login";
       throw new ClientApiError("Session expired", 401, "UNAUTHORIZED", requestId);
     }

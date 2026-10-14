@@ -66,6 +66,16 @@ func Unauthorized(msg string) *AppError {
 	}
 }
 
+// UnauthorizedCode membuat error 401 dengan kode kustom, dipakai agar klien
+// dapat membedakan alur (mis. permintaan kode 2FA).
+func UnauthorizedCode(code, msg string) *AppError {
+	return &AppError{
+		Code:    code,
+		Status:  http.StatusUnauthorized,
+		Message: msg,
+	}
+}
+
 func Forbidden(msg string) *AppError {
 	return &AppError{
 		Code:    "FORBIDDEN",

@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/uix
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/uix/tabs";
 import SessionsTable from "./components/sessions-table";
 import TokensTable from "./components/tokens-table";
+import ActionsTable from "./components/actions-table";
 
 export default function APP05Page() {
   const [tab, setTab] = useState("sessions");
@@ -22,12 +23,16 @@ export default function APP05Page() {
           <TabsList variant="line">
             <TabsTrigger value="sessions">Sessions</TabsTrigger>
             <TabsTrigger value="tokens">Tokens</TabsTrigger>
+            <TabsTrigger value="actions">Action</TabsTrigger>
           </TabsList>
           <TabsContent value="sessions">
             <SessionsTable />
           </TabsContent>
           <TabsContent value="tokens">
             <TokensTable />
+          </TabsContent>
+          <TabsContent value="actions">
+            <ActionsTable />
           </TabsContent>
         </Tabs>
       </CardContent>

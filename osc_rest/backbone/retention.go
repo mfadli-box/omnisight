@@ -22,8 +22,15 @@ func retentionRules() []retentionRule {
 		}
 		return def
 	}
-	telemetry := []retentionRule{}
-	logs := []retentionRule{}
+	telemetry := []retentionRule{
+		{table: "bot_heartbeat", col: "created_at", days: 30},
+		{table: "obs_metric", col: "recorded_at", days: 30},
+	}
+	logs := []retentionRule{
+		{table: "sec_waf_event", col: "occurred_at", days: 90},
+		{table: "obs_log", col: "recorded_at", days: 90},
+		{table: "jms_run", col: "started_at", days: 90},
+	}
 	all := make([]retentionRule, 0, len(telemetry)+len(logs))
 	for _, r := range telemetry {
 		r.days = tableDays(strings.ToUpper(r.table), r.days)

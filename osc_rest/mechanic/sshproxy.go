@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -22,11 +24,40 @@ type WSMessage struct {
 	Rows    int    `json:"rows,omitempty"`
 }
 
+const (
+	wsReadLimit   = 1 << 20
+	wsIdleTimeout = 60 * time.Second
+)
+
+// allowedWSOrigins adalah allowlist origin WebSocket yang diizinkan. Bila
+// kosong, hanya origin yang host-nya sama dengan request Host yang diterima
+// (mencegah Cross-Site WebSocket Hijacking).
+var allowedWSOrigins = func() map[string]bool {
+	m := map[string]bool{}
+	for _, o := range strings.Split(os.Getenv("WS_ALLOWED_ORIGINS"), ",") {
+		if s := strings.TrimSpace(o); s != "" {
+			m[s] = true
+		}
+	}
+	return m
+}()
+
 var wsUpgrader = websocket.Upgrader{
 	ReadBufferSize:  8192,
 	WriteBufferSize: 8192,
 	CheckOrigin: func(r *http.Request) bool {
-		return true
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			return true
+		}
+		if len(allowedWSOrigins) > 0 {
+			return allowedWSOrigins[origin]
+		}
+		u, err := url.Parse(origin)
+		if err != nil {
+			return false
+		}
+		return strings.EqualFold(u.Host, r.Host)
 	},
 }
 
@@ -36,6 +67,27 @@ func HandleSSHWebSocket(c *gin.Context, sshConfig *ssh.ClientConfig, host string
 		return
 	}
 	defer conn.Close()
+	conn.SetReadLimit(wsReadLimit)
+	_ = conn.SetReadDeadline(time.Now().Add(wsIdleTimeout))
+	conn.SetPongHandler(func(string) error {
+		return conn.SetReadDeadline(time.Now().Add(wsIdleTimeout))
+	})
+	pingDone := make(chan struct{})
+	defer close(pingDone)
+	go func() {
+		ticker := time.NewTicker(wsIdleTimeout / 2)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-pingDone:
+				return
+			case <-ticker.C:
+				if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(10*time.Second)); err != nil {
+					return
+				}
+			}
+		}
+	}()
 	recorder, err := newSessionRecorder(recordPath)
 	if err != nil {
 		writeWSJSON(conn, WSMessage{

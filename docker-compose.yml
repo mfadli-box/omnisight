@@ -6,9 +6,11 @@ networks:
 volumes:
   xbase:
     driver: local
+  files:
+    driver: local
 
 services:
-  # ─── Database (Prisma + Postgresql) ─────────────────────────
+  # ─── Database (Postgresql) ────────────────────────────────────
   osc_base:
     image: postgres:18-alpine
     container_name: osc_base
@@ -21,12 +23,12 @@ services:
       - POSTGRES_DB=${PG_DATA:-osc}
       - POSTGRES_BACKUP=${PG_BACK:-osc_back}
       - POSTGRES_USER=${PG_USER:-dbe}
-      - POSTGRES_PASSWORD=${PG_PASS:-rahasia}
+      - POSTGRES_PASSWORD=${PG_PASS:?PG_PASS must be set}
       - POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256 --auth-local=scram-sha-256
     ports:
-      - "37771:5432"
+      - "127.0.0.1:37771:5432"
     volumes:
-      - xbase:/var/lib/postgresql
+      - xbase:/var/lib/postgresql/data
       - ./osc_base/pgbouncer.sh:/docker-entrypoint-initdb.d/init.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-dbe} -d ${PG_DATA:-osc}"]
@@ -37,5 +39,63 @@ services:
     networks:
       blackbox:
         ipv4_address: 172.99.66.1
-  # ─── Backend  (Go) ──────────────────────────────────────────
-  # ─── Frontend (Next.js) ─────────────────────────────────────
+
+  # ─── Backend  (Go Gin) ───────────────────────────────────────
+  osc_rest:
+    build:
+      context: ./osc_rest
+    container_name: osc_rest
+    depends_on:
+      osc_base:
+        condition: service_healthy
+    environment:
+      - TZ=${TZ:-Asia/Jakarta}
+      - PG_HOST=osc_base
+      - PG_PORT=5432
+      - PG_DATA=${PG_DATA:-osc}
+      - PG_USER=${PG_USER:-dbe}
+      - PG_PASS=${PG_PASS:-}
+      - PG_SSLMODE=${PG_SSLMODE:-disable}
+      - IS_POOL=${IS_POOL:-false}
+      - RE_FLAG=${RE_FLAG:-true}
+      - RE_DAYS=${RE_DAYS:-30}
+      - RE_LOGS=${RE_LOGS:-90}
+      - CR_KEYS=${CR_KEYS:-}
+      - RE_SECRET=${RE_SECRET:-}
+      - LISTEN_ADDR=0.0.0.0:37772
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-}
+      - TRUSTED_PROXIES=${TRUSTED_PROXIES:-localhost,172.99.77.1}
+      - WS_ALLOWED_ORIGINS=${WS_ALLOWED_ORIGINS:-}
+      - HRIS_ALLOWED_HOSTS=${HRIS_ALLOWED_HOSTS:-}
+    ports:
+      - "127.0.0.1:37772:37772"
+    volumes:
+      - files:/app/files
+    restart: always
+    networks:
+      blackbox:
+        ipv4_address: 172.99.66.2
+
+  # ─── Frontend (Next.js 16) ───────────────────────────────────
+  osc_site:
+    build:
+      context: ./osc_site
+    container_name: osc_site
+    depends_on:
+      - osc_rest
+    environment:
+      - TZ=${TZ:-Asia/Jakarta}
+      - BE_POOL=http://osc_rest:37772
+      - WS_NAME=${WS_NAME:-OmniSight}
+      - WS_META=${WS_META:-OmniSight}
+      - WS_DESC=${WS_DESC:-ICT Management}
+      - NEXT_PUBLIC_WS_POOL=${NEXT_PUBLIC_WS_POOL:-ws://127.0.0.1:37772}
+      - NODE_ENV=production
+    ports:
+      - "127.0.0.1:37773:37773"
+    volumes:
+      - files:/app/files
+    restart: always
+    networks:
+      blackbox:
+        ipv4_address: 172.99.66.3

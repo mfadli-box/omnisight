@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { sessionCookie } from "@/lib/utility";
 
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   if (!pathname.startsWith("/board")) {
     return NextResponse.next();
   }
-  const cookie = req.cookies.get("OmniSightMemory")?.value;
+  const cookie = req.cookies.get(sessionCookie)?.value;
   if (!cookie) {
     return NextResponse.redirect(new URL("/login", req.url));
   }

@@ -1,4 +1,4 @@
-﻿package pub
+package pub
 
 import (
 	"context"
@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -14,6 +16,18 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
+
+// hrisAllowedHosts memuat allowlist host HRIS dari env HRIS_ALLOWED_HOSTS
+// (dipisah koma). Bila kosong, hanya endpoint https yang diizinkan.
+func hrisAllowedHosts() map[string]bool {
+	m := map[string]bool{}
+	for _, h := range strings.Split(os.Getenv("HRIS_ALLOWED_HOSTS"), ",") {
+		if s := strings.ToLower(strings.TrimSpace(h)); s != "" {
+			m[s] = true
+		}
+	}
+	return m
+}
 
 func Companies(ctx context.Context) ([]CompanyOption, error) {
 	return companyOptions(ctx)
@@ -68,16 +82,36 @@ session:
 	if !user.IsActive {
 		return LoginResponse{}, errors.New("account is deactivated")
 	}
+
+	// Verifikasi TOTP wajib bila 2FA aktif untuk akun ini (berlaku untuk
+	// login lokal maupun HRIS).
+		if user.IsTOTPEnabled {
+			if user.TOTPSecret == nil || *user.TOTPSecret == "" {
+				return LoginResponse{}, errors.New("account 2FA is misconfigured")
+			}
+			if req.TOTPCode == "" {
+				return LoginResponse{}, ErrTOTPRequired
+			}
+			secret := *user.TOTPSecret
+			if dec, err := mechanic.Decrypt(secret); err == nil {
+				secret = dec
+			}
+			if !mechanic.VerifyTOTP(secret, req.TOTPCode) {
+				_ = recordFailedAttempt(ctx, db, user.ID)
+				return LoginResponse{}, errors.New("invalid username or password")
+			}
+		}
 	if err := resetFailedAttempt(ctx, db, user.ID); err != nil {
 		return LoginResponse{}, err
 	}
 	issued := time.Now()
 	expires := issued.Add(sessionTTL)
 	token := uuid.New().String()
+	tokenHash := mechanic.HashToken(token)
 	if _, err := createSession(ctx, db, appUserTokenCreate{
 		UserID:          user.ID,
 		TokenType:       "WEB",
-		Token:           token,
+		Token:           tokenHash,
 		AccessExpiresAt: expires,
 	}); err != nil {
 		return LoginResponse{}, err
@@ -106,15 +140,42 @@ session:
 	}, nil
 }
 
-// hrisExternalLogin memanggil endpoint HRIS eksternal via GET untuk
-// memverifikasi kredensial pengguna. URL harus mengandung placeholder
-// {$U} untuk username dan {$P} untuk password.
+// hrisExternalLogin memanggil endpoint HRIS eksternal untuk memverifikasi
+// kredensial pengguna. URL harus mengandung placeholder {$U} untuk username
+// dan {$P} untuk password.
+//
+// Hardening SSRF:
+//   - nilai disubstitusi di-URL-encode (mencegah query/path injection),
+//   - skema dibatasi ke http/https,
+//   - host harus ada di allowlist HRIS_ALLOWED_HOSTS (bila diset),
+//   - redirect tidak diikuti, timeout dibatasi.
 func hrisExternalLogin(hrisLink, username, password string) error {
-	url := strings.ReplaceAll(hrisLink, "{$U}", username)
-	url = strings.ReplaceAll(url, "{$P}", password)
+	rawURL := strings.ReplaceAll(hrisLink, "{$U}", url.QueryEscape(username))
+	rawURL = strings.ReplaceAll(rawURL, "{$P}", url.QueryEscape(password))
 
-	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Get(url)
+	parsed, err := url.Parse(rawURL)
+	if err != nil || parsed.Host == "" {
+		return errors.New("HRIS: invalid endpoint URL")
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return errors.New("HRIS: unsupported URL scheme")
+	}
+	allowedHosts := hrisAllowedHosts()
+	if len(allowedHosts) > 0 {
+		if !allowedHosts[strings.ToLower(parsed.Hostname())] {
+			return errors.New("HRIS: endpoint host is not allowed")
+		}
+	} else if parsed.Scheme != "https" {
+		return errors.New("HRIS: only https endpoints are allowed when HRIS_ALLOWED_HOSTS is unset")
+	}
+
+	client := &http.Client{
+		Timeout: 15 * time.Second,
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	resp, err := client.Get(rawURL)
 	if err != nil {
 		return fmt.Errorf("HRIS connection failed: %w", err)
 	}

@@ -74,9 +74,11 @@ Modul diberi prefix 3 huruf agar frontend dapat memetakan ikon & grup:
 | `NET` | Network Monitoring | · |
 | `OBS` | Observability | · |
 | `POD` | Container/Pod | · |
-| `VMS` | VM & Security | · |
-| `WAF` | Web Application Firewall | · |
-| `WEB` | Web/Proxy | · |
+| `VMS` | VM & Hypervisor Management | · |
+| `SEC` | Security Operations / SIEM | · |
+| `PAM` | Bastion / Privileged Access | · |
+| `WAF` | Web Application Firewall (perimeter) | · |
+| `WEB` | Web Server/Proxy + Domain & DNS | · |
 
 Frontend memetakan prefix ini ke ikon via `src/app/board/model/module.ts`.
 
@@ -86,8 +88,9 @@ Frontend memetakan prefix ini ke ikon via `src/app/board/model/module.ts`.
 - Setiap model punya kolom audit `created_at`/`updated_at` (tanpa
   `created_by`/`updated_by`).
 - `is_active` untuk soft state (hindari hard-delete).
-- Prefix model per cluster: `app_*`; cluster lain akan memakai prefix berbeda
-  (mis. `net_*`, `sec_*`, `obs_*`, `pod_*`, `jms_*`) sesuai daftar retensi di
+- Prefix model per cluster: `app_*`; cluster lain memakai prefix berbeda
+  (`amm_*`, `net_*`, `vms_*`, `pod_*`, `sec_*`, `pam_*`, `web_*`, `jms_*`,
+  `bot_*`, `dso_*`, `obs_*`, `doc_*`) sesuai daftar retensi di
   `osc_rest/backbone/retention.go` / catatan `notes.txt`.
 - Perusahaan wajib `@@unique([code])`; entity milik perusahaan umumnya
   `@@unique([company_id, <code>])`.

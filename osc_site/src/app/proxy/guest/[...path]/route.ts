@@ -1,5 +1,15 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { BE_POOL } from "@/lib/backend";
+import { sessionCookie } from "@/lib/utility";
+
+const SESSION_MAX_AGE = 60 * 60 * 24;
+
+type BackendSession = {
+  token?: string;
+  expires_at?: string;
+  user_profile?: unknown;
+};
 
 async function proxyRequest(
   method: string,
@@ -35,14 +45,37 @@ async function proxyRequest(
     console.error(`[PROXY:GUEST] ${method} ${apiPath} → ${res.status}`, errorBody);
   }
 
+  // Pada login sukses, ekstrak token untuk disimpan di cookie HttpOnly dan
+  // hapus dari body agar tidak pernah terekspos ke JavaScript klien.
+  const session = (data as { data?: BackendSession } | null)?.data;
+  let sessionToken: string | undefined;
+  if (res.ok && session?.token) {
+    sessionToken = session.token;
+    delete session.token;
+  }
+
   const body_ = data && data.code
     ? { code: data.code, error: data.error ?? "", request_id: requestId || (data.request_id ?? "") }
     : data;
 
-  return NextResponse.json(body_, {
+  const response = NextResponse.json(body_, {
     status: res.status,
     headers: { "X-Request-ID": requestId },
   });
+
+  if (sessionToken) {
+    response.cookies.set({
+      name: sessionCookie,
+      value: JSON.stringify({ token: sessionToken, expires_at: session?.expires_at ?? "" }),
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: SESSION_MAX_AGE,
+    });
+  }
+
+  return response;
 }
 
 export async function GET(
@@ -64,4 +97,43 @@ export async function POST(
   const apiPath = "/" + path.join("/");
   const body = await req.json().catch(() => null);
   return proxyRequest("POST", apiPath, body);
+}
+
+export async function DELETE(
+  _req: Request,
+  { params }: { params: Promise<{ path: string[] }> },
+) {
+  const { path } = await params;
+  const apiPath = "/" + path.join("/");
+  // Logout: revoke token di backend (server-side) lalu hapus cookie HttpOnly.
+  if (apiPath === "/PUB00") {
+    const jar = await cookies();
+    const raw = jar.get(sessionCookie)?.value;
+    if (raw) {
+      try {
+        const s = JSON.parse(decodeURIComponent(raw)) as { token?: string };
+        if (s?.token) {
+          await fetch(`${BE_POOL}/rest/pages/APP00`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${s.token}` },
+            cache: "no-store",
+          }).catch(() => undefined);
+        }
+      } catch {
+        /* cookie rusak — tetap hapus */
+      }
+    }
+    const response = NextResponse.json({ data: { message: "logged out" } }, { status: 200 });
+    response.cookies.set({
+      name: sessionCookie,
+      value: "",
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 0,
+    });
+    return response;
+  }
+  return proxyRequest("DELETE", apiPath);
 }

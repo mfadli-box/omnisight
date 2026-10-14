@@ -89,6 +89,22 @@ type TokenResponse struct {
 	CreatedAt        string  `json:"created_at"`
 }
 
+// --- User Action (app_user_action) ---
+
+type ActionResponse struct {
+	ID         string  `json:"id"`
+	UserID     string  `json:"user_id"`
+	Username   string  `json:"username,omitempty"`
+	Fullname   string  `json:"fullname,omitempty"`
+	CompanyID  *string `json:"company_id,omitempty"`
+	ModuleCode *string `json:"module_code,omitempty"`
+	Action     string  `json:"action"`
+	Path       string  `json:"path"`
+	IPAddress  *string `json:"ip_address,omitempty"`
+	UserAgent  *string `json:"user_agent,omitempty"`
+	CreatedAt  string  `json:"created_at"`
+}
+
 var SessionStatuses = map[string]bool{
 	"ACTIVE":  true,
 	"EXPIRED": true,

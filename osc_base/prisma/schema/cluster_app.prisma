@@ -15,6 +15,7 @@ model app_module {
   privileges  app_user_privilege[]
 
   @@unique([code])
+  @@index([parent_id])
 }
 
 model app_company {
@@ -98,6 +99,7 @@ model app_user {
   areas               app_user_area[]
   actions             app_user_action[]
   tokens              app_user_token[]
+  sessions            app_user_session[]
   approval_signs      app_approval_sign[]
   signature_flags     app_signature_flag[]
 
@@ -158,6 +160,8 @@ model app_user_session {
   ended_at      DateTime?
   status        String    @default("ACTIVE") @db.VarChar(20)
   policy_id     String?
+
+  user          app_user  @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([user_id])
   @@index([session_token])
@@ -231,6 +235,7 @@ model app_approval_sign {
   user     app_user           @relation(fields: [user_id], references: [id])
 
   @@unique([step_id, user_id])
+  @@index([user_id])
 }
 
 model app_signature_type {
@@ -276,4 +281,5 @@ model app_signature_flag {
   user        app_user            @relation(fields: [user_id], references: [id])
 
   @@unique([form_id, user_id])
+  @@index([user_id])
 }

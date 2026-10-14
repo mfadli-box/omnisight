@@ -5,27 +5,45 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"strings"
 )
 
-func getEncryptKey() []byte {
-	key := os.Getenv("RE_SECRET")
+var encryptKey []byte
+
+// InitCrypto memuat dan memvalidasi RE_SECRET. Gagal keras (fail-closed)
+// bila secret tidak diset atau terlalu pendek — sistem TIDAK boleh berjalan
+// dengan kunci default yang dapat diprediksi.
+func InitCrypto() error {
+	key := strings.TrimSpace(os.Getenv("RE_SECRET"))
 	if key == "" {
-		key = "omnisight-default-key-32b!"
+		return errors.New("RE_SECRET is not set: refusing to start without an encryption secret")
 	}
 	b := []byte(key)
 	if len(b) < 32 {
-		padded := make([]byte, 32)
-		copy(padded, b)
-		return padded
+		return fmt.Errorf("RE_SECRET must be at least 32 bytes (got %d)", len(b))
 	}
-	return b[:32]
+	encryptKey = b[:32]
+	return nil
+}
+
+func getEncryptKey() ([]byte, error) {
+	if encryptKey == nil {
+		if err := InitCrypto(); err != nil {
+			return nil, err
+		}
+	}
+	return encryptKey, nil
 }
 
 func Encrypt(plaintext string) (string, error) {
-	key := getEncryptKey()
+	key, err := getEncryptKey()
+	if err != nil {
+		return "", err
+	}
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return "", fmt.Errorf("aes.NewCipher: %w", err)
@@ -43,7 +61,10 @@ func Encrypt(plaintext string) (string, error) {
 }
 
 func Decrypt(encoded string) (string, error) {
-	key := getEncryptKey()
+	key, err := getEncryptKey()
+	if err != nil {
+		return "", err
+	}
 	data, err := base64.StdEncoding.DecodeString(encoded)
 	if err != nil {
 		return "", fmt.Errorf("base64 decode: %w", err)

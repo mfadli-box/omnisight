@@ -16,6 +16,7 @@ export default function ModuleTable({ onSelectModule, selectedModuleId }: Module
   const [formOpen, setFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<"create" | "update">("create");
   const [editingModule, setEditingModule] = useState<APP01Module | null>(null);
+  const [formKey, setFormKey] = useState(0);
   const [refreshTrigger, setRefreshTrigger] = useState(false);
 
   const columns: Column<APP01Module>[] = [
@@ -45,11 +46,13 @@ export default function ModuleTable({ onSelectModule, selectedModuleId }: Module
     onCreate: () => {
       setFormMode("create");
       setEditingModule(null);
+      setFormKey((k) => k + 1);
       setFormOpen(true);
     },
     onUpdate: (row) => {
       setFormMode("update");
       setEditingModule(row);
+      setFormKey((k) => k + 1);
       setFormOpen(true);
     },
     onDelete: async (row) => {
@@ -78,6 +81,7 @@ export default function ModuleTable({ onSelectModule, selectedModuleId }: Module
         hideSelect={true}
       />
       <ModuleForm
+        key={`${formMode}-${editingModule?.id ?? "new"}-${formKey}`}
         isOpen={formOpen}
         mode={formMode}
         module={editingModule}

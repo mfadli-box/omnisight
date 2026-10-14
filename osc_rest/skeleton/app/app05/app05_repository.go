@@ -412,3 +412,97 @@ func tokenDelete(ctx context.Context, db *pgxpool.Pool, id string) error {
 	_, err := db.Exec(ctx, "DELETE FROM app_user_token WHERE id = $1", id)
 	return err
 }
+
+// --- User Action ---
+
+const actionColumns = `
+	a.id, a.user_id, COALESCE(u.username, ''), COALESCE(u.fullname, ''),
+	a.company_id, a.module_code, a.action, a.path, a.ip_address,
+	a.user_agent, a.created_at`
+
+func actionGet(ctx context.Context, db *pgxpool.Pool, id string) (ActionResponse, error) {
+	var r ActionResponse
+	var createdAt time.Time
+	err := db.QueryRow(ctx, `
+		SELECT	`+actionColumns+`
+		FROM	app_user_action a
+		LEFT	JOIN app_user u ON u.id = a.user_id
+		WHERE	a.id = $1`, id).Scan(
+		&r.ID, &r.UserID, &r.Username, &r.Fullname, &r.CompanyID,
+		&r.ModuleCode, &r.Action, &r.Path, &r.IPAddress, &r.UserAgent,
+		&createdAt)
+	if err != nil {
+		return ActionResponse{}, err
+	}
+	r.CreatedAt = fmtTimeVal(createdAt)
+	return r, nil
+}
+
+func actionList(ctx context.Context, db *pgxpool.Pool, p mechanic.GridParams) (mechanic.Page[ActionResponse], error) {
+	p.Default()
+	where := ` WHERE 1=1`
+	args := []any{}
+	argn := 0
+	if p.Search != "" {
+		argn++
+		args = append(args, mechanic.Like(p.Search))
+		where += fmt.Sprintf(` AND (
+			COALESCE(u.username, '') ILIKE $%d OR
+			COALESCE(u.fullname, '') ILIKE $%d OR
+			COALESCE(a.module_code, '') ILIKE $%d OR
+			a.action ILIKE $%d OR
+			a.path ILIKE $%d OR
+			COALESCE(a.ip_address, '') ILIKE $%d
+		)`, argn, argn, argn, argn, argn, argn)
+	}
+	var total int64
+	if err := db.QueryRow(ctx, `
+		SELECT	count(*)
+		FROM	app_user_action a
+		LEFT	JOIN app_user u ON u.id = a.user_id
+	`+where, args...).Scan(&total); err != nil {
+		return mechanic.Page[ActionResponse]{}, err
+	}
+	limit, offset := mechanic.LimitOffset(p)
+	order := mechanic.OrderClause(p.Sort, p.Order, map[string]string{
+		"username":    "u.username",
+		"module_code": "a.module_code",
+		"action":      "a.action",
+		"path":        "a.path",
+		"ip_address":  "a.ip_address",
+		"created_at":  "a.created_at",
+	}, "a.created_at")
+	argn++
+	limitArg := argn
+	argn++
+	offsetArg := argn
+	q := `
+		SELECT	` + actionColumns + `
+		FROM	app_user_action a
+		LEFT	JOIN app_user u ON u.id = a.user_id
+	` + where + order + fmt.Sprintf(` LIMIT $%d OFFSET $%d`, limitArg, offsetArg)
+	args = append(args, limit, offset)
+	rows, err := db.Query(ctx, q, args...)
+	if err != nil {
+		return mechanic.Page[ActionResponse]{}, err
+	}
+	defer rows.Close()
+	list := []ActionResponse{}
+	for rows.Next() {
+		var r ActionResponse
+		var createdAt time.Time
+		if err := rows.Scan(&r.ID, &r.UserID, &r.Username, &r.Fullname,
+			&r.CompanyID, &r.ModuleCode, &r.Action, &r.Path, &r.IPAddress,
+			&r.UserAgent, &createdAt); err != nil {
+			return mechanic.Page[ActionResponse]{}, err
+		}
+		r.CreatedAt = fmtTimeVal(createdAt)
+		list = append(list, r)
+	}
+	return mechanic.Page[ActionResponse]{
+		Rows:      list,
+		Total:     total,
+		Page:      p.Page,
+		PageSize:  p.PageSize,
+		TotalPage: mechanic.TotalPage(total, p.PageSize)}, nil
+}

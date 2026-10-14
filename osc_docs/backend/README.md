@@ -77,7 +77,12 @@ Semua di `backbone/memory.go` — middleware reuse untuk group route.
 | `USLock()` | Hanya admin (`isAdmin` true). |
 | `USBots()` | Auth token robot via `CR_KEYS` (dipisah koma) — untuk agen. |
 | `USRole(moduleCode, level)` | Cek privilege via `app_user_privilege` + `app_module`; level `VIEW/BOOK/POST`; admin bypass. |
-| `USLogs(moduleCode)` | Audit log semua request sukses ke `app_user_action`. |
+| `USLogs(moduleCode)` | Audit log request sukses (POST/PUT/PATCH/DELETE) ke `app_user_action`; `moduleCode` kosong → diambil dari segmen path (`/rest/pages/<APPxx>/...`). |
+
+> `GET /rest/pages/APP00/module` untuk non-admin hanya mengembalikan modul
+> dengan privilege `level <> HIDE`, tetapi **semua leluhur (parent) tetap
+> disertakan** bila ada minimal satu turunan non-`HIDE` (recursive CTE ancestor
+> walk) agar grup sidebar tidak hilang.
 
 Auth flow pada header:
 
@@ -106,7 +111,7 @@ Didefinisikan di `backbone/routes.go`. Middleware global: `RequestID()`,
 | `/rest/guest` | — | Endpoint publik (login, info company). |
 | `/rest/pages` (root) | `USLoad()` | Halaman terautentikasi (company wajib sudah dipilih). |
 | `/rest/pages` (auths) | `USAuth()` | Data user sendiri (tanpa pengecekan company). |
-| `/rest/pages` (admin) | `USAuth(), USLock()` | Hanya admin (CRUD module/company/user). |
+| `/rest/pages` (admin) | `USAuth(), USLock(), USLogs("")` | Hanya admin (CRUD module/company/user); audit otomatis ke `app_user_action` (module dari segmen path). |
 | `/rest/agent` | `USBots()` | Worker otomasi (service account). |
 
 Daftar route terdaftar saat ini (`skeleton/pub`, `skeleton/app/app00`,
@@ -214,11 +219,15 @@ ikut menghapus baris tautan & privilege terkait dalam satu transaksi.
 | GET | `/rest/pages/APP05/tokens/:id` | `app05.APP05TokensGet` | `USAuth(), USLock()` |
 | PUT | `/rest/pages/APP05/tokens/:id` | `app05.APP05TokensUpdate` | `USAuth(), USLock()` |
 | DELETE | `/rest/pages/APP05/tokens/:id` | `app05.APP05TokensDelete` | `USAuth(), USLock()` |
+| GET | `/rest/pages/APP05/actions` | `app05.APP05ActionsList` | `USAuth(), USLock()` |
+| GET | `/rest/pages/APP05/actions/:id` | `app05.APP05ActionsGet` | `USAuth(), USLock()` |
 
-> `app_user_session` tidak punya FK ke `app_user` (JOIN kiri untuk username);
-> `app_user_token` punya FK `onDelete: Cascade`. Update token menerima
+> `app_user_session` dan `app_user_token` punya FK ke `app_user`
+> (`onDelete: Cascade`); query sesi/token memakai `LEFT JOIN app_user` untuk
+> mengambil username. Update token menerima
 > `revoke: true/false` untuk mengisi/mengosongkan `revoked_at`; update sesi
 > menerima `end: true` untuk `status='ENDED'` + `ended_at=now()`.
+> `app_user_action` hanya baca (audit trail): list + get, tanpa create/update/delete.
 
 Endpoint status/placeholder: `/`, `/rest`, `/hook`, `/rest/guest/`,
 `/rest/agent/` (balasan `message` saja).

@@ -1,6 +1,7 @@
-﻿package pub
+package pub
 
 import (
+	"errors"
 	"net/http"
 
 	"osc_rest/mechanic"
@@ -31,6 +32,8 @@ func PUB00Login(c *gin.Context) {
 	session, err := Login(c.Request.Context(), req)
 	if err != nil {
 		switch {
+		case errors.Is(err, ErrTOTPRequired):
+			mechanic.Error(c, mechanic.UnauthorizedCode("TOTP_REQUIRED", "2FA code required"))
 		case err.Error() == "invalid username or password",
 			err.Error() == "account is locked, try again later",
 			err.Error() == "account is deactivated":

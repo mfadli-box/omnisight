@@ -16,6 +16,7 @@ export default function CompanyTable({ onSelectCompany, selectedCompanyId }: Com
   const [formOpen, setFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<"create" | "update">("create");
   const [editingCompany, setEditingCompany] = useState<APP02Company | null>(null);
+  const [formKey, setFormKey] = useState(0);
   const [refreshTrigger, setRefreshTrigger] = useState(false);
 
   const columns: Column<APP02Company>[] = [
@@ -37,11 +38,13 @@ export default function CompanyTable({ onSelectCompany, selectedCompanyId }: Com
     onCreate: () => {
       setFormMode("create");
       setEditingCompany(null);
+      setFormKey((k) => k + 1);
       setFormOpen(true);
     },
     onUpdate: (row) => {
       setFormMode("update");
       setEditingCompany(row);
+      setFormKey((k) => k + 1);
       setFormOpen(true);
     },
     onDelete: async (row) => {
@@ -69,6 +72,7 @@ export default function CompanyTable({ onSelectCompany, selectedCompanyId }: Com
         refreshTrigger={refreshTrigger}
       />
       <CompanyForm
+        key={`${formMode}-${editingCompany?.id ?? "new"}-${formKey}`}
         isOpen={formOpen}
         mode={formMode}
         company={editingCompany}

@@ -1,6 +1,13 @@
-﻿package pub
+package pub
 
-import "time"
+import (
+	"errors"
+	"time"
+)
+
+// ErrTOTPRequired dikembalikan saat akun mengaktifkan 2FA namun kode TOTP
+// belum dikirim oleh klien.
+var ErrTOTPRequired = errors.New("2FA code required")
 
 // CompanyOption adalah opsi company untuk dropdown login.
 type CompanyOption struct {
@@ -14,6 +21,7 @@ type LoginRequest struct {
 	CompanyID string `json:"company_id"`
 	Username  string `json:"username"`
 	Password  string `json:"password"`
+	TOTPCode  string `json:"totp_code"`
 }
 
 // UserProfile adalah profil user yang dikembalikan setelah login.

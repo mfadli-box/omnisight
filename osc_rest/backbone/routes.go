@@ -2,8 +2,11 @@ package backbone
 
 import (
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
+	"osc_rest/mechanic"
 	app00 "osc_rest/skeleton/app/app00"
 	app01 "osc_rest/skeleton/app/app01"
 	app02 "osc_rest/skeleton/app/app02"
@@ -17,15 +20,32 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func envList(name string, def []string) []string {
+	raw := strings.TrimSpace(os.Getenv(name))
+	if raw == "" {
+		return def
+	}
+	out := []string{}
+	for _, v := range strings.Split(raw, ",") {
+		if s := strings.TrimSpace(v); s != "" {
+			out = append(out, s)
+		}
+	}
+	if len(out) == 0 {
+		return def
+	}
+	return out
+}
+
 func SetRouter() *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	rest := gin.New()
 	rest.Use(RequestID())
 	rest.Use(CustomRecovery())
 	rest.Use(Logger())
-	rest.SetTrustedProxies([]string{"localhost", "172.99.77.1"})
+	rest.SetTrustedProxies(envList("TRUSTED_PROXIES", []string{"localhost", "172.99.77.1"}))
 	rest.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:37771", "http://172.99.77.1:37771"},
+		AllowOrigins:     envList("CORS_ALLOWED_ORIGINS", []string{"http://localhost:37771", "http://172.99.77.1:37771"}),
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Company-ID"},
 		ExposeHeaders:    []string{"Content-Length", "X-Request-ID"},
@@ -39,6 +59,7 @@ func SetRouter() *gin.Engine {
 	SetDatabase()
 
 	guest := rest.Group("/rest/guest")
+	guest.Use(mechanic.RateLimit(10, time.Minute))
 	guest.GET("/", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"message": "guest"}) })
 
 	pages := rest.Group("/rest/pages")
@@ -46,7 +67,7 @@ func SetRouter() *gin.Engine {
 	auths := rest.Group("/rest/pages")
 	auths.Use(USAuth())
 	admin := rest.Group("/rest/pages")
-	admin.Use(USAuth(), USLock())
+	admin.Use(USAuth(), USLock(), USLogs(""))
 	pages.GET("/", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"message": "pages"}) })
 	pub.Use(PgSQL)
 	app00.Use(PgSQL)
@@ -143,6 +164,8 @@ func SetRouter() *gin.Engine {
 	admin.GET("/APP05/tokens/:id", app05.APP05TokensGet)
 	admin.PUT("/APP05/tokens/:id", app05.APP05TokensUpdate)
 	admin.DELETE("/APP05/tokens/:id", app05.APP05TokensDelete)
+	admin.GET("/APP05/actions", app05.APP05ActionsList)
+	admin.GET("/APP05/actions/:id", app05.APP05ActionsGet)
 
 	return rest
 }

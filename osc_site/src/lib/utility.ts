@@ -7,6 +7,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export const storageKey = "OmniSightMemory";
+export const sessionCookie = "OmniSightSession";
 
 type ProfileUser = {
   id: string;
@@ -23,7 +24,7 @@ type ProfileUser = {
 };
 
 export type SessionData = {
-  token: string;
+  token?: string;
   expires_at: string;
   user_profile: ProfileUser;
 };
@@ -32,7 +33,7 @@ export const parseSession = (value: string | null): SessionData | null => {
   if (!value) return null;
   try {
     const parsed = JSON.parse(value) as SessionData;
-    if (!parsed?.token || !parsed?.expires_at) return null;
+    if (!parsed?.expires_at || !parsed?.user_profile) return null;
     return parsed;
   } catch {
     return null;
@@ -44,22 +45,32 @@ export const isSessionExpired = (session: SessionData | null) => {
   return new Date(session.expires_at).getTime() <= Date.now();
 };
 
+// Membersihkan sesi klien. Token akses TIDAK disimpan di JS — ia berada di
+// cookie HttpOnly, sehingga penghapusannya harus dilakukan oleh server.
 export const forceLogout = (router?: { replace: (url: string) => void }) => {
   window.localStorage.removeItem(storageKey);
+  const done = () => {
+    if (router) {
+      router.replace("/login");
+    } else {
+      window.location.href = "/login";
+    }
+  };
   try {
-    document.cookie = `${storageKey}=; path=/; max-age=0`;
-  } catch { }
-  if (router) {
-    router.replace("/login");
-  } else {
-    window.location.href = "/login";
+    fetch("/proxy/guest/PUB00", { method: "DELETE", credentials: "same-origin" })
+      .catch(() => {})
+      .finally(done);
+  } catch {
+    done();
   }
 };
 
+// Menyimpan HANYA profil (tanpa token) untuk kebutuhan UI klien. Sesi
+// autentikasi sesungguhnya disimpan di cookie HttpOnly oleh route server.
 export const persistSession = (session: SessionData) => {
-  const sessionStr = JSON.stringify(session);
-  window.localStorage.setItem(storageKey, sessionStr);
-  document.cookie = `${storageKey}=${encodeURIComponent(sessionStr)}; path=/; max-age=${60 * 60 * 24}`;
+  const { token: _token, ...safe } = session;
+  void _token;
+  window.localStorage.setItem(storageKey, JSON.stringify(safe));
 };
 
 export const getInitials = (str: string): string => {

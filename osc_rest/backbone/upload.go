@@ -36,6 +36,10 @@ func UploadHandler(c *gin.Context) {
 		mechanic.Error(c, mechanic.ValidationError("Category must be documents, evidence, or avatars"))
 		return
 	}
+	if _, err := uuid.Parse(entityID); err != nil {
+		mechanic.Error(c, mechanic.ValidationError("ID must be a valid UUID"))
+		return
+	}
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, MaxUploadSize)
 	file, err := c.FormFile("file")
 	if err != nil {
@@ -48,7 +52,13 @@ func UploadHandler(c *gin.Context) {
 		return
 	}
 	dir := filepath.Join(UploadBase, category, entityID)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	// Pertahanan berlapis: pastikan direktori hasil resolusi tetap berada
+	// di dalam UploadBase (anti path traversal).
+	if rel, err := filepath.Rel(UploadBase, dir); err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		mechanic.Error(c, mechanic.ValidationError("Invalid upload path"))
+		return
+	}
+	if err := os.MkdirAll(dir, 0750); err != nil {
 		mechanic.Error(c, mechanic.InternalError("Failed to create upload directory", err))
 		return
 	}

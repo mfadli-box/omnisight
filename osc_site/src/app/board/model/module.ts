@@ -2,8 +2,8 @@
 
 import {
   type LucideIcon,
-  Activity, AppWindow, Container, Cpu, FileText, Globe, Lock,
-  ReceiptText, ServerCog, Shield, Users,
+  Activity, AppWindow, Container, Cpu, FileText, Globe, KeyRound, Lock,
+  ReceiptText, ServerCog, Shield, ShieldCheck, Users,
 } from "lucide-react";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { usePreferencesStore } from "@/app/theme";
@@ -93,7 +93,9 @@ function mapIconByCode(code: string): LucideIcon | undefined {
   if (key === "JMS") return Lock;
   if (key === "NET") return Activity;
   if (key === "OBS") return Activity;
+  if (key === "PAM") return KeyRound;
   if (key === "POD") return Container;
+  if (key === "SEC") return ShieldCheck;
   if (key === "SYS") return Users;
   if (key === "VMS") return Cpu;
   if (key === "WAF") return Shield;
@@ -167,7 +169,7 @@ export function useModuleItem(): NavGroup[] {
     let active = true;
     const load = async () => {
       const session = parseSession(window.localStorage.getItem(storageKey));
-      const isLoggedIn = Boolean(session?.token);
+      const isLoggedIn = Boolean(session);
       const isAdmin = Boolean(session?.user_profile.is_admin);
       if (!isLoggedIn || !session) {
         if (active) setItems(buildNavGroups([], false, false));
@@ -181,7 +183,7 @@ export function useModuleItem(): NavGroup[] {
       try {
         const response = await fetch(`/proxy/pages/APP00/module?company_id=${companyId}`, {
           method: "GET",
-          headers: { Authorization: `Bearer ${session.token}` },
+          credentials: "same-origin",
         });
         const data = await response.json();
         const tree = Array.isArray(data?.data) ? data.data : [];

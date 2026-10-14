@@ -24,18 +24,26 @@ AD_PASS="rahasia2024"
 
 ```env
 TZ=Asia/Jakarta
-PG_HOST=osc_base        # nama service di docker compose; localhost bila di host
+PG_HOST=localhost        # nama service di docker compose; localhost bila di host
 PG_PORT=37771           # mapping host docker compose (37771:5432)
 PG_DATA=osc
 PG_USER=dbe
 PG_PASS=rahasia
+PG_SSLMODE=disable      # produksi: gunakan `require`/`verify-full`
 IS_POOL=false
 RE_FLAG=true
 RE_DAYS=30
 RE_LOGS=90
 CR_KEYS=
-RE_SECRET=
+RE_SECRET=              # WAJIB: ≥32 byte acak (openssl rand -base64 48)
+LISTEN_ADDR=127.0.0.1:37772
 ```
+
+> **Penting:** sejak audit keamanan, backend **menolak start** bila `RE_SECRET`
+> kosong atau kurang dari 32 byte. Generate dengan `openssl rand -base64 48`,
+> lalu isi `RE_SECRET`. `LISTEN_ADDR` default `127.0.0.1:37772` (hanya lokal);
+> di dalam container set `LISTEN_ADDR=0.0.0.0:37772`. Lihat
+> [security.md](security.md).
 
 > Saat menjalankan backend di host (bukan docker), set `PG_HOST=localhost`
 > dan sesuaikan `PG_PORT` / `PG_PASS` dengan container yang berjalan.
@@ -118,9 +126,13 @@ cd osc_site && docker build -t osc_site .
 Jalankan manual (sementara, hingga service ditambahkan ke compose):
 
 ```bash
-docker run -d --network blackbox --name osc_rest -p 37772:37772 osc_rest
-docker run -d --network blackbox --name osc_site -p 37773:37773 osc_site
+docker run -d --network blackbox --name osc_rest -p 127.0.0.1:37772:37772 osc_rest
+docker run -d --network blackbox --name osc_site -p 127.0.0.1:37773:37773 osc_site
 ```
+
+> Di produksi, **jangan** publikasikan `37772`/`37771` ke internet. Cukup
+> ekspos frontend `37773` di balik reverse proxy TLS (lihat `deploy/`).
+> Bila frontend berjalan dalam container, set `LISTEN_ADDR=0.0.0.0:37772`.
 
 Untuk merevisi `docker-compose.yml` (tambah service `osc_rest`, `osc_site`),
 ikuti pola service `osc_base` yang sudah ada: definisikan service, env dari
@@ -163,7 +175,7 @@ Catatan:
 | Backend tak connect DB | `.env` tidak terbaca | Pastikan jalankan dari folder `osc_rest`; cek `PG_HOST=localhost` bila di host |
 | `invalid go version` saat build | Toolchain Go lama | Pasang Go ≥ 1.26.6 (lihat `go.mod`); utama `/usr/local/go` |
 | Login gagal | DB belum di-seed | `npx prisma db seed` |
-| CORS error | Origin beda dengan `AllowOrigins` | Tambah origin di `backbone/routes.go` |
+| CORS error | Origin beda dengan `AllowOrigins` | Set `CORS_ALLOWED_ORIGINS` (koma) di `.env` backend |
 | Frontend 502 | `BE_POOL` salah | Perbaiki `BE_POOL` (`:37772`); pastikan backend jalan |
 | Seed `P2002` (duplikat) | Username `where` vs `create` beda | Gunakan `username: "root"` di kedua blok `upsert` |
 

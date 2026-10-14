@@ -50,6 +50,7 @@ const loginSchema = z.object({
   username: z.string().min(1, "Username is required"),
   password: z.string().min(1, "Password is required"),
   captcha: z.string().min(1, "Captcha is required"),
+  totp: z.string().optional(),
 });
 
 type LoginForm = z.infer<typeof loginSchema>;
@@ -58,6 +59,7 @@ export default function LoginPage() {
   const router = useRouter();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [totpRequired, setTotpRequired] = useState(false);
   const [hrisCompanies, setHrisCompanies] = useState<HrisCompany[]>([]);
   const [loadingHris, setLoadingHris] = useState(true);
   const [captchaVersion, setCaptchaVersion] = useState(0);
@@ -79,7 +81,7 @@ export default function LoginPage() {
 
   const loginForm = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { username: "", password: "", captcha: "", company_id: "" },
+    defaultValues: { username: "", password: "", captcha: "", company_id: "", totp: "" },
   });
   const selectedCompanyId = useWatch({
     control: loginForm.control,
@@ -116,21 +118,27 @@ export default function LoginPage() {
       const res = await fetch("/proxy/guest/PUB00", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({
           company_id: data.company_id,
           username: data.username,
           password: data.password,
+          totp_code: data.totp ?? "",
         }),
       });
       const resData = await res.json();
       if (!res.ok) {
+        if (resData.code === "TOTP_REQUIRED") {
+          setTotpRequired(true);
+          setError("Enter the 6-digit code from your authenticator app");
+          return;
+        }
         setError(resData.error || "Login failed");
         refreshCaptcha();
         return;
       }
       const profile = { ...resData.data.user_profile, company_id: data.company_id };
       const session = {
-        token: resData.data.token,
         expires_at: resData.data.expires_at,
         user_profile: profile,
       };
@@ -248,6 +256,26 @@ export default function LoginPage() {
                 }] : undefined} />
               </FieldContent>
             </Field>
+
+            {totpRequired && (
+              <Field data-invalid={!!loginForm.formState.errors.totp}>
+                <FieldContent>
+                  <FieldLabel htmlFor="totp">2FA Code</FieldLabel>
+                  <Input
+                    id="totp"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    placeholder="6-digit code"
+                    aria-invalid={!!loginForm.formState.errors.totp}
+                    {...loginForm.register("totp")}
+                  />
+                  <FieldError errors={loginForm.formState.errors.totp ? [{
+                    message: loginForm.formState.errors.totp.message,
+                  }] : undefined} />
+                </FieldContent>
+              </Field>
+            )}
 
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Signing in..." : "Sign in"}

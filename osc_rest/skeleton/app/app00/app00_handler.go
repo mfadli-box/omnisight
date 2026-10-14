@@ -24,7 +24,7 @@ func APP00Logout(c *gin.Context) {
 		UPDATE	app_user_token
 		SET		revoked_at = now(),
 				revoked_reason = 'logout'
-		WHERE	token = $1 AND revoked_at IS NULL`, token)
+		WHERE	token = $1 AND revoked_at IS NULL`, mechanic.HashToken(token))
 	if err != nil {
 		mechanic.Error(c, mechanic.InternalError("Failed to revoke session", err))
 		return

@@ -1,0 +1,33 @@
+# Caddyfile — TLS otomatis (Let's Encrypt) + reverse proxy untuk OmniSight
+#
+# Letakkan di host, jalankan Caddy, dan ganti `example.com` dengan domain Anda.
+# Backend (:37772) dan database (:37771) TIDAK boleh dipublikasikan ke internet;
+# Caddy hanya meneruskan ke frontend Next.js (:37773).
+
+{
+	email admin@example.com
+}
+
+example.com {
+	encode zstd gzip
+
+	# Header keamanan (lapis kedua; aplikasi juga mengirim header sendiri).
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# Batasi ukuran body (unggahan maksimum 20MB + margin).
+	request_body {
+		max_size 25MB
+	}
+
+	reverse_proxy 127.0.0.1:37773 {
+		# Teruskan IP asli klien agar rate-limit backend bekerja.
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+}

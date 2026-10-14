@@ -15,6 +15,7 @@ kontrol akses berbasis modul/area, sesi/token aman, dan audit trail.
 
 - `code` unik; `path` lokasi menu; `is_page` membedakan halaman vs folder.
 - Relasi self `modular` (parent–children) untuk hierarki menu bertingkat.
+- Indeks `parent_id` untuk penelusuran rantai leluhur/turunan.
 - Dipakai frontend untuk membangun sidebar & otorisasi menu (`APP00/module`).
 
 ### 2.2 `app_company` — Perusahaan
@@ -39,7 +40,8 @@ kontrol akses berbasis modul/area, sesi/token aman, dan audit trail.
 - Keamanan: `password` (bcrypt), `is_totp_enabled`, `totp_secret`,
   `locked_until`, `failed_attempts` (lockout brute-force).
 - Flag: `is_admin`, `is_hris`, `is_active`.
-- Relasi: `companies`, `areas`, `actions`, `tokens`.
+- Relasi: `companies`, `areas`, `actions`, `tokens`, `sessions`,
+  `approval_signs`, `signature_flags`.
 
 ### 2.6 `app_user_company` — Pivot User ⇄ Company
 
@@ -60,7 +62,8 @@ kontrol akses berbasis modul/area, sesi/token aman, dan audit trail.
 
 - `session_token` `VarChar(512)`, `ip_address`, `user_agent`,
   `started_at`, `last_active`, `ended_at`, `status`.
-- Indeks: `user_id`, `session_token`, `status`.
+- Relasi `user` ke `app_user` (`onDelete: Cascade`) — sesi ikut terhapus bila
+  user dihapus; indeks `user_id`, `session_token`, `status`.
 
 ### 2.10 `app_user_action` — Audit Trail
 
@@ -91,6 +94,7 @@ kontrol akses berbasis modul/area, sesi/token aman, dan audit trail.
 ### 2.14 `app_approval_sign` — Penanda Antrean Persetujuan (Signer per Step)
 
 - `@@unique([step_id, user_id])` — satu user hanya satu baris per step.
+- Indeks `user_id` (pencarian balik berdasarkan user).
 - `onDelete: Cascade` dari `app_approval_step`.
 
 ### 2.15 `app_signature_form` — Pengajuan Tanda Tangan (Form)
@@ -102,7 +106,22 @@ kontrol akses berbasis modul/area, sesi/token aman, dan audit trail.
 ### 2.16 `app_signature_flag` — Tanda/Sikap Signer dalam Form
 
 - `@@unique([form_id, user_id])`; `status` default `PENDING`.
+- Indeks `user_id` (pencarian balik berdasarkan user).
 - `comment` opsional; `onDelete: Cascade` dari `app_signature_form`.
+
+### 2.17 Rencana — Admin Lanjutan `APP06`–`APP11`
+
+Model baru (tetap prefix `app_*`) untuk Fase 6 — lihat
+[../planning/app_sys.md](../planning/app_sys.md). **Belum dibangun**:
+
+| Kode | Model | Isi pokok |
+|---|---|---|
+| `APP06` | `app_notify_channel`, `app_notify_template`, `app_notify_rule`, `app_notify_message` | Notifikasi terpusat (kanal/template/aturan + log kirim). |
+| `APP07` | `app_integration`, `app_integration_sync`, `app_employee` | Integrasi HRIS/SSO + riwayat sync + data karyawan. |
+| `APP08` | `app_api_key`, `app_webhook`, `app_webhook_delivery` | Kunci API (hash + scope) + webhook keluar + log pengiriman. |
+| `APP09` | `app_report` (+ `app_user_action`) | Report tersimpan; audit memakai `app_user_action`. |
+| `APP10` | `app_preference`, `app_company_setting` | Preferensi user & setting per-company. |
+| `APP11` | `app_backup`, `app_backup_item` | Backup konfigurasi/metadata + item. |
 
 ## 3. Relasi Inti
 

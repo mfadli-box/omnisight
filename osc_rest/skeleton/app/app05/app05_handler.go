@@ -129,3 +129,23 @@ func APP05TokensDelete(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Token deleted"})
 }
+
+// --- User Action ---
+
+func APP05ActionsList(c *gin.Context) {
+	data, err := ListActions(c.Request.Context(), gridParams(c))
+	if err != nil {
+		mechanic.Error(c, mechanic.InternalError("Failed to load actions", err))
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": data})
+}
+
+func APP05ActionsGet(c *gin.Context) {
+	data, err := GetAction(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		mechanic.Error(c, mechanic.NotFound("Action not found"))
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": data})
+}

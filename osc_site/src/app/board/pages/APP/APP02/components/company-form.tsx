@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 import DataDialog from "@/uix/datadialog";
@@ -50,10 +50,6 @@ export default function CompanyForm({ isOpen, mode, company, onClose, onSaved }:
   const [values, setValues] = useState<CompanyFormValues>(() => defaultValues(company));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    setValues(defaultValues(company));
-  }, [isOpen, company]);
 
   const set = <K extends keyof CompanyFormValues>(key: K, value: CompanyFormValues[K]) => {
     setValues((prev) => ({ ...prev, [key]: value }));

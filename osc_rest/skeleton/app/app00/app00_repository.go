@@ -59,35 +59,27 @@ func moduleRows(ctx context.Context, db *pgxpool.Pool, companyID, userID string,
 		args = []any{companyID}
 	} else {
 		query = `
-			SELECT	m.id, m.parent_id, m.code, m.name, m.path, m.is_page
-			FROM	app_module m
-			JOIN	app_company_module cm ON cm.module_id = m.id
-			JOIN	app_user_privilege p ON p.module_id = m.id
-			JOIN	app_user_company uc ON uc.id = p.user_company_id
-			WHERE	cm.company_id = $1
-			  AND	cm.is_active = true
-			  AND	m.is_active = true
-			  AND	uc.user_id = $2
-			  AND	uc.company_id = $1
-			  AND	uc.is_active = true
-			  AND	p.level <> 'HIDE'
-			UNION
-			SELECT	m.id, m.parent_id, m.code, m.name, m.path, m.is_page
-			FROM	app_module m
-			WHERE	m.id IN (
-				SELECT	DISTINCT parent_id
-				FROM	app_module ch
-				JOIN	app_company_module cm ON cm.module_id = ch.id
-				JOIN	app_user_privilege p ON p.module_id = ch.id
+			WITH RECURSIVE visible (id, parent_id, code, name, path, is_page) AS (
+				SELECT	m.id, m.parent_id, m.code, m.name, m.path, m.is_page
+				FROM	app_module m
+				JOIN	app_company_module cm ON cm.module_id = m.id
+				JOIN	app_user_privilege p ON p.module_id = m.id
 				JOIN	app_user_company uc ON uc.id = p.user_company_id
 				WHERE	cm.company_id = $1
 				  AND	cm.is_active = true
-				  AND	ch.is_active = true
+				  AND	m.is_active = true
 				  AND	uc.user_id = $2
 				  AND	uc.company_id = $1
 				  AND	uc.is_active = true
 				  AND	p.level <> 'HIDE'
+				UNION
+				SELECT	m.id, m.parent_id, m.code, m.name, m.path, m.is_page
+				FROM	app_module m
+				JOIN	visible v ON v.parent_id = m.id
+				WHERE	m.is_active = true
 			)
+			SELECT DISTINCT id, parent_id, code, name, path, is_page
+			FROM	visible
 			ORDER BY name`
 		args = []any{companyID, userID}
 	}

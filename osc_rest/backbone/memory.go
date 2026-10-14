@@ -2,10 +2,13 @@ package backbone
 
 import (
 	"context"
+	"crypto/subtle"
 	"net/http"
 	"os"
 	"strings"
 	"time"
+
+	"osc_rest/mechanic"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -62,7 +65,7 @@ func USLoad() gin.HandlerFunc {
 		`
 		var session SessionMemory
 		ctx := context.Background()
-		err := db.QueryRow(ctx, query, token).Scan(
+		err := db.QueryRow(ctx, query, mechanic.HashToken(token)).Scan(
 			&session.UserId,
 			&session.CompanyId,
 			&session.ExpiresAt,
@@ -158,7 +161,7 @@ func USAuth() gin.HandlerFunc {
 			isHris    bool
 		)
 		ctx := context.Background()
-		err := db.QueryRow(ctx, query, token).Scan(
+		err := db.QueryRow(ctx, query, mechanic.HashToken(token)).Scan(
 			&userID, &expiresAt, &isActive, &isAdmin, &isHris,
 		)
 		if err != nil || expiresAt.Before(time.Now()) {
@@ -218,7 +221,7 @@ func USBots() gin.HandlerFunc {
 		}
 		valid := false
 		for _, allowed := range strings.Split(expected, ",") {
-			if strings.TrimSpace(allowed) == token {
+			if subtle.ConstantTimeCompare([]byte(strings.TrimSpace(allowed)), []byte(token)) == 1 {
 				valid = true
 				break
 			}
@@ -273,6 +276,13 @@ func USLogs(moduleCode string) gin.HandlerFunc {
 		}
 		module := strings.TrimSpace(moduleCode)
 		path := strings.TrimSpace(c.Request.URL.Path)
+		if module == "" {
+			seg := strings.TrimPrefix(path, "/rest/pages/")
+			if i := strings.IndexByte(seg, '/'); i >= 0 {
+				seg = seg[:i]
+			}
+			module = strings.TrimSpace(seg)
+		}
 		ipAddress := strings.TrimSpace(c.ClientIP())
 		userAgent := strings.TrimSpace(c.GetHeader("User-Agent"))
 		auditID := uuid.New().String()
@@ -371,8 +381,8 @@ func USRole(moduleCode string, requiredLevel string) gin.HandlerFunc {
 		}
 		level = strings.TrimSpace(level)
 		if rank[level] < requiredInt {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"code":       "UNAUTHORIZED",
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+				"code":       "FORBIDDEN",
 				"error":      "Insufficient privilege",
 				"request_id": c.GetString("request_id"),
 			})

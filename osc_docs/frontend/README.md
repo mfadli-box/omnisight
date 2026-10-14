@@ -37,7 +37,7 @@ osc_site/
 │   │   │   │   │   ├── APP02/      # company admin (company-table + modules-tab + areas-tab)
 │   │   │   │   │   ├── APP03/      # user admin (user-table + companies-tab + privileges-tab + areas-tab)
 │   │   │   │   │   ├── APP04/      # signature admin (types-table + steps-tab + signers-tab + forms-table + flags-tab)
-│   │   │   │   │   └── APP05/      # session admin (sessions-table + session-form + tokens-table + token-form)
+│   │   │   │   │   └── APP05/      # session admin (sessions-table + session-form + tokens-table + token-form + actions-table)
 │   │   │   │   └── SYS/   # halaman session-profile
 │   │   │   │       ├── SYS01/    # profil (profile-card)
 │   │   │   │       ├── SYS02/    # ganti password (password-form)
@@ -101,6 +101,10 @@ Semua proxy meneruskan `X-Request-ID` dan format error backend.
 - memetakan kode modul (`APP`, `AMM`, `BOT`, `DOC`, `JMS`, `NET`, `OBS`, `POD`,
   `SYS`, `VMS`, `WAF`, `WEB`) → ikon `lucide-react`;
 - `is_page` → link; non-page → grup dengan submenu;
+- untuk user non-admin, backend hanya mengirim modul dengan privilege
+  `level <> HIDE`, namun **seluruh leluhur (parent) tetap disertakan** jika ada
+  minimal satu turunan yang tidak `HIDE` (recursive ancestor walk), sehingga
+  grup parent tidak hilang dari sidebar;
 - menu statis: admin mendapat group `Application` (APP01–05: Module, Company,
   User, Signature, Session), user login mendapat `Session Profile`
   (SYS01–SYS03); modul dinamis ditambahkan di atasnya.

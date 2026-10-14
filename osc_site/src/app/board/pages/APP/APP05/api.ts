@@ -48,6 +48,20 @@ export interface UserToken {
   created_at: string;
 }
 
+export interface UserAction {
+  id: string;
+  user_id: string;
+  username?: string;
+  fullname?: string;
+  company_id?: string | null;
+  module_code?: string | null;
+  action: string;
+  path: string;
+  ip_address?: string | null;
+  user_agent?: string | null;
+  created_at: string;
+}
+
 export function fetchSessions(p: GridParams): Promise<GridResult<UserSession>> {
   return gridFetch<UserSession>("/APP05/sessions", p);
 }
@@ -106,6 +120,14 @@ export function updateToken(id: string, body: Partial<Record<keyof UserToken, un
 
 export function deleteToken(id: string) {
   return removeItem(`/APP05/tokens/${id}`);
+}
+
+export function fetchActions(p: GridParams): Promise<GridResult<UserAction>> {
+  return gridFetch<UserAction>("/APP05/actions", p);
+}
+
+export function fetchAction(id: string): Promise<UserAction> {
+  return getOne<UserAction>(`/APP05/actions/${id}`);
 }
 
 export async function fetchUserOptions() {

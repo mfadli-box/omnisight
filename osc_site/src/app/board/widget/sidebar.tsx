@@ -61,9 +61,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     try {
       fetch("/proxy/pages/APP00", {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${session.token}`,
-        },
+        credentials: "same-origin",
       });
       forceClientLogout();
     } catch (err) {
@@ -89,7 +87,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       return;
     }
     fetch("/proxy/pages/APP00/company", {
-      headers: { Authorization: `Bearer ${session.token}` },
+      credentials: "same-origin",
     }).then((res) => {
       if (res.status === 401 || res.status === 403) forceLogout(router);
     }).catch(() => forceLogout(router));

@@ -59,9 +59,7 @@ export function CompanyCombobox() {
     }
     const initialCompany = (lockedCompanyId || companyId || "").trim();
       fetch(`/proxy/pages/APP00/company`, {
-        headers: {
-          Authorization: `Bearer ${session.token}`,
-        },
+        credentials: "same-origin",
       })
       .then((res) => res.json())
       .then((response: CompanyResponse) => {

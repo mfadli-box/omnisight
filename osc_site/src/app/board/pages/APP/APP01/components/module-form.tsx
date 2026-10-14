@@ -50,10 +50,6 @@ export default function ModuleForm({ isOpen, mode, module, onClose, onSaved }: M
   const [parentOptions, setParentOptions] = useState<Array<{ id: string; name: string }>>([]);
 
   useEffect(() => {
-    setValues(defaultValues(module));
-  }, [isOpen, module]);
-
-  useEffect(() => {
     let cancelled = false;
     async function load() {
       try {

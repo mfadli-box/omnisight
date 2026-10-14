@@ -30,7 +30,18 @@ osc_base/
 |---|---|---|
 | `prisma/schema/schema.prisma` | [schema.md](schema.md) | Generator data client + datasource PostgreSQL |
 | `prisma/schema/cluster_app.prisma` | [cluster_app.md](cluster_app.md) | Model multi-tenant aplikasi (`app_*`) |
-| `prisma/schema/cluster_*.prisma` (mendatang) | `cluster_*.md` | Model per cluster (net/obs/sec/dso/dll.) |
+| `prisma/schema/cluster_amm.prisma` | [cluster_amm.md](cluster_amm.md) | Asset management & CMDB (`amm_*`) |
+| `prisma/schema/cluster_net.prisma` | [cluster_net.md](cluster_net.md) | Network monitoring (`net_*`) |
+| `prisma/schema/cluster_vms.prisma` | [cluster_vms.md](cluster_vms.md) | VM & hypervisor management (`vms_*`) |
+| `prisma/schema/cluster_pod.prisma` | [cluster_pod.md](cluster_pod.md) | Container/Pod (`pod_*`) |
+| `prisma/schema/cluster_sec.prisma` | [cluster_sec.md](cluster_sec.md) | Keamanan perimeter/WAF + SIEM/HIDS (`sec_*`) |
+| `prisma/schema/cluster_pam.prisma` (rencana) | [cluster_pam.md](cluster_pam.md) | Bastion / Privileged Access (`pam_*`) |
+| `prisma/schema/cluster_web.prisma` | [cluster_web.md](cluster_web.md) | Web/Proxy + Domain & DNS (`web_*`) |
+| `prisma/schema/cluster_jms.prisma` | [cluster_jms.md](cluster_jms.md) | Job management (`jms_*`) |
+| `prisma/schema/cluster_bot.prisma` | [cluster_bot.md](cluster_bot.md) | Bot/Agent (`bot_*`) |
+| `prisma/schema/cluster_dso.prisma` | [cluster_dso.md](cluster_dso.md) | DevOps/CI-CD (`dso_*`) |
+| `prisma/schema/cluster_obs.prisma` | [cluster_obs.md](cluster_obs.md) | Observability (`obs_*`) |
+| `prisma/schema/cluster_doc.prisma` | [cluster_doc.md](cluster_doc.md) | Document (`doc_*`) |
 
 Konvensi: satu file Prisma = satu dokumen detail; cluster baru menambah satu
 file `cluster_<nama>.prisma` + satu dokumen `cluster_<nama>.md`.
@@ -75,9 +86,10 @@ updated_at  DateTime @default(now())
 - Setiap model hanya menyimpan `created_at`/`updated_at` (tanpa `created_by`/`updated_by`).
 - Unique: `@@unique` eksplisit (mis. `@@unique([code])`,
   `@@unique([company_id, code])`).
-- Prefix model: `app_*` untuk cluster aplikasi; `net_*`, `obs_*`, `sec_*`,
-  `pod_*`, `jms_*`, `dso_*`, `web_*`, `vms_*`, `bot_*` untuk cluster lain
-  (sesuai daftar retensi `osc_rest/backbone/retention.go`).
+- Prefix model: `app_*` untuk cluster aplikasi; `amm_*`, `net_*`, `vms_*`,
+  `pod_*`, `sec_*`, `pam_*`, `web_*`, `jms_*`, `bot_*`, `dso_*`, `obs_*`,
+  `doc_*` untuk cluster lain (sesuai daftar retensi
+  `osc_rest/backbone/retention.go`).
 
 ## 5. Manajemen Migrasi
 
@@ -89,8 +101,13 @@ npx prisma migrate deploy         # terapkan ke environment lain
 npx prisma db seed                # seed admin + modul
 ```
 
-Migrasi terakhir saat penulisan: `20261006024400_init` (membuat seluruh model
-`cluster_app`).
+Riwayat migrasi:
+
+| Migrasi | Isi |
+|---|---|
+| `20261006024400_init` | Seluruh model `cluster_app`. |
+| `20261009022147_planned_clusters` | Cluster terencana: `amm`, `net`, `vms`, `pod`, `sec`, `web`, `jms`, `bot`, `dso`, `obs`, `doc`. |
+| `20261009022856_complete_cluster_app` | FK `app_user_session.user_id` → `app_user` + indeks `parent_id`/`user_id`. |
 
 ## 6. Seed
 

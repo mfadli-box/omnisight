@@ -9,15 +9,31 @@ import (
 	"time"
 
 	"osc_rest/backbone"
+	"osc_rest/mechanic"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	_ = godotenv.Load()
+	if err := mechanic.InitCrypto(); err != nil {
+		backbone.Log.Fatal().Err(err).Msg("crypto initialization failed")
+	}
 	backbone.SetDatabase()
 	rest := backbone.SetRouter()
 	go backbone.CleanupExpiredSessions()
+	addr := os.Getenv("LISTEN_ADDR")
+	if addr == "" {
+		addr = "127.0.0.1:37772"
+	}
 	srv := &http.Server{
-		Addr:    ":37772",
-		Handler: rest,
+		Addr:              addr,
+		Handler:           rest,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		MaxHeaderBytes:    1 << 20,
 	}
 	go func() {
 		backbone.Log.Info().Str("addr", srv.Addr).Msg("server starting")

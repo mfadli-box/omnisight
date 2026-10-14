@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { BE_POOL } from "@/lib/backend";
-import { storageKey } from "@/lib/utility";
+import { sessionCookie } from "@/lib/utility";
 
 async function getSession() {
   const jar = await cookies();
-  const raw = jar.get(storageKey)?.value;
+  const raw = jar.get(sessionCookie)?.value;
   if (!raw) return null;
   try {
     return JSON.parse(decodeURIComponent(raw));
