@@ -1,0 +1,47 @@
+// Cluster PAM — Bastion / Privileged Access Management.
+// Target akses, kredensial istimewa (terenkripsi), kebijakan & hibah akses.
+// Dokumen: osc_docs/database/cluster_pam.md
+
+model pam_asset {
+  id        String   @id @default(uuid())
+  company_id String  @default("")
+  code      String
+  name      String
+  category  String   @default("SERVER") // SERVER | VM | NETWORK | CONTAINER | DB
+  protocol  String   @default("SSH")    // SSH | SFTP | RDP | VNC | TELNET?
+  host      String
+  port      Int      @default(22)
+  os        String?
+  tags      Json?
+  is_active Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  accounts  pam_account[]
+
+  @@unique([company_id, code])
+  @@index([company_id])
+}
+
+model pam_account {
+  id                 String    @id @default(uuid())
+  asset_id           String
+  name               String
+  username           String
+  auth_type          String    @default("PASSWORD") // PASSWORD | SSH_KEY | AGENT
+  secret_enc         String?   @db.Text
+  key_enc            String?   @db.Text
+  passphrase_enc     String?   @db.Text
+  privileged         Boolean   @default(false)
+  auto_rotate        Boolean   @default(false)
+  rotate_interval_days Int?
+  last_rotated_at    DateTime?
+  is_active          Boolean   @default(true)
+  created_at         DateTime  @default(now())
+  updated_at         DateTime  @default(now())
+
+  asset              pam_asset @relation(fields: [asset_id], references: [id], onDelete: Cascade)
+
+  @@unique([asset_id, name])
+  @@index([asset_id])
+}
