@@ -28,6 +28,7 @@
   routing, pola endpoint.
 - [Audit keamanan](development/security.md) — temuan, perbaikan, dan
   checklist go-live untuk ekspos publik.
+- [User Guide](user-guide.md) — panduan penggunaan aplikasi untuk end-user.
 
 ## 3. Structure of osc_docs
 
