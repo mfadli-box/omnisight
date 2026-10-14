@@ -41,10 +41,12 @@ model net_device {
   created_at  DateTime  @default(now())
   updated_at  DateTime  @default(now())
 
-  subnet         net_subnet?         @relation(fields: [subnet_id], references: [id])
-  interfaces     net_interface[]
-  config_backups net_config_backup[]
-  changes        net_change[]
+  subnet           net_subnet?         @relation(fields: [subnet_id], references: [id])
+  interfaces       net_interface[]
+  config_backups   net_config_backup[]
+  changes          net_change[]
+  netSyslogEvents  net_syslog_event[]
+  netFirewallRules net_firewall_rule[]
 
   @@unique([company_id, code])
   @@index([company_id])
@@ -121,4 +123,64 @@ model net_change {
 
   @@index([company_id, created_at])
   @@index([device_id, created_at])
+}
+
+model net_syslog_event {
+  id          String   @id @default(uuid())
+  company_id  String   @default("")
+  device_id   String?
+  source_ip   String?
+  facility    String?
+  severity    String?
+  program     String?
+  message     String   @db.Text
+  kind        String   @default("SYSLOG") // SYSLOG | TRAP
+  dedup_key   String?
+  count       Int      @default(1)
+  first_seen  DateTime @default(now())
+  last_seen   DateTime @default(now())
+  recorded_at DateTime @default(now())
+
+  device net_device? @relation(fields: [device_id], references: [id])
+
+  @@index([company_id, recorded_at])
+  @@index([company_id, dedup_key])
+}
+
+model net_firewall_rule {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  device_id  String?
+  chain      String
+  action     String
+  src_addr   String?
+  dst_addr   String?
+  protocol   String?
+  dst_port   String?
+  comment    String?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  device net_device? @relation(fields: [device_id], references: [id])
+
+  @@index([company_id])
+}
+
+model net_alert_rule {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  code       String
+  name       String
+  scope      String   @default("DEVICE") // DEVICE | INTERFACE | SENSOR
+  metric     String
+  comparator String   @default("GT") // GT | GTE | LT | LTE | EQ
+  threshold  Float
+  severity   String   @default("WARNING") // INFO | WARNING | CRITICAL
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@unique([company_id, code])
+  @@index([company_id])
 }
