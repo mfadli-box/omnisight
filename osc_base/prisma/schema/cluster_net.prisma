@@ -1,0 +1,69 @@
+// Cluster NET — Network Monitoring.
+// Perangkat jaringan, topologi (subnet), dan antarmuka.
+// Dokumen: osc_docs/database/cluster_net.md
+
+model net_subnet {
+  id          String   @id @default(uuid())
+  company_id  String   @default("")
+  code        String
+  name        String
+  cidr        String
+  gateway     String?
+  vlan        Int?
+  description String?
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now())
+
+  devices     net_device[]
+
+  @@unique([company_id, code])
+  @@index([company_id])
+}
+
+model net_device {
+  id          String    @id @default(uuid())
+  company_id  String    @default("")
+  subnet_id   String?
+  code        String
+  name        String
+  hostname    String?
+  ip_address  String?
+  mac_address String?
+  device_type String    @default("SWITCH") // ROUTER | SWITCH | AP | FIREWALL | SERVER | OTHER
+  vendor      String?
+  model       String?
+  location    String?
+  status      String    @default("UNKNOWN") // UP | DOWN | UNKNOWN
+  last_seen   DateTime?
+  notes       String?
+  is_active   Boolean   @default(true)
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @default(now())
+
+  subnet      net_subnet?     @relation(fields: [subnet_id], references: [id])
+  interfaces  net_interface[]
+
+  @@unique([company_id, code])
+  @@index([company_id])
+  @@index([subnet_id])
+  @@index([status])
+}
+
+model net_interface {
+  id          String   @id @default(uuid())
+  device_id   String
+  name        String
+  if_index    Int?
+  mac_address String?
+  ip_address  String?
+  speed_mbps  Int?
+  status      String   @default("UNKNOWN")
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now())
+
+  device      net_device @relation(fields: [device_id], references: [id], onDelete: Cascade)
+
+  @@unique([device_id, name])
+  @@index([device_id])
+}

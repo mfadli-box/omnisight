@@ -1,0 +1,42 @@
+// Cluster SEC — Keamanan perimeter (WAF).
+// Aturan WAF dan event blokir. Tabel event beretensi (telemetry/log).
+// Dokumen: osc_docs/database/cluster_sec.md
+
+model sec_waf_rule {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  code       String
+  name       String
+  rule_type  String   @default("CUSTOM") // CUSTOM | SQLI | XSS | RCE | RATE_LIMIT
+  pattern    String?
+  action     String   @default("BLOCK") // ALLOW | BLOCK | LOG
+  priority   Int      @default(100)
+  severity   String   @default("MEDIUM") // LOW | MEDIUM | HIGH | CRITICAL
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  events     sec_waf_event[]
+
+  @@unique([company_id, code])
+  @@index([company_id])
+}
+
+model sec_waf_event {
+  id          String   @id @default(uuid())
+  company_id  String   @default("")
+  rule_id     String?
+  source_ip   String
+  method      String?
+  path        String?
+  action      String   @default("BLOCK")
+  severity    String   @default("MEDIUM")
+  occurred_at DateTime @default(now())
+  created_at  DateTime @default(now())
+
+  rule        sec_waf_rule? @relation(fields: [rule_id], references: [id])
+
+  @@index([company_id])
+  @@index([rule_id])
+  @@index([occurred_at])
+}

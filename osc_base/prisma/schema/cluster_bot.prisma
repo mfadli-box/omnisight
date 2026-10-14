@@ -1,0 +1,65 @@
+// Cluster BOT — Bot/Agent.
+// Registrasi agent, heartbeat (telemetry), dan queue tugas.
+// Dokumen: osc_docs/database/cluster_bot.md
+
+model bot_agent {
+  id         String    @id @default(uuid())
+  company_id String    @default("")
+  code       String
+  name       String
+  hostname   String?
+  ip_address String?
+  os         String?
+  version    String?
+  token      String    @unique @default(uuid())
+  status     String    @default("OFFLINE") // ONLINE | OFFLINE | DISABLED
+  last_seen  DateTime?
+  is_active  Boolean   @default(true)
+  created_at DateTime  @default(now())
+  updated_at DateTime  @default(now())
+
+  heartbeats bot_heartbeat[]
+  tasks      bot_task[]
+
+  @@unique([company_id, code])
+  @@index([company_id])
+  @@index([status])
+}
+
+model bot_heartbeat {
+  id         String   @id @default(uuid())
+  agent_id   String
+  cpu_pct    Float?
+  mem_pct    Float?
+  disk_pct   Float?
+  load_avg   Float?
+  uptime_s   Int?
+  created_at DateTime @default(now())
+
+  agent      bot_agent @relation(fields: [agent_id], references: [id], onDelete: Cascade)
+
+  @@index([agent_id])
+  @@index([created_at])
+}
+
+model bot_task {
+  id           String    @id @default(uuid())
+  agent_id     String
+  code         String?
+  name         String
+  payload      Json?
+  status       String    @default("QUEUED") // QUEUED | RUNNING | DONE | FAILED
+  priority     Int       @default(0)
+  scheduled_at DateTime?
+  started_at   DateTime?
+  finished_at  DateTime?
+  result       String?
+  error        String?
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @default(now())
+
+  agent        bot_agent @relation(fields: [agent_id], references: [id], onDelete: Cascade)
+
+  @@index([agent_id])
+  @@index([status])
+}

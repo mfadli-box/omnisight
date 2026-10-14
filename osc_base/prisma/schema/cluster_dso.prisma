@@ -1,0 +1,60 @@
+// Cluster DSO — DevOps/CI-CD.
+// Pipeline, build, dan deployment.
+// Dokumen: osc_docs/database/cluster_dso.md
+
+model dso_pipeline {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  code       String
+  name       String
+  provider   String   @default("GITHUB") // GITHUB | GITLAB | JENKINS | OTHER
+  repo_url   String?
+  branch     String   @default("main")
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  builds     dso_build[]
+
+  @@unique([company_id, code])
+  @@index([company_id])
+}
+
+model dso_build {
+  id           String    @id @default(uuid())
+  pipeline_id  String
+  number       Int
+  commit_sha   String?
+  status       String    @default("QUEUED") // QUEUED | RUNNING | SUCCESS | FAILED | CANCELED
+  started_at   DateTime?
+  finished_at  DateTime?
+  duration_ms  Int?
+  artifact_url String?
+  logs_url     String?
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @default(now())
+
+  pipeline     dso_pipeline @relation(fields: [pipeline_id], references: [id], onDelete: Cascade)
+  deploys      dso_deploy[]
+
+  @@unique([pipeline_id, number])
+  @@index([pipeline_id])
+  @@index([status])
+}
+
+model dso_deploy {
+  id          String    @id @default(uuid())
+  build_id    String
+  environment String    @default("staging")
+  status      String    @default("PENDING") // PENDING | RUNNING | SUCCESS | FAILED | ROLLED_BACK
+  version     String?
+  released_by String?
+  deployed_at DateTime?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @default(now())
+
+  build       dso_build @relation(fields: [build_id], references: [id], onDelete: Cascade)
+
+  @@index([build_id])
+  @@index([environment])
+}

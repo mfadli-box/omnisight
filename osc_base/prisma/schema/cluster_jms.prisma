@@ -1,0 +1,57 @@
+// Cluster JMS — Job Management.
+// Definisi job, jadwal (cron), dan riwayat eksekusi. Tabel run beretensi.
+// Dokumen: osc_docs/database/cluster_jms.md
+
+model jms_job {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  code       String
+  name       String
+  job_type   String   @default("SHELL") // SHELL | HTTP | SQL
+  command    String?
+  endpoint   String?
+  enabled    Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  schedules  jms_schedule[]
+  runs       jms_run[]
+
+  @@unique([company_id, code])
+  @@index([company_id])
+}
+
+model jms_schedule {
+  id          String    @id @default(uuid())
+  job_id      String
+  cron        String
+  timezone    String    @default("Asia/Jakarta")
+  is_active   Boolean   @default(true)
+  last_run_at DateTime?
+  next_run_at DateTime?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @default(now())
+
+  job         jms_job @relation(fields: [job_id], references: [id], onDelete: Cascade)
+
+  @@index([job_id])
+}
+
+model jms_run {
+  id          String    @id @default(uuid())
+  job_id      String
+  started_at  DateTime  @default(now())
+  finished_at DateTime?
+  status      String    @default("RUNNING") // RUNNING | SUCCESS | FAILED
+  exit_code   Int?
+  output      String?
+  error       String?
+  duration_ms Int?
+  created_at  DateTime  @default(now())
+
+  job         jms_job @relation(fields: [job_id], references: [id], onDelete: Cascade)
+
+  @@index([job_id])
+  @@index([started_at])
+  @@index([status])
+}

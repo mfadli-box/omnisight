@@ -1,0 +1,57 @@
+// Cluster OBS — Observability.
+// Metrik, log, dan alert. Tabel metrik & log beretensi (telemetry/log).
+// Dokumen: osc_docs/database/cluster_obs.md
+
+model obs_metric {
+  id          String   @id @default(uuid())
+  company_id  String   @default("")
+  source      String
+  name        String
+  value       Float
+  unit        String?
+  labels      Json?
+  recorded_at DateTime @default(now())
+  created_at  DateTime @default(now())
+
+  @@index([company_id])
+  @@index([source, name, recorded_at])
+  @@index([recorded_at])
+}
+
+model obs_log {
+  id          String   @id @default(uuid())
+  company_id  String   @default("")
+  source      String
+  level       String   @default("INFO") // DEBUG | INFO | WARN | ERROR | FATAL
+  message     String
+  context     Json?
+  recorded_at DateTime @default(now())
+  created_at  DateTime @default(now())
+
+  @@index([company_id])
+  @@index([level])
+  @@index([source])
+  @@index([recorded_at])
+}
+
+model obs_alert {
+  id           String    @id @default(uuid())
+  company_id   String    @default("")
+  code         String
+  name         String
+  severity     String    @default("MEDIUM") // LOW | MEDIUM | HIGH | CRITICAL
+  source       String?
+  condition    String?
+  message      String?
+  status       String    @default("FIRING") // FIRING | ACK | RESOLVED
+  triggered_at DateTime  @default(now())
+  acked_at     DateTime?
+  resolved_at  DateTime?
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @default(now())
+
+  @@unique([company_id, code])
+  @@index([company_id])
+  @@index([status])
+  @@index([severity])
+}

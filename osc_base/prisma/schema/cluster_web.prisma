@@ -1,0 +1,54 @@
+// Cluster WEB — Web/Proxy.
+// Virtual host, sertifikat TLS, dan upstream.
+// Dokumen: osc_docs/database/cluster_web.md
+
+model web_vhost {
+  id          String   @id @default(uuid())
+  company_id  String   @default("")
+  code        String
+  server_name String
+  listen_port Int      @default(443)
+  ssl         Boolean  @default(true)
+  root        String?
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now())
+
+  upstreams   web_upstream[]
+
+  @@unique([company_id, server_name])
+  @@index([company_id])
+}
+
+model web_certificate {
+  id          String    @id @default(uuid())
+  company_id  String    @default("")
+  common_name String
+  issuer      String?
+  serial      String?
+  not_before  DateTime?
+  not_after   DateTime?
+  fingerprint String?
+  status      String    @default("VALID") // VALID | EXPIRING | EXPIRED | REVOKED
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @default(now())
+
+  @@index([company_id])
+  @@index([status])
+  @@index([not_after])
+}
+
+model web_upstream {
+  id            String   @id @default(uuid())
+  vhost_id      String?
+  name          String
+  target_url    String
+  weight        Int      @default(1)
+  health_status String   @default("UNKNOWN") // UP | DOWN | UNKNOWN
+  created_at    DateTime @default(now())
+  updated_at    DateTime @default(now())
+
+  vhost         web_vhost? @relation(fields: [vhost_id], references: [id], onDelete: Cascade)
+
+  @@index([vhost_id])
+}

@@ -1,0 +1,59 @@
+// Cluster DOC — Document & Kolaborasi.
+// Repositori dokumen, versi, dan tanda tangan.
+// Dokumen: osc_docs/database/cluster_doc.md
+
+model doc_document {
+  id          String   @id @default(uuid())
+  company_id  String   @default("")
+  code        String
+  title       String
+  category    String?
+  description String?
+  owner_id    String?
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now())
+
+  versions    doc_version[]
+  signs       doc_sign[]
+
+  @@unique([company_id, code])
+  @@index([company_id])
+}
+
+model doc_version {
+  id          String   @id @default(uuid())
+  document_id String
+  version     Int
+  file_path   String?
+  mime_type   String?
+  size_bytes  BigInt?
+  checksum    String?
+  change_note String?
+  created_at  DateTime @default(now())
+
+  document    doc_document @relation(fields: [document_id], references: [id], onDelete: Cascade)
+  signs       doc_sign[]
+
+  @@unique([document_id, version])
+  @@index([document_id])
+}
+
+model doc_sign {
+  id          String    @id @default(uuid())
+  document_id String
+  version_id  String?
+  user_id     String
+  status      String    @default("PENDING") // PENDING | SIGNED | REJECTED
+  comment     String?
+  signed_at   DateTime?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @default(now())
+
+  document    doc_document @relation(fields: [document_id], references: [id], onDelete: Cascade)
+  version     doc_version? @relation(fields: [version_id], references: [id])
+
+  @@index([document_id])
+  @@index([version_id])
+  @@index([user_id])
+}

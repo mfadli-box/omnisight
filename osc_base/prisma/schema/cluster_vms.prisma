@@ -1,0 +1,72 @@
+// Cluster VMS — VM & Security.
+// Inventaris hypervisor, guest VM, dan temuan kerentanan.
+// Dokumen: osc_docs/database/cluster_vms.md
+
+model vms_host {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  code       String
+  name       String
+  hostname   String?
+  ip_address String?
+  hypervisor String   @default("VMWARE") // VMWARE | HYPERV | PROXMOX | KVM | OTHER
+  version    String?
+  cpu_cores  Int?
+  ram_mb     Int?
+  storage_gb Int?
+  status     String   @default("UNKNOWN")
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  guests     vms_guest[]
+  findings   vms_finding[]
+
+  @@unique([company_id, code])
+  @@index([company_id])
+}
+
+model vms_guest {
+  id          String   @id @default(uuid())
+  host_id     String
+  code        String
+  name        String
+  guest_os    String?
+  cpu_cores   Int?
+  ram_mb      Int?
+  disk_gb     Int?
+  power_state String   @default("OFF") // ON | OFF | SUSPENDED
+  ip_address  String?
+  notes       String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now())
+
+  host        vms_host      @relation(fields: [host_id], references: [id], onDelete: Cascade)
+  findings    vms_finding[]
+
+  @@unique([host_id, code])
+  @@index([host_id])
+}
+
+model vms_finding {
+  id          String    @id @default(uuid())
+  host_id     String?
+  guest_id    String?
+  title       String
+  severity    String    @default("MEDIUM") // LOW | MEDIUM | HIGH | CRITICAL
+  cve         String?
+  description String?
+  status      String    @default("OPEN") // OPEN | ACK | RESOLVED
+  detected_at DateTime  @default(now())
+  resolved_at DateTime?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @default(now())
+
+  host        vms_host?  @relation(fields: [host_id], references: [id])
+  guest       vms_guest? @relation(fields: [guest_id], references: [id])
+
+  @@index([host_id])
+  @@index([guest_id])
+  @@index([status])
+  @@index([severity])
+}

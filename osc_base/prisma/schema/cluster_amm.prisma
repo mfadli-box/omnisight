@@ -1,0 +1,138 @@
+// Cluster AMM — Asset Management.
+// Aset/lokasi (store) beserta perangkat POS, digital signage, akun toko, dan EDC.
+// Dokumen: osc_docs/database/cluster_amm.md
+
+model amm_asset_type {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  code       String
+  name       String
+  category   String   @default("")
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  assets     amm_asset[]
+
+  @@unique([company_id, code])
+  @@index([company_id])
+}
+
+model amm_asset {
+  id           String   @id @default(uuid())
+  company_id   String   @default("")
+  area_id      String?
+  type_id      String?
+  code         String
+  name         String
+  ip_address   String?
+  notes        String?
+  is_active    Boolean  @default(true)
+  rent_status  Int      @default(0)
+  phone_type   String?
+  phone_number String?
+  phone_imei   String?
+  created_at   DateTime @default(now())
+  updated_at   DateTime @default(now())
+
+  type         amm_asset_type?     @relation(fields: [type_id], references: [id])
+  devices      amm_asset_device[]
+  signage      amm_digital_signage[]
+  accounts     amm_store_account[]
+  edcs         amm_store_edc[]
+  tags         amm_asset_tag[]
+
+  @@unique([company_id, code])
+  @@index([company_id])
+  @@index([area_id])
+  @@index([type_id])
+}
+
+model amm_asset_tag {
+  id         String   @id @default(uuid())
+  asset_id   String
+  tag        String
+  created_at DateTime @default(now())
+
+  asset      amm_asset @relation(fields: [asset_id], references: [id], onDelete: Cascade)
+
+  @@unique([asset_id, tag])
+  @@index([asset_id])
+}
+
+model amm_asset_device {
+  id            String   @id @default(uuid())
+  asset_id      String
+  role          String   @default("CASHIER1") // SERVER | CASHIER1 | CASHIER2 | ...
+  pos_model     String?
+  ram           String?
+  printer_model String?
+  year          Int?
+  serial        String?
+  detail        String?
+  is_active     Boolean  @default(true)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @default(now())
+
+  asset         amm_asset @relation(fields: [asset_id], references: [id], onDelete: Cascade)
+
+  @@unique([asset_id, role])
+  @@index([asset_id])
+}
+
+model amm_digital_signage {
+  id          String   @id @default(uuid())
+  asset_id    String
+  device_type String   @default("TV") // PC | TV
+  position    Int?
+  brand       String?
+  serial      String?
+  detail      String?
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now())
+
+  asset       amm_asset @relation(fields: [asset_id], references: [id], onDelete: Cascade)
+
+  @@unique([asset_id, device_type, position])
+  @@index([asset_id])
+}
+
+model amm_store_account {
+  id            String   @id @default(uuid())
+  asset_id      String
+  external_id   String?
+  account_type  String
+  username      String?
+  password_enc  String?
+  phone         String?
+  sid           String?
+  mid           String?
+  external_uuid String?
+  is_active     Boolean  @default(true)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @default(now())
+
+  asset         amm_asset @relation(fields: [asset_id], references: [id], onDelete: Cascade)
+
+  @@index([asset_id])
+  @@index([account_type])
+}
+
+model amm_store_edc {
+  id           String   @id @default(uuid())
+  asset_id     String
+  bank         String
+  edc_type     String
+  connect_with String?
+  connect_to   String?
+  mid          String?
+  tid          String?
+  is_active    Boolean  @default(true)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @default(now())
+
+  asset        amm_asset @relation(fields: [asset_id], references: [id], onDelete: Cascade)
+
+  @@index([asset_id])
+}

@@ -1,0 +1,61 @@
+// Cluster POD — Container/Pod.
+// Cluster orkestrasi, node, dan workload.
+// Dokumen: osc_docs/database/cluster_pod.md
+
+model pod_cluster {
+  id           String   @id @default(uuid())
+  company_id   String   @default("")
+  code         String
+  name         String
+  provider     String   @default("K8S") // K8S | OPENSHIFT | NOMAD | DOCKER
+  api_endpoint String?
+  version      String?
+  status       String   @default("UNKNOWN")
+  is_active    Boolean  @default(true)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @default(now())
+
+  nodes        pod_node[]
+  workloads    pod_workload[]
+
+  @@unique([company_id, code])
+  @@index([company_id])
+}
+
+model pod_node {
+  id              String    @id @default(uuid())
+  cluster_id      String
+  name            String
+  role            String    @default("WORKER") // WORKER | CONTROL
+  ip_address      String?
+  cpu_capacity    String?
+  mem_capacity_mb Int?
+  status          String    @default("UNKNOWN")
+  last_seen       DateTime?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @default(now())
+
+  cluster         pod_cluster @relation(fields: [cluster_id], references: [id], onDelete: Cascade)
+
+  @@unique([cluster_id, name])
+  @@index([cluster_id])
+}
+
+model pod_workload {
+  id             String   @id @default(uuid())
+  cluster_id     String
+  namespace      String   @default("default")
+  name           String
+  kind           String   @default("DEPLOYMENT") // DEPLOYMENT | STATEFULSET | DAEMONSET | POD | JOB
+  image          String?
+  replicas       Int?
+  ready_replicas Int?
+  status         String   @default("UNKNOWN")
+  created_at     DateTime @default(now())
+  updated_at     DateTime @default(now())
+
+  cluster        pod_cluster @relation(fields: [cluster_id], references: [id], onDelete: Cascade)
+
+  @@unique([cluster_id, namespace, name, kind])
+  @@index([cluster_id])
+}
