@@ -55,3 +55,50 @@ model obs_alert {
   @@index([status])
   @@index([severity])
 }
+
+model obs_system {
+  id         String    @id @default(uuid())
+  company_id String    @default("")
+  agent_id   String?
+  hostname   String
+  os         String?
+  ip         String?
+  last_seen  DateTime?
+  is_active  Boolean   @default(true)
+  created_at DateTime  @default(now())
+  updated_at DateTime  @default(now())
+
+  @@index([company_id])
+}
+
+model obs_check {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  code       String
+  name       String
+  type       String   @default("HTTP") // HTTP | PING | TCP | DNS | SSL | ICMP
+  target     String
+  interval   Int      @default(60)
+  timeout    Int      @default(10)
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  results obs_check_result[]
+
+  @@unique([company_id, code])
+  @@index([company_id])
+}
+
+model obs_check_result {
+  id          String   @id @default(uuid())
+  check_id    String
+  status      String   @default("UP") // UP | DOWN | UNKNOWN
+  duration_ms Int?
+  message     String?  @db.Text
+  created_at  DateTime @default(now())
+
+  check obs_check @relation(fields: [check_id], references: [id], onDelete: Cascade)
+
+  @@index([check_id, created_at])
+}
