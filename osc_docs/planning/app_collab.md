@@ -19,9 +19,9 @@ perencanaan**: manajemen berkas pengguna, chat internal, pengiriman mail
 | Fitur | Ringkas | Kemungkinan kode |
 |---|---|---|
 | **File Manager** | CRUD berkas/folder per-user & per-company, unggah, unduh, rename, move, hapus, share (tautan/ACL), kuota, versi, preview, pemindaian antivirus, storage lokal/S3. | `DOC` (perluas) |
-| **Chat** | Percakapan internal antar-user/kanal, pesan realtime via WebSocket, lampiran, read-state, mention. | `APP12` (usulan) |
-| **Mail** | Kotak masuk/sent internal + pengiriman email (SMTP) mandiri dari UI; berbeda dari dispatcher notifikasi `APP06`. | `APP13` (usulan) |
-| **Announcement/News** | Pengumuman & berita internal dengan target (semua/company/role), jadwal tayang, read-tracking; ringkasan di dashboard. | `APP14` (usulan) |
+| **Chat** | Percakapan internal antar-user/kanal, pesan realtime via WebSocket, lampiran, read-state, mention. | `TIM` — Chat |
+| **Mail** | Kotak masuk/sent internal + pengiriman email (SMTP) mandiri dari UI; berbeda dari dispatcher notifikasi `APP06`. | `TIM` — Mail |
+| **Announcement/News** | Pengumuman & berita internal dengan target (semua/company/role), jadwal tayang, read-tracking; ringkasan di dashboard. | `ANN` |
 
 > Kode final ditetapkan saat aplikasi mulai dikerjakan.
 
@@ -73,9 +73,9 @@ Semua model mengikuti konvensi [database/README.md](../database/README.md#4-konv
 
 - File Manager: halaman `/DOC/files` (list/grid, breadcrumb, drag-drop, preview,
   share dialog, kuota).
-- Chat: panel `/CHAT` (daftar kanal, thread, composer, indikator online).
-- Mail: `/MAIL` (inbox/sent/compose).
-- Announcement: `/NEWS` + kartu ringkasan di dashboard.
+- Chat: panel `/TIM/chat` (daftar kanal, thread, composer, indikator online).
+- Mail: `/TIM/mail` (inbox/sent/compose).
+- Announcement: `/ANN` + kartu ringkasan di dashboard.
 
 ## 6. Dependensi
 

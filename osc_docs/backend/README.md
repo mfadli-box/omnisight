@@ -328,19 +328,33 @@ default aman (`PageSize` clamp 500, `Order` default ASC). Gunakan:
 
 ## 8. Retensi Data
 
-`backbone/retention.go`: hapus data tua berdasarkan tabel + kolom umur.
-Env: `RE_FLAG`, `RE_DAYS`, `RE_LOGS`, dan override per tabel `RE_DAYS_<NAMA_TABEL>`.
-Daftar tabel diambil dari daftar `retentionRule` di `retentionRules()`; loop tiap
-1 jam memakai `PgSQL.Exec`. Implementasi saat ini: daftar `telemetry`/`logs`
-masih kosong (dikembangkan saat cluster tersedia).
+`backbone/retention.go`: hapus data tua berdasarkan tabel + kolom umur, dijalankan
+dari `main.go` (`go backbone.RunDataRetention()`) berulang tiap `RE_INTERVAL` jam
+(default 1 jam). Penghapusan dilakukan bertahap (batch `10.000` baris) agar tidak
+mengunci tabel besar.
+
+Tiga kelas retensi:
+
+| Kelas | Default | Env | Contoh tabel |
+|---|---|---|---|
+| Telemetri (metrik/stat) | 30 hari | `RE_DAYS` | `bot_heartbeat`, `obs_metric`, `net_interface_stat`, `sec_syscollector_*` |
+| Log/event/audit | 90 hari | `RE_LOGS` | `obs_log`, `sec_event`, `net_syslog_event`, `web_access_log`, `app_user_action`, `jms_run` |
+| Report/rollup | 365 hari | `RE_REPORT` | `obs_metric_rollup`, `net_interface_stat_rollup`, `web_access_stat`, `sec_compliance_report` |
+
+Env: `RE_FLAG`, `RE_DAYS`, `RE_LOGS`, `RE_REPORT`, `RE_INTERVAL`, dan override per
+tabel `RE_DAYS_<NAMA_TABEL>` (mis. `RE_DAYS_BOT_HEARTBEAT=14`). Daftar tabel
+diambil dari `retentionRules()`. Temuan (`sec_vuln`, `vms_finding`,
+`sec_cloud_finding`) hanya dipurge bila **sudah selesai** (`resolved_at` terisi /
+status bukan `OPEN`) agar temuan terbuka tidak hilang.
 
 ## 9. Cleanup Rutin (`main.go`)
 
-Satu goroutine dijalankan saat server start:
+Dua goroutine dijalankan saat server start:
 
 | Fungsi | Peran |
 |---|---|
 | `CleanupExpiredSessions()` | Set `status='EXPIRED'` + `ended_at` pada sesi `ACTIVE` yang `last_active < -30 menit`. |
+| `RunDataRetention()` | Purge telemetri/log/report sesuai umur (lihat §8). |
 
 (`CleanupContainerStatus`/`CleanupHostStatus` dihapus — akan muncul kembali saat
 tabel cluster tersedia.)
@@ -352,7 +366,8 @@ tabel cluster tersedia.)
 | `PG_HOST`,`PG_PORT`,`PG_USER`,`PG_PASS`,`PG_DATA` | Koneksi PostgreSQL (pool `PgSQL`) |
 | `IS_POOL` | `true` → pool besar (max 100) untuk worker; false → normal (50) |
 | `RE_FLAG` | Aktifkan retensi |
-| `RE_DAYS`,`RE_LOGS` | Umur data default; `RE_DAYS_<TABLE>` override per tabel |
+| `RE_DAYS`,`RE_LOGS`,`RE_REPORT` | Umur data default per kelas; `RE_DAYS_<TABLE>` override per tabel |
+| `RE_INTERVAL` | Interval sapu retensi (jam), default `1` |
 | `CR_KEYS` | Token robot agen (dipisah koma) |
 | `RE_SECRET` | Secret AES-GCM untuk enkripsi data sensitif |
 

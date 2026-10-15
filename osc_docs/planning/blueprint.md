@@ -103,8 +103,9 @@ endpoint. Daftar lengkap ada di
 - Konvensi model: id `uuid`, kolom audit `created_at`/`updated_at`,
   `is_active` untuk soft state, uniqueness per company
   (`@@unique([company_id, code])`).
-- Retensi data telemetri/log diatur `osc_rest/backbone/retention.go` (env
-  `RE_DAYS_*`).
+- Retensi data telemetri/log/report diatur `osc_rest/backbone/retention.go`
+  (env `RE_DAYS`, `RE_LOGS`, `RE_REPORT`, `RE_INTERVAL`, override `RE_DAYS_*`),
+  dijalankan otomatis dari `main.go`.
 
 ## 6. Pola Implementasi
 

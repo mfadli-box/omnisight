@@ -122,7 +122,7 @@ Model baru (tetap prefix `app_*`) untuk Fase 6 — lihat
 | `APP09` | `app_report` (+ `app_user_action`) | Report tersimpan; audit memakai `app_user_action`. |
 | `APP10` | `app_preference`, `app_company_setting` | Preferensi user & setting per-company. |
 | `APP11` | `app_backup`, `app_backup_item` | Backup konfigurasi/metadata + item. |
-| `NEWS` | `app_announcement`, `app_announcement_read` | Pengumuman/news internal + pelacakan baca (lihat [../planning/app_collab.md](../planning/app_collab.md)). |
+| `ANN` | `app_announcement`, `app_announcement_read` | Pengumuman/news internal + pelacakan baca (lihat [../planning/app_collab.md](../planning/app_collab.md)). |
 
 ## 3. Relasi Inti
 

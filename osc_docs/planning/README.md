@@ -10,6 +10,8 @@
 |---|---|
 | [blueprint.md](blueprint.md) | Cetak biru arsitektur: visi, stack, topologi, otorisasi, konvensi modul & cluster, pola implementasi. |
 | [roadmap.md](roadmap.md) | Perencanaan bertahap: fase, milestone, dan detail aplikasi yang akan dibuat. |
+| [susunan-modul.md](susunan-modul.md) | **Urutan pembangunan modul sebelum stack fitur dibangun**, mengikuti alur data: Master → Transaksi → Log/Agent → Report. |
+| [status-modul.md](status-modul.md) | **Tabel kesiapan per aplikasi/fitur** (kode modul `PREFIXnn` · alat: agent/frontend/keduanya · status backend · status alat) sebelum masuk backend. |
 | [checklist.md](checklist.md) | Checklist status per aplikasi (database, backend, frontend, dokumen, test) — sudah/belum. |
 | [modules/](modules/README.md) | Planning **per modul** untuk modul yang sudah ada (`PUB00`, `APP00`–`APP05`, `SYS`). |
 | [additional.md](additional.md) | Data aset lokasi (store) yang harus diinput + pemetaan ke model `AMM`. |
@@ -60,7 +62,7 @@ lapisan sudah ada; **Rencana** = belum dimulai.
 | `OBS` | Observability (monitoring ala Beszel) | — | DB selesai · runtime rencana | [plan](app_obs.md) |
 | `DOC` | Document & File Manager | — | DB selesai | [plan](app_collab.md) |
 | `TIM` | Tim & Kolaborasi (Chat + Mail) | usulan `TIM01`.. | DB selesai · runtime rencana | [plan](app_collab.md) |
-| `NEWS` | Announcement/News | usulan `APP14` | DB selesai · runtime rencana | [plan](app_collab.md) |
+| `ANN` | Announcement/News | usulan `ANN01`.. | DB selesai · runtime rencana | [plan](app_collab.md) |
 
 ## 3. Konteks Cepat
 
@@ -72,6 +74,8 @@ lapisan sudah ada; **Rencana** = belum dimulai.
 - Setiap aplikasi admin mengikuti pola skeleton `osc_rest/skeleton/app/appNN/`
   (handler/usecase/repository/template) dan halaman `osc_site/.../APP/APPNN/`.
 - Planning rinci tiap modul yang sudah ada: [modules/](modules/README.md).
+- **Urutan eksekusi** pembangunan modul mengikuti alur data (Master → Transaksi →
+  Log/Agent → Report): lihat [susunan-modul.md](susunan-modul.md).
 - Detail teknis tiap komponen: [backend](../backend/README.md),
   [frontend](../frontend/README.md), [database](../database/README.md),
   [konvensi](../development/conventions.md).

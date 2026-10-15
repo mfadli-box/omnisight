@@ -22,6 +22,7 @@ func main() {
 	backbone.SetDatabase()
 	rest := backbone.SetRouter()
 	go backbone.CleanupExpiredSessions()
+	go backbone.RunDataRetention()
 	addr := os.Getenv("LISTEN_ADDR")
 	if addr == "" {
 		addr = "127.0.0.1:37772"

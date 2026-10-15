@@ -2,6 +2,10 @@
 
 > Checklist aplikasi OmniSight yang **sudah** dibuat dan yang **akan** dibuat.
 > Tandai `[x]` bila lapisan terkait selesai dan terverifikasi.
+>
+> **Urutan pembangunan** modul yang akan datang mengikuti alur data
+> (Master → Transaksi → Log/Agent → Report): lihat
+> [susunan-modul.md](susunan-modul.md).
 
 ## Definition of Done
 
@@ -329,7 +333,7 @@ Rencana rinci: [app_collab.md](app_collab.md).
       `tim_attachment`.
 - [x] DB — Announcement/News: `app_announcement`, `app_announcement_read`.
 - [ ] Backend — skeleton `doc/`, `tim/`, `app/` + WebSocket chat + SMTP.
-- [ ] Frontend — halaman File Manager, `CHAT`, `MAIL`, `NEWS`.
+- [ ] Frontend — halaman File Manager, `TIM` (chat/mail), `ANN`.
 
 ---
 

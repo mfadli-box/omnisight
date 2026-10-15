@@ -61,6 +61,10 @@ services:
     depends_on:
       osc_base:
         condition: service_healthy
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       - TZ=${TZ:-Asia/Jakarta}
       - PG_HOST=osc_base
@@ -73,6 +77,8 @@ services:
       - RE_FLAG=${RE_FLAG:-true}
       - RE_DAYS=${RE_DAYS:-30}
       - RE_LOGS=${RE_LOGS:-90}
+      - RE_REPORT=${RE_REPORT:-365}
+      - RE_INTERVAL=${RE_INTERVAL:-1}
       - CR_KEYS=${CR_KEYS:-}
       - RE_SECRET=${RE_SECRET:-}
       - LISTEN_ADDR=0.0.0.0:37772
@@ -105,6 +111,10 @@ services:
     depends_on:
       osc_rest:
         condition: service_healthy
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       - TZ=${TZ:-Asia/Jakarta}
       - BE_POOL=http://osc_rest:37772
@@ -140,6 +150,10 @@ services:
     depends_on:
       osc_base:
         condition: service_healthy
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       - TZ=${TZ:-Asia/Jakarta}
       - DATABASE_URL=postgresql://${PG_USER:-dbe}:${PG_PASS}@osc_base:5432/${PG_DATA:-osc}?schema=public

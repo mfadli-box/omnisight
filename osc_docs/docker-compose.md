@@ -152,7 +152,27 @@ docker build -t omnisight/schema ./osc_base
 docker build -f osc_auto/Dockerfile.agent --build-arg AGENT=agent_vm -t omnisight/agent_vm ./osc_auto
 ```
 
-## 8. Troubleshooting
+## 8. Log & Retensi
+
+Dua lapis rotasi/pembersihan:
+
+1. **Log container (Docker)** — setiap service memakai opsi logging
+   `max-size: 10m` + `max-file: 3` (rotasi file log Docker, maksimum ~30 MB per
+   container). Atur per service di `docker-compose.yml` / `docker-compose.agent.yml`.
+2. **Data log di database (retensi)** — `osc_rest` menjalankan
+   `RunDataRetention()` otomatis: purge telemetri/log/report sesuai umur, berulang
+   tiap `RE_INTERVAL` jam. Kelas retensi:
+
+   | Kelas | Env | Default | Contoh |
+   |---|---|---|---|
+   | Telemetri | `RE_DAYS` | 30 hari | `bot_heartbeat`, `obs_metric`, `net_interface_stat` |
+   | Log/event/audit | `RE_LOGS` | 90 hari | `obs_log`, `sec_event`, `web_access_log`, `app_user_action` |
+   | Report/rollup | `RE_REPORT` | 365 hari | `obs_metric_rollup`, `web_access_stat` |
+
+   Override per tabel: `RE_DAYS_<TABEL>` (mis. `RE_DAYS_BOT_HEARTBEAT=14`).
+   Matikan retensi dengan `RE_FLAG=false`.
+
+## 9. Troubleshooting
 
 | Masalah | Solusi |
 |---|---|
@@ -164,7 +184,7 @@ docker build -f osc_auto/Dockerfile.agent --build-arg AGENT=agent_vm -t omnisigh
 | Migrasi gagal `P3005` (DB tidak kosong) | Tandai baseline: `docker compose run --rm osc_migrate npx prisma migrate resolve --applied <migrasi>` |
 | Agen `heartbeat status=404` | Wajar jika endpoint `/rest/agent/heartbeat` belum diimplementasikan (scaffold) |
 
-## 9. Catatan Keamanan
+## 10. Catatan Keamanan
 
 - Jangan expose port 37771/37772 ke publik. Gunakan reverse proxy (lihat `deploy/`) untuk 37773.
 - `RE_SECRET` minimal 32 byte acak, disimpan aman.

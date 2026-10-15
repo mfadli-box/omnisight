@@ -20,6 +20,10 @@
 > perluasan sudah terpasang (304 model di 14 cluster). Fase 2–7 kini berada
 > pada tahap **implementasi backend + frontend**, bukan lagi perencanaan skema.
 > Lihat [database/README.md](../database/README.md).
+>
+> **Urutan eksekusi implementasi** tidak lagi per-fase fitur, melainkan mengikuti
+> alur data **Master → Transaksi → Log/Agent → Report**: lihat
+> [susunan-modul.md](susunan-modul.md).
 
 ---
 
@@ -118,7 +122,7 @@ chat internal, mail mandiri, dan pengumuman/news. Rencana rinci:
 |---|---|---|---|
 | `DOC` (perluas) | File Manager | Folder/berkas, versi, share, kuota, preview, scan, S3 | `doc_folder`, `doc_file`, `doc_file_version`, `doc_share`, `doc_quota` |
 | `TIM` | Tim & Kolaborasi | Chat (kanal/DM, pesan realtime WS, lampiran, read-state) + Mail (kotak masuk/keluar + SMTP mandiri) | `tim_room`, `tim_member`, `tim_message`, `tim_reaction`, `tim_account`, `tim_email`, `tim_attachment` |
-| `NEWS` | Announcement/News | Pengumuman internal + read-tracking | `app_announcement`, `app_announcement_read` |
+| `ANN` | Announcement/News | Pengumuman internal + read-tracking | `app_announcement`, `app_announcement_read` |
 
 ---
 
