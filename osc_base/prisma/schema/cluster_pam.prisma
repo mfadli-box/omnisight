@@ -45,3 +45,36 @@ model pam_account {
   @@unique([asset_id, name])
   @@index([asset_id])
 }
+
+model pam_policy {
+  id             String   @id @default(uuid())
+  company_id     String   @default("")
+  code           String
+  name           String
+  protocols      Json?
+  require_approval Boolean @default(false)
+  require_mfa    Boolean @default(false)
+  max_session_min Int     @default(480)
+  is_active      Boolean @default(true)
+  created_at     DateTime @default(now())
+  updated_at     DateTime @default(now())
+
+  @@unique([company_id, code])
+  @@index([company_id])
+}
+
+model pam_session {
+  id         String    @id @default(uuid())
+  company_id String    @default("")
+  user_id    String?
+  asset_id   String?
+  account_id String?
+  status     String    @default("ACTIVE") // ACTIVE | ENDED
+  started_at DateTime  @default(now())
+  ended_at   DateTime?
+  src_ip     String?
+  created_at DateTime  @default(now())
+  updated_at DateTime  @default(now())
+
+  @@index([company_id, started_at])
+}
