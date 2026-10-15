@@ -3,21 +3,33 @@
 // Dokumen: osc_docs/database/cluster_vms.md
 
 model vms_host {
-  id         String   @id @default(uuid())
-  company_id String   @default("")
-  code       String
-  name       String
-  hostname   String?
-  ip_address String?
-  hypervisor String   @default("VMWARE") // VMWARE | HYPERV | PROXMOX | KVM | OTHER
-  version    String?
-  cpu_cores  Int?
-  ram_mb     Int?
-  storage_gb Int?
-  status     String   @default("UNKNOWN")
-  is_active  Boolean  @default(true)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
+  id              String   @id @default(uuid())
+  company_id      String   @default("")
+  code            String
+  name            String
+  hostname        String?
+  ip_address      String?
+  hypervisor      String   @default("VMWARE") // VMWARE | HYPERV | PROXMOX | KVM | OTHER
+  version         String?
+  cpu_cores       Int?
+  ram_mb          Int?
+  storage_gb      Int?
+  status          String   @default("UNKNOWN")
+  is_active       Boolean  @default(true)
+  agent_id        String?
+  api_endpoint    String?
+  api_mode        String?  @default("AGENT") // API | SSH | AGENT
+  username        String?
+  secret_enc      String?  @db.Text
+  cluster_id      String?
+  pool_id         String?
+  managed         Boolean  @default(false)
+  cpu_used        Float?
+  ram_used_mb     Int?
+  storage_used_gb Float?
+  uptime_sec      BigInt?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @default(now())
 
   guests   vms_guest[]
   findings vms_finding[]
@@ -27,19 +39,39 @@ model vms_host {
 }
 
 model vms_guest {
-  id          String   @id @default(uuid())
-  host_id     String
-  code        String
-  name        String
-  guest_os    String?
-  cpu_cores   Int?
-  ram_mb      Int?
-  disk_gb     Int?
-  power_state String   @default("OFF") // ON | OFF | SUSPENDED
-  ip_address  String?
-  notes       String?
-  created_at  DateTime @default(now())
-  updated_at  DateTime @default(now())
+  id                   String   @id @default(uuid())
+  host_id              String
+  code                 String
+  name                 String
+  guest_os             String?
+  cpu_cores            Int?
+  ram_mb               Int?
+  disk_gb              Int?
+  power_state          String   @default("OFF") // ON | OFF | SUSPENDED
+  ip_address           String?
+  notes                String?
+  external_id          String?
+  host_ref             String?
+  node                 String?
+  vcpu                 Int?
+  cpu_pct              Float?
+  mem_used_mb          Int?
+  disk_used_gb         Float?
+  guest_type           String?  @default("VM") // VM | CONTAINER
+  template             Boolean  @default(false)
+  autostart            Boolean  @default(false)
+  boot_order           Json?
+  startup_order        Int?
+  startup_delay_sec    Int?
+  shutdown_timeout_sec Int?
+  hotplug              Json?
+  agent_status         String?
+  agent_version        String?
+  cloud_init           String?  @db.Text
+  cloud_init_meta      String?  @db.Text
+  cloud_init_network   String?  @db.Text
+  created_at           DateTime @default(now())
+  updated_at           DateTime @default(now())
 
   host      vms_host       @relation(fields: [host_id], references: [id], onDelete: Cascade)
   findings  vms_finding[]
@@ -73,12 +105,16 @@ model vms_finding {
 }
 
 model vms_snapshot {
-  id         String   @id @default(uuid())
-  guest_id   String
-  company_id String   @default("")
-  name       String
-  size_bytes Int?
-  created_at DateTime @default(now())
+  id          String   @id @default(uuid())
+  guest_id    String
+  company_id  String   @default("")
+  name        String
+  size_bytes  Int?
+  with_ram    Boolean  @default(false)
+  is_live     Boolean  @default(false)
+  parent_id   String?
+  description String?
+  created_at  DateTime @default(now())
 
   guest vms_guest @relation(fields: [guest_id], references: [id], onDelete: Cascade)
 
@@ -150,15 +186,21 @@ model vms_nic {
 }
 
 model vms_backup {
-  id         String   @id @default(uuid())
-  guest_id   String?
-  company_id String   @default("")
-  name       String
-  path       String?  @db.Text
-  size_bytes Int?
-  status     String   @default("DONE")
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
+  id          String    @id @default(uuid())
+  guest_id    String?
+  company_id  String    @default("")
+  name        String
+  path        String?   @db.Text
+  size_bytes  Int?
+  status      String    @default("DONE")
+  mode        String?   @default("SNAPSHOT") // SNAPSHOT | SUSPEND | STOP
+  storage     String?
+  compression String?
+  encrypted   Boolean   @default(false)
+  retention   Int?
+  verified_at DateTime?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @default(now())
 
   @@index([company_id])
 }

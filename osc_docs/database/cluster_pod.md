@@ -2,6 +2,8 @@
 
 > Dokumen detail cluster **POD** — Container/Pod (`pod_*`).
 > 🔗 Kembali ke [database/README.md](README.md).
+>
+> ✅ **Status: sudah dibangun.** Seluruh 42 model cluster `pod_*` telah terpasang di `prisma/schema/cluster_pod.prisma` beserta migrasinya. Catatan "rencana/belum dibangun" di bawah bersifat historis.
 
 ## 1. Ringkasan
 
@@ -37,15 +39,15 @@ pod_cluster (1) ──► (N) pod_node
   `pod_registry`, `pod_action`, `pod_env_var`, `pod_git_credential`,
   `pod_git_sync`, `pod_build`, `pod_backup`, `pod_scan`, `pod_scan_finding`,
   `pod_template`, `pod_template_registry`, `pod_exec_session`, `pod_pod`,
-  `pod_secret`, `pod_disk_usage`, `pod_webhook`) masih **rencana** — lihat
-  [../planning/app_pod.md](../planning/app_pod.md). Dokumen ini akan diperbarui
-  saat tabel tersebut dibangun.
+  `pod_secret`, `pod_disk_usage`, `pod_webhook`) sudah **dibangun** — lihat
+  [../planning/app_pod.md](../planning/app_pod.md). Seluruh tabel tersebut
+  sudah dibangun.
 - Konvensi umum model: [README.md](README.md#4-konvensi-model).
 
-## 5. Model Runtime Lanjutan (rencana gap)
+## 5. Model Runtime Lanjutan (dibangun)
 
 Menindaklanjuti audit paritas Dockge/Arcane, ditambahkan perluasan model dan
-model baru berikut (semua **rencana**, detail di
+model baru berikut (semua **sudah dibangun**, detail di
 [../planning/app_pod.md](../planning/app_pod.md) §6.2–§6.3):
 
 - **Perluasan field** — `pod_container`/`pod_image` (`update_strategy`,

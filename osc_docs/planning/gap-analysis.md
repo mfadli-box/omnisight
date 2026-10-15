@@ -1,39 +1,51 @@
 # Gap Analysis - Fitur yang Diminta
 
+> **Status terbaru (diperbarui):** lapisan database sudah **lengkap** (290 model
+> di 13 cluster). Gap yang tersisa bersifat **implementasi runtime** dan
+> **fitur yang belum masuk perencanaan** (kini dicatat di
+> [app_collab.md](app_collab.md)). Lihat ringkasan di bawah.
+
 Berdasarkan permintaan review, berikut hasil gap analysis untuk fitur User File Management, User Guide, Notification/Chat/Mail/Announcement/News.
 
 ## 1. User File Management
 
-**Status**: Ada (parsial). 
+**Status**: Ada (parsial, backend). 
 - Implementasi: `/files/[...path]` route di `osc_site/src/app/files/[...path]/route.ts` (auth + boundary check). 
-- Gap: Tidak ada manajemen file UI (upload/list/delete/share/rename/move/permission per-folder/company). Tidak ada quota, versioning, preview (selain pdf/png/jpg). Tidak ada antivirus/scanning. Tidak ada eksternal storage (S3). Tidak ada modul APP/SYS khusus untuk user file management.
-
-**Rekomendasi**: Tambah fitur di planning (mis. DOC/File manager module) atau perluas `app_sys`/modul baru.
+- Gap: Tidak ada manajemen file UI (upload/list/delete/share/rename/move/permission per-folder/company). Tidak ada quota, versioning, preview (selain pdf/png/jpg). Tidak ada antivirus/scanning. Tidak ada eksternal storage (S3). Model DB belum ada.
+- Rencana: **[app_collab.md §3.1](app_collab.md)** (model `doc_folder`, `doc_file`, `doc_file_version`, `doc_share`, `doc_quota`).
 
 ## 2. User Guide
 
-**Status**: Tidak ada. Tidak ditemukan dokumentasi user guide (hanya dev docs: README, conventions, run, security, docker-compose). Tidak ada help/tutorial di frontend.
+**Status**: Ada (dasar). File [`../user-guide.md`](../user-guide.md) telah dibuat &
+di-link dari [docs README](../README.md). Masih minim — perlu diperkaya
+(screenshot, per-modul) dan/atau bantuan inline di frontend.
 
-**Rekomendasi**: Tambah `osc_docs/user-guide.md`, atau fitur help inline.
+**Rekomendasi**: Perluas `user-guide.md` seiring modul dibangun.
 
 ## 3. Notification, Chat, Mail, Announcement/News
 
-**Status**: Hanya perencanaan, belum implementasi (lihat APP06 di app_sys.md).
-- Notification: direncanakan APP06 (kanal email/webhook/Telegram/Slack, template, rules). Belum ada kode.
-- Mail/SMTP: tidak ada implementasi pengiriman.
-- Chat: tidak ada (internal chat, socket chat).
-- Announcement/News: status page punya `is_announcement` (OBS), tapi tidak ada news feed internal.
+**Status**: Sebagian — DB sudah siap untuk notifikasi; sisanya belum diplanning.
+- Notification: DB **lengkap** (`app_notify_*`, `obs_notify_channel`); runtime
+  dispatcher **belum ada** (APP06).
+- Mail/SMTP: tidak ada implementasi; rencana di [app_collab.md §3.3](app_collab.md).
+- Chat: tidak ada; rencana di [app_collab.md §3.2](app_collab.md).
+- Announcement/News: status page punya `is_announcement` (OBS); news feed
+  internal rencana di [app_collab.md §3.4](app_collab.md).
 
-**Rekomendasi**: Prioritaskan APP06 + channel email/SMTP.
+**Rekomendasi**: Prioritaskan APP06 (notifikasi runtime) + mail/SMTP.
 
 ## 4. Monitoring/Management Tools (Docker/VM/MikroTik/Asset/Bastion/Web)
 
-Sudah ada perencanaan detail di app_*.md (POD vs Dockge/Arcane, OBS vs Beszel/Uptime-Kuma, NET vs LibreNMS, SEC+VMS vs Wazuh/Proxmox, AMM vs Snipe-IT, PAM vs JumpServer, WEB vs Nginx-UI/NPM). Gap detail sudah dibahas sebelumnya. Untuk implementasi, perlu membangun sesuai planning.
+DB sudah **lengkap** untuk semua modul. Perencanaan detail ada di app_*.md
+(POD vs Dockge/Arcane, OBS vs Beszel/Uptime-Kuma, NET vs LibreNMS,
+SEC+VMS vs Wazuh/Proxmox, AMM vs Snipe-IT, PAM vs JumpServer, WEB vs
+Nginx-UI/NPM). Gap yang tersisa: **implementasi backend + frontend** sesuai
+planning.
 
 ## 5. Security Re-check
 
-Sudah dilakukan hardening: token hashing, logout revoke, files route verifikasi backend, hapus storageKey fallback, TOTP decrypt. Sisa: token plaintext di DB sudah di-hash (kita ubah ke hash), captcha client-side perlu verifikasi server, rate-limit in-memory (multi-replica), CSP unsafe-inline (trade-off). Lihat security.md.
+Sudah dilakukan hardening: token hashing, logout revoke, files route verifikasi backend, hapus storageKey fallback, TOTP decrypt. Sisa: token plaintext di DB sudah di-hash (kita ubah ke hash), captcha client-side perlu verifikasi server, rate-limit in-memory (multi-replica), CSP unsafe-inline (trade-off). Lihat [security.md](../development/security.md).
 
 ## 6. Dockerization
 
-Sudah: docker-compose host (base/rest/site), docker-compose agent (osc_auto), Dockerfiles ada. Dokumentasi di osc_docs/docker-compose.md, deploy di osc_docs/deploy/.
+Sudah: docker-compose host (`osc_base`/`osc_rest`/`osc_site`), docker-compose agent (`osc_auto`), Dockerfiles ada. Dokumentasi di [docker-compose.md](../docker-compose.md), deploy di [deploy/](../deploy/).

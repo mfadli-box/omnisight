@@ -10,11 +10,16 @@
 |---|---|---|---|
 | 0 | Fondasi stack | `osc_base`, `osc_rest`, `osc_site`, docs, test | Selesai |
 | 1 | Core platform & identitas | `APP00`–`APP05`, `SYS01`–`SYS03`, `PUB00` | Selesai |
-| 2 | Manajemen aset & inventaris | `AMM`, `NET`, `VMS`, `POD` | DB selesai (runtime `POD`/`VMS` masih rencana) |
-| 3 | Keamanan & Akses | `WAF`, `SEC` (Wazuh-like), `PAM` (Bastion/PAM), `WEB`, `VMS` (findings) | DB selesai (SIEM/Bastion rencana) |
+| 2 | Manajemen aset & inventaris | `AMM`, `NET`, `VMS`, `POD` | DB selesai · runtime `POD`/`VMS` rencana |
+| 3 | Keamanan & Akses | `WAF`, `SEC` (Wazuh-like), `PAM` (Bastion/PAM), `WEB`, `VMS` (findings) | DB selesai · SIEM/Bastion rencana |
 | 4 | Operasional & otomasi | `JMS`, `BOT`, `DSO`, `OBS` | DB selesai |
 | 5 | Dokumen & kolaborasi | `DOC` | DB selesai |
-| 6 | Lanjutan admin | `APP06`–`APP11` | Rencana |
+| 6 | Lanjutan admin | `APP06`–`APP11` | DB selesai |
+
+> **Status lapisan DB: lengkap.** Seluruh cluster (`cluster_*.prisma`) + field
+> perluasan sudah terpasang (290 model di 13 cluster). Fase 2–6 kini berada
+> pada tahap **implementasi backend + frontend**, bukan lagi perencanaan skema.
+> Lihat [database/README.md](../database/README.md).
 
 ---
 
@@ -47,7 +52,7 @@ Layanan pendukung selesai: `applink` (auto-link), `USLogs` (audit), `USRole`
 
 ---
 
-## Fase 2 — Manajemen Aset & Inventaris (Rencana)
+## Fase 2 — Manajemen Aset & Inventaris (DB selesai · implementasi rencana)
 
 Tujuan: inventaris infrastruktur yang dapat dipetakan dari berbagai sumber.
 
@@ -61,33 +66,33 @@ Tujuan: inventaris infrastruktur yang dapat dipetakan dari berbagai sumber.
 Prinsip: data telemetri ber-retensi (lihat `retention.go`), data referensi
 bersifat persisten.
 
-## Fase 3 — Keamanan, Akses & Web (Rencana)
+## Fase 3 — Keamanan, Akses & Web (DB selesai · implementasi rencana)
 
 | Prefix | Aplikasi | Cakupan usulan | Model usulan | Dependensi |
 |---|---|---|---|---|
 | `WAF` | Web Application Firewall | Aturan, event blokir, tanda tangan serangan (perimeter). | `sec_waf_rule`, `sec_waf_event` | `NET`, `WEB` |
-| `SEC` | Security Operations / SIEM (ala Wazuh) | **HIDS/FIM/SCA/SIEM**: agen keamanan, log+decoder+rule, FIM (who-data/diff/registry), CIS, kerentanan host, insiden, active response (script/timeout/revert), compliance; **ingest log `WEB`/nginx & syslog `NET`**; **upgrade agen jarak jauh**, **feed ruleset**, **threat intel (VirusTotal/MISP)**, **log forwarding**. **Paritas Wazuh (MAJOR)**: **syscollector** (inventaris HW/SW/port), **rule DSL** (if_sid/frequency/list/PCRE2), CDB, malware (YARA/ClamAV/Defender), vuln feed, Docker runtime, osquery, auditd, live query, agent groups, compliance mapping, logtest, Windows EventChannel/Sysmon, cloud/CSPM, fine RBAC, MITRE sub-teknik. Non-goal: OpenSearch (pakai PostgreSQL). Agen capability `security`. Rencana rinci: [app_sec.md](app_sec.md). | `sec_agent`, `sec_decoder`, `sec_rule`, `sec_event`, `sec_event_alert`, `sec_fim_event`, `sec_sca_policy`, `sec_sca_result`, `sec_vuln`, `sec_incident`, `sec_incident_event`, `sec_response_action`, `sec_compliance_report`, `sec_log_source`, `sec_rule_feed`, `sec_intel_feed`, `sec_intel_ioc`, `sec_forwarder`, `sec_syscollector_hardware`, `sec_agent_group`, `sec_cdb_list`, `sec_cdb_entry`, `sec_malware_event`, `sec_vuln_feed`, `sec_container_event`, `sec_osquery_query`, `sec_live_query`, `sec_response_script`, `sec_rbac_grant`, `sec_cloud_account`, `sec_cloud_finding` | `VMS`, `NET`, `WEB`, `OBS`, `BOT` |
+| `SEC` | Security Operations / SIEM (ala Wazuh) | **HIDS/FIM/SCA/SIEM**: agen keamanan, log+decoder+rule, FIM (who-data/diff/registry), CIS, kerentanan host, insiden, active response (script/timeout/revert), compliance; **ingest log `WEB`/nginx & syslog `NET`**; **upgrade agen jarak jauh**, **feed ruleset**, **threat intel (VirusTotal/MISP)**, **log forwarding**. **Paritas Wazuh (MAJOR)**: **syscollector** (inventaris HW/SW/port), **rule DSL** (if_sid/frequency/list/PCRE2), CDB, malware (YARA/ClamAV/Defender), vuln feed, Docker runtime, osquery, auditd, live query, agent groups, compliance mapping, logtest, Windows EventChannel/Sysmon, cloud/CSPM, fine RBAC, MITRE sub-teknik. Non-goal: OpenSearch (pakai PostgreSQL). Agen capability `security`. Rencana rinci: [app_sec.md](app_sec.md). | `sec_agent`, `sec_decoder`, `sec_rule`, `sec_event`, `sec_event_alert`, `sec_fim_event`, `sec_sca_policy`, `sec_sca_result`, `sec_vuln`, `sec_incident`, `sec_incident_event`, `sec_response_action`, `sec_compliance_report`, `sec_log_source`, `sec_rule_feed`, `sec_intel_feed`, `sec_intel_ioc`, `sec_forwarder`, `sec_syscollector_hardware`, `sec_syscollector_os`, `sec_syscollector_package`, `sec_syscollector_iface`, `sec_syscollector_port`, `sec_syscollector_process`, `sec_syscollector_user`, `sec_syscollector_group`, `sec_syscollector_service`, `sec_syscollector_hotfix`, `sec_syscollector_browser_ext`, `sec_agent_group`, `sec_cdb_list`, `sec_cdb_entry`, `sec_malware_event`, `sec_vuln_feed`, `sec_container_event`, `sec_osquery_query`, `sec_live_query`, `sec_response_script`, `sec_rbac_grant`, `sec_cloud_account`, `sec_cloud_finding` | `VMS`, `NET`, `WEB`, `OBS`, `BOT` |
 | `PAM` | Bastion / Privileged Access (ala JumpServer) | **Gateway SSH/SFTP/RDP/VNC**: credential vault, RBAC per-aset, perekaman+replay sesi, live monitor/shadow, command filter, approval, access request; **SSH gateway native**, **MFA per koneksi (TOTP/WebAuthn/RADIUS)**, **watermark**, **reason wajib**, rotasi kredensial. **Paritas JumpServer**: **login ACL bastion (MAJOR)**, **kontrol clipboard (MAJOR)**, share sesi, command log store pluggable, account template, bulk import/export, tiket eksternal, approval multi-level, idle timeout, lockout/cap sesi, native RDP, discovery, API key, health check. Non-goal: Telnet. Proxy di `osc_rest`, agen = relay. Rencana rinci: [app_pam.md](app_pam.md). | `pam_asset`, `pam_account`, `pam_policy`, `pam_grant`, `pam_command_filter`, `pam_session`, `pam_command`, `pam_access_request`, `pam_gateway`, `pam_login_acl`, `pam_lockout`, `pam_account_template`, `pam_command_filter_binding`, `pam_approval_flow`, `pam_approval_step`, `pam_access_request_approval`, `pam_apikey`, `pam_health_check`, `pam_discovery_job`, `pam_ticket_provider` | `AMM`, `VMS`, `NET`, `POD`, `SEC`, `APP04` |
 | `WEB` | Web Server/Proxy + Domain & DNS (ala Nginx UI) | Site/vhost, reverse proxy, **stream L4**, upstream, access-list, editor config + safe apply; **TLS/ACME auto-renew** (HTTP-01/DNS-01, wildcard); **domain & DNS/DDNS (WHOIS expiry, record via provider)**; **analitik log akses/error + live tail**. **Paritas Nginx UI/NPM**: tuning lanjutan (WS/HSTS/redirect/location), wizard, snippet/template, metrik node, upgrade nginx, backup/export-import, cluster deploy, dead/404, static files, reverse index, panel auth. Rencana rinci: [app_web.md](app_web.md). | `web_vhost`, `web_certificate`, `web_upstream` + `web_server`, `web_stream`, `web_access_list`, `web_access_entry`, `web_acme_account`, `web_dns_provider`, `web_domain`, `web_dns_record`, `web_config_revision`, `web_change`, `web_access_log`, `web_access_stat`, `web_location`, `web_snippet`, `web_template`, `web_server_metric`, `web_backup`, `web_deploy` | `NET`, `OBS`, `WAF`, `SEC`, `JMS` |
 
-## Fase 4 — Operasional & Otomasi (Rencana)
+## Fase 4 — Operasional & Otomasi (DB selesai · implementasi rencana)
 
 | Prefix | Aplikasi | Cakupan usulan | Model usulan | Dependensi |
 |---|---|---|---|---|
 | `JMS` | Job Management | Definisi job, jadwal, run history, retry. | `jms_job`, `jms_schedule`, `jms_run` | `BOT`/agent |
 | `BOT` | Bot/Agent | Registrasi agent, heartbeat, task queue. | `bot_agent`, `bot_heartbeat`, `bot_task` | `USBots()` |
 | `DSO` | DevOps/CI-CD | Pipeline, build, deploy, environment. Dipakai `POD` untuk **image build** (lihat [app_pod.md](app_pod.md)). | `dso_pipeline`, `dso_build`, `dso_deploy` | repo/VCS |
-| `OBS` | Observability (monitoring ala Beszel + uptime-kuma) | Hub + agent: metrik host & container (Docker/Podman), **VM host & guest** (hypervisor, prioritas **Incus/LXD**), **systemd service**, data historis, alert, notifikasi (kanal diperluas), network probe (grup/dependensi, tag, retry, Prometheus), **status page publik** + insiden/pengumuman, **maintenance window**, **cert/domain expiry**, real-time ~1s, impor Uptime Kuma, **ekspor Prometheus** (`/rest/metrics`). **Paritas Beszel/Uptime-Kuma**: disk tambahan (Btrfs/eMMC/mdraid), health/restart container, check WS/DB-engine/SMTP/Radius + opsi HTTP/proxy. Rencana rinci: [app_obs.md](app_obs.md). | `obs_metric`, `obs_log`, `obs_alert` + `obs_system`, `obs_metric_rollup`, `obs_disk`, `obs_container_stat`, `obs_vmhost`, `obs_vm`, `obs_vm_stat`, `obs_check`, `obs_check_group`, `obs_check_result`, `obs_alert_rule`, `obs_notification`, `obs_silence`, `obs_dashboard`, `obs_report`, `obs_maintenance`, `obs_status_page`, `obs_status_page_item`, `obs_service`, `obs_status_page_incident`, `obs_import_job` | `NET`, `POD`, `VMS`, `WEB`, `BOT` |
+| `OBS` | Observability (monitoring ala Beszel + uptime-kuma) | Hub + agent: metrik host & container (Docker/Podman), **VM host & guest** (hypervisor, prioritas **Incus/LXD**), **systemd service**, data historis, alert, notifikasi (kanal diperluas), network probe (grup/dependensi, tag, retry, Prometheus), **status page publik** + insiden/pengumuman, **maintenance window**, **cert/domain expiry**, real-time ~1s, impor Uptime Kuma, **ekspor Prometheus** (`/rest/metrics`). **Paritas Beszel/Uptime-Kuma**: disk tambahan (Btrfs/eMMC/mdraid), health/restart container, check WS/DB-engine/SMTP/Radius + opsi HTTP/proxy. Rencana rinci: [app_obs.md](app_obs.md). | `obs_metric`, `obs_log`, `obs_alert` + `obs_system`, `obs_metric_rollup`, `obs_disk`, `obs_container_stat`, `obs_vmhost`, `obs_vm`, `obs_vm_stat`, `obs_check`, `obs_check_group`, `obs_check_result`, `obs_alert_rule`, `obs_notification`, `obs_notify_channel`, `obs_silence`, `obs_dashboard`, `obs_report`, `obs_maintenance`, `obs_status_page`, `obs_status_page_item`, `obs_service`, `obs_status_page_incident`, `obs_import_job` | `NET`, `POD`, `VMS`, `WEB`, `BOT` |
 
 Endpoint agen memakai grup `/rest/agent` (`USBots()`) yang telah disiapkan.
 
-## Fase 5 — Dokumen & Kolaborasi (Rencana)
+## Fase 5 — Dokumen & Kolaborasi (DB selesai · implementasi rencana)
 
 | Prefix | Aplikasi | Cakupan usulan | Model usulan | Dependensi |
 |---|---|---|---|---|
 | `DOC` | Document | Repositori dokumen, versi, tanda tangan. | `doc_document`, `doc_version`, `doc_sign` | `APP04` |
 
-## Fase 6 — Lanjutan Admin (Rencana)
+## Fase 6 — Lanjutan Admin (DB selesai · implementasi rencana)
 
 Rentang `APP06`–`APP11` berisi **layanan admin bersama**. Rencana rinci:
 [app_sys.md](app_sys.md).
@@ -103,7 +108,21 @@ Rentang `APP06`–`APP11` berisi **layanan admin bersama**. Rencana rinci:
 
 Kode final ditetapkan saat aplikasi mulai dikerjakan.
 
+## Fase 7 — Backlog: File Manager & Kolaborasi (Rencana, belum ada model)
+
+Menutup gap [gap-analysis.md](gap-analysis.md): manajemen berkas pengguna,
+chat internal, mail mandiri, dan pengumuman/news. Rencana rinci:
+[app_collab.md](app_collab.md).
+
+| Kode | Aplikasi | Cakupan usulan | Model usulan |
+|---|---|---|---|
+| `DOC` (perluas) | File Manager | Folder/berkas, versi, share, kuota, preview, scan, S3 | `doc_folder`, `doc_file`, `doc_file_version`, `doc_share`, `doc_quota` |
+| `APP12` | Chat | Kanal/DM, pesan realtime (WS), lampiran, read-state | `chat_room`, `chat_member`, `chat_message`, `chat_reaction` |
+| `APP13` | Mail | Kotak masuk/keluar + SMTP mandiri | `mail_account`, `mail_message`, `mail_attachment` |
+| `APP14` | Announcement/News | Pengumuman internal + read-tracking | `app_announcement`, `app_announcement_read` |
+
 ---
+
 
 ## Kriteria "Selesai" (Definition of Done)
 

@@ -19,21 +19,31 @@ model amm_asset_type {
 }
 
 model amm_asset {
-  id           String   @id @default(uuid())
-  company_id   String   @default("")
-  area_id      String?
-  type_id      String?
-  code         String
-  name         String
-  ip_address   String?
-  notes        String?
-  is_active    Boolean  @default(true)
-  rent_status  Int      @default(0)
-  phone_type   String?
-  phone_number String?
-  phone_imei   String?
-  created_at   DateTime @default(now())
-  updated_at   DateTime @default(now())
+  id              String    @id @default(uuid())
+  company_id      String    @default("")
+  area_id         String?
+  type_id         String?
+  code            String
+  name            String
+  ip_address      String?
+  notes           String?
+  is_active       Boolean   @default(true)
+  rent_status     Int       @default(0)
+  phone_type      String?
+  phone_number    String?
+  phone_imei      String?
+  acquired_at     DateTime?
+  purchase_cost   Decimal?  @db.Decimal(18, 2)
+  warranty_until  DateTime?
+  status_label_id String?
+  department_id   String?
+  supplier_id     String?
+  asset_model_id  String?
+  manufacturer_id String?
+  is_requestable  Boolean   @default(false)
+  qr_token        String?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @default(now())
 
   type     amm_asset_type?       @relation(fields: [type_id], references: [id])
   devices  amm_asset_device[]
@@ -563,16 +573,35 @@ model amm_reservation {
 }
 
 model amm_asset_request {
-  id            String   @id @default(uuid())
-  company_id    String   @default("")
-  requester_id  String?
-  asset_type_id String?
-  reason        String?  @db.Text
-  status        String   @default("PENDING") // PENDING | APPROVED | REJECTED | FULFILLED
-  created_at    DateTime @default(now())
-  updated_at    DateTime @default(now())
+  id                   String    @id @default(uuid())
+  company_id           String    @default("")
+  code                 String?
+  requester_id         String?
+  asset_type_id        String?
+  type                 String    @default("NEW") // ASSIGN | TRANSFER | REPAIR | DISPOSAL | NEW | RESERVE | RETURN | ACCESSORY_REQUEST
+  asset_id             String?
+  accessory_id         String?
+  kit_id               String?
+  requested_by         String?
+  target_user_id       String?
+  target_area_id       String?
+  target_department_id String?
+  reason               String?   @db.Text
+  status               String    @default("PENDING") // PENDING | APPROVED | REJECTED | CANCELLED | FULFILLED
+  approver_id          String?
+  decided_at           DateTime?
+  request_date         DateTime?
+  expected_date        DateTime?
+  fulfilled_at         DateTime?
+  notes                String?   @db.Text
+  is_user_facing       Boolean   @default(false)
+  audit_trail          Json?
+  created_at           DateTime  @default(now())
+  updated_at           DateTime  @default(now())
 
+  @@unique([company_id, code])
   @@index([company_id])
+  @@index([requested_by, status])
 }
 
 model amm_eula {

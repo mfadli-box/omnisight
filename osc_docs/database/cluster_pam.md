@@ -1,10 +1,11 @@
-# Osc_base — `prisma/schema/cluster_pam.prisma` (rencana)
+# Osc_base — `prisma/schema/cluster_pam.prisma`
 
 > Dokumen detail cluster **PAM** — Bastion / Privileged Access Management
-> (`pam_*`). 🔗 Kembali ke [database/README.md](README.md) ·
+> (`pam_*`). 🔗 Kembali ke [database/README.md](README.md).
 > Rencana modul: [../planning/app_pam.md](../planning/app_pam.md).
-> ⚠️ Berkas `cluster_pam.prisma` + migrasi **belum dibuat** — dokumen ini
-> mencatat model yang direncanakan.
+>
+> ✅ **Status: sudah dibangun.** Seluruh 20 model cluster `pam_*` telah
+> terpasang di `prisma/schema/cluster_pam.prisma` beserta migrasinya.
 
 ## 1. Ringkasan
 
@@ -12,7 +13,7 @@ Cluster PAM menyimpan **target akses** (server/VM/perangkat/container),
 **vault kredensial istimewa** (terenkripsi), **kebijakan & hibah akses**,
 **sesi** beserta **audit perintah**, filter perintah, dan permintaan akses.
 
-## 2. Model (rencana)
+## 2. Model
 
 ### 2.1 `pam_asset` — Target Akses
 - `@@unique([company_id, code])`; `category` ∈
@@ -124,6 +125,6 @@ pam_session.relay_agent_id ──► bot_agent (BOT)
   `pam_access_request`/`pam_approval_flow`/`pam_approval_step`/`pam_access_request_approval`/`pam_gateway`/`pam_login_acl`/`pam_lockout`/`pam_apikey`/`pam_health_check`/`pam_discovery_job`/`pam_ticket_provider` → persisten. MFA per koneksi (`mfa_verified`, `mfa_method`), watermark grafis, clipboard control, dan `reason` wajib bila policy menetapkannya. **Login ACL (MAJOR)** dan **lockout** mengamankan akses ke bastion itu sendiri.
 - Tautan lintas-cluster (opsional) ke `amm_asset`, `vms_guest`, `net_device`,
   `pod_container`, dan `app_user`; relasi dijaga eksplisit.
-- Prisma/migrasi: **akan dibuat saat modul dibangun** (lihat
+- Prisma/migrasi: **sudah dibuat** (lihat
   [../planning/app_pam.md](../planning/app_pam.md)).
 - Konvensi umum model: [README.md](README.md#4-konvensi-model).

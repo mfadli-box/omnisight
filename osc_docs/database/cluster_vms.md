@@ -2,6 +2,8 @@
 
 > Dokumen detail cluster **VMS** — VM & Hypervisor Management (`vms_*`).
 > 🔗 Kembali ke [database/README.md](README.md).
+>
+> ✅ **Status: sudah dibangun.** Seluruh 19 model cluster `vms_*` telah terpasang di `prisma/schema/cluster_vms.prisma` beserta migrasinya. Catatan "rencana/belum dibangun" di bawah bersifat historis.
 
 ## 1. Ringkasan
 
@@ -115,7 +117,7 @@ vms_guest (1) ──► (N) vms_passthrough
   security group), **`vms_sdn`** (zone/VNet/VXLAN/EVPN), **`vms_pool`** (resource
   pool), **`vms_cluster`/`vms_node`** (join/quorum/Corosync), **`vms_ha`** (HA
   manager), **`vms_replication`** (replikasi async), **`vms_passthrough`**
-  (PCI/USB) — **belum dibangun**, akses hypervisor via agen (capability `vmhost`,
+  (PCI/USB) — **sudah dibangun**, akses hypervisor via agen (capability `vmhost`,
   prioritas Incus/LXD); termasuk **provisioning** (create VM ISO/template +
   cloud-init user-data/**meta-data**/**network-config**).
   `vms_finding` menerima impor dari `SEC` (`sec_vuln`/`sec_sca_result`).

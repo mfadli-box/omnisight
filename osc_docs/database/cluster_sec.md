@@ -2,13 +2,15 @@
 
 > Dokumen detail cluster **SEC** — Keamanan Perimeter / WAF + **SIEM/HIDS/XDR**
 > (`sec_*`). 🔗 Kembali ke [database/README.md](README.md).
+>
+> ✅ **Status: sudah dibangun.** Seluruh 43 model cluster `sec_*` telah terpasang di `prisma/schema/cluster_sec.prisma` beserta migrasinya. Catatan "rencana/belum dibangun" di bawah bersifat historis.
 
 ## 1. Ringkasan
 
 Cluster SEC menyimpan aturan WAF dan event blokir. Tabel **event termasuk log**
 dan dipurge oleh retention (`RE_DAYS_SEC_WAF_EVENT`, default 90 hari).
 
-Selain WAF, cluster `sec_*` menampung rencana **SIEM/HIDS/XDR** (modul `SEC`,
+Selain WAF, cluster `sec_*` menampung **SIEM/HIDS/XDR** (modul `SEC`,
 ala Wazuh) — lihat §2.3 dan §4. Dua penambahan **MAJOR**: **Syscollector
 (inventaris sistem)** dan **Rich rule DSL**.
 
@@ -24,7 +26,7 @@ ala Wazuh) — lihat §2.3 dan §4. Dua penambahan **MAJOR**: **Syscollector
 - Indeks `company_id`, `rule_id`, `occurred_at`.
 - Relasi opsional ke `sec_waf_rule`.
 
-### 2.3 Rencana model SIEM/HIDS/XDR — **belum dibangun**
+### 2.3 Model SIEM/HIDS/XDR — **sudah dibangun**
 
 #### 2.3.1 Inti SIEM
 - `sec_agent` — `agent_id`? (→ `bot_agent`), `host_ref`?, `os`, `arch`,
@@ -108,8 +110,8 @@ sec_rbac_grant ──(grant)──► sec_agent / sec_agent_group / file / node
 
 ## 4. Catatan
 
-- Cluster `sec_*` menampung rencana **SIEM/HIDS/XDR** (modul `SEC`, ala Wazuh)
-  beserta **penutupan gap** terbaru — **belum dibangun**. Rincian lengkap:
+- Cluster `sec_*` menampung **SIEM/HIDS/XDR** (modul `SEC`, ala Wazuh)
+  beserta **penutupan gap** terbaru — **sudah dibangun**. Rincian lengkap:
   [../planning/app_sec.md](../planning/app_sec.md).
 - **MAJOR**: **Syscollector** (`sec_syscollector_*`) & **Rich rule DSL**
   (`sec_rule`).

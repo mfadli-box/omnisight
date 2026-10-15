@@ -60,15 +60,44 @@ model sec_agent {
 }
 
 model sec_rule {
-  id         String   @id @default(uuid())
-  company_id String   @default("")
-  code       String
-  name       String
-  severity   String   @default("MEDIUM") // LOW | MEDIUM | HIGH | CRITICAL
-  content    String?  @db.Text
-  is_active  Boolean  @default(true)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
+  id                     String   @id @default(uuid())
+  company_id             String   @default("")
+  code                   String
+  name                   String
+  severity               String   @default("MEDIUM") // LOW | MEDIUM | HIGH | CRITICAL
+  content                String?  @db.Text
+  is_active              Boolean  @default(true)
+  category               String? // SIEM | FIM | HIDS | ROOTCHECK | SCA | COMPLIANCE | MALWARE | CONTAINER | CLOUD | OSQUERY
+  decoder                String?
+  parent_id              String?
+  if_sid                 String?
+  if_group               String?
+  match                  String?  @db.Text
+  regex                  String?  @db.Text
+  offset                 Int?
+  negate                 Boolean  @default(false)
+  frequency              Int?
+  timeframe              Int?
+  same_field             String?
+  different_field        String?
+  same_source_ip         Boolean  @default(false)
+  same_id                String?
+  different_id           String?
+  list_ref               String?
+  rule_group             String?
+  is_json                Boolean  @default(false)
+  mitre_tactic           String?
+  mitre_technique        String?
+  mitre_subtechnique     String?
+  compliance_pci_dss     Json?
+  compliance_gdpr        Json?
+  compliance_hipaa       Json?
+  compliance_nist_800_53 Json?
+  compliance_tsc         Json?
+  source                 String?
+  level                  Int?
+  created_at             DateTime @default(now())
+  updated_at             DateTime @default(now())
 
   @@unique([company_id, code])
   @@index([company_id])
@@ -117,14 +146,19 @@ model sec_agent_group {
 }
 
 model sec_decoder {
-  id         String   @id @default(uuid())
-  company_id String   @default("")
-  code       String
-  name       String
-  content    String?  @db.Text
-  is_active  Boolean  @default(true)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
+  id             String   @id @default(uuid())
+  company_id     String   @default("")
+  code           String
+  name           String
+  content        String?  @db.Text
+  is_active      Boolean  @default(true)
+  parent_id      String?
+  offset         Int?
+  program_name   String?
+  is_json        Boolean  @default(false)
+  dynamic_fields Json?
+  created_at     DateTime @default(now())
+  updated_at     DateTime @default(now())
 
   @@unique([company_id, code])
   @@index([company_id])
@@ -423,6 +457,140 @@ model sec_syscollector_hardware {
   cpu         String?
   memory_mb   Int?
   disks       Json?
+  recorded_at DateTime @default(now())
+
+  @@index([agent_id])
+}
+
+model sec_syscollector_os {
+  id           String   @id @default(uuid())
+  agent_id     String?
+  os_name      String?
+  os_version   String?
+  architecture String?
+  kernel       String?
+  hostname     String?
+  recorded_at  DateTime @default(now())
+
+  @@index([agent_id])
+}
+
+model sec_syscollector_package {
+  id           String   @id @default(uuid())
+  agent_id     String?
+  name         String
+  version      String?
+  architecture String?
+  vendor       String?
+  source       String?
+  recorded_at  DateTime @default(now())
+
+  @@index([agent_id])
+  @@index([name])
+}
+
+model sec_syscollector_iface {
+  id          String   @id @default(uuid())
+  agent_id    String?
+  name        String
+  mac         String?
+  ipv4        String?
+  ipv6        String?
+  netmask     String?
+  mtu         Int?
+  state       String?
+  recorded_at DateTime @default(now())
+
+  @@index([agent_id])
+}
+
+model sec_syscollector_port {
+  id          String   @id @default(uuid())
+  agent_id    String?
+  protocol    String?
+  local_ip    String?
+  local_port  Int?
+  remote_ip   String?
+  remote_port Int?
+  state       String?
+  process     String?
+  pid         Int?
+  recorded_at DateTime @default(now())
+
+  @@index([agent_id])
+}
+
+model sec_syscollector_process {
+  id          String    @id @default(uuid())
+  agent_id    String?
+  pid         Int?
+  name        String
+  command     String?   @db.Text
+  user        String?
+  cpu_pct     Float?
+  mem_pct     Float?
+  state       String?
+  start_time  DateTime?
+  recorded_at DateTime  @default(now())
+
+  @@index([agent_id])
+}
+
+model sec_syscollector_user {
+  id          String   @id @default(uuid())
+  agent_id    String?
+  username    String
+  uid         String?
+  gid         String?
+  home        String?
+  shell       String?
+  groups      Json?
+  recorded_at DateTime @default(now())
+
+  @@index([agent_id])
+}
+
+model sec_syscollector_group {
+  id          String   @id @default(uuid())
+  agent_id    String?
+  name        String
+  gid         String?
+  members     Json?
+  recorded_at DateTime @default(now())
+
+  @@index([agent_id])
+}
+
+model sec_syscollector_service {
+  id           String   @id @default(uuid())
+  agent_id     String?
+  name         String
+  display_name String?
+  state        String?
+  start_type   String?
+  recorded_at  DateTime @default(now())
+
+  @@index([agent_id])
+}
+
+model sec_syscollector_hotfix {
+  id           String    @id @default(uuid())
+  agent_id     String?
+  hotfix_id    String
+  description  String?
+  installed_at DateTime?
+  recorded_at  DateTime  @default(now())
+
+  @@index([agent_id])
+}
+
+model sec_syscollector_browser_ext {
+  id          String   @id @default(uuid())
+  agent_id    String?
+  browser     String
+  name        String
+  version     String?
+  profile     String?
   recorded_at DateTime @default(now())
 
   @@index([agent_id])

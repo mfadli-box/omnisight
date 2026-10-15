@@ -22,24 +22,47 @@ model net_subnet {
 }
 
 model net_device {
-  id          String    @id @default(uuid())
-  company_id  String    @default("")
-  subnet_id   String?
-  code        String
-  name        String
-  hostname    String?
-  ip_address  String?
-  mac_address String?
-  device_type String    @default("SWITCH") // ROUTER | SWITCH | AP | FIREWALL | SERVER | OTHER
-  vendor      String?
-  model       String?
-  location    String?
-  status      String    @default("UNKNOWN") // UP | DOWN | UNKNOWN
-  last_seen   DateTime?
-  notes       String?
-  is_active   Boolean   @default(true)
-  created_at  DateTime  @default(now())
-  updated_at  DateTime  @default(now())
+  id                 String    @id @default(uuid())
+  company_id         String    @default("")
+  subnet_id          String?
+  code               String
+  name               String
+  hostname           String?
+  ip_address         String?
+  mac_address        String?
+  device_type        String    @default("SWITCH") // ROUTER | SWITCH | AP | FIREWALL | SERVER | OTHER
+  vendor             String?
+  model              String?
+  location           String?
+  status             String    @default("UNKNOWN") // UP | DOWN | UNKNOWN
+  last_seen          DateTime?
+  notes              String?
+  is_active          Boolean   @default(true)
+  agent_id           String?
+  ros_version        String?
+  identity           String?
+  board_name         String?
+  serial             String?
+  api_endpoint       String?
+  api_mode           String?   @default("API") // API | REST
+  api_port           Int?
+  api_tls            Boolean   @default(false)
+  username           String?
+  secret_enc         String?   @db.Text
+  managed            Boolean   @default(false)
+  uptime_sec         BigInt?
+  cpu_load_pct       Float?
+  mem_free_mb        Int?
+  snmp_version       String?   @default("NONE") // V2C | V3 | NONE
+  snmp_community_enc String?   @db.Text
+  snmp_v3_user       String?
+  snmp_v3_auth_enc   String?   @db.Text
+  snmp_v3_priv_enc   String?   @db.Text
+  snmp_port          Int?      @default(161)
+  snmp_enabled       Boolean   @default(false)
+  tags               Json?
+  created_at         DateTime  @default(now())
+  updated_at         DateTime  @default(now())
 
   subnet           net_subnet?         @relation(fields: [subnet_id], references: [id])
   interfaces       net_interface[]
@@ -55,16 +78,24 @@ model net_device {
 }
 
 model net_interface {
-  id          String   @id @default(uuid())
-  device_id   String
-  name        String
-  if_index    Int?
-  mac_address String?
-  ip_address  String?
-  speed_mbps  Int?
-  status      String   @default("UNKNOWN")
-  created_at  DateTime @default(now())
-  updated_at  DateTime @default(now())
+  id           String   @id @default(uuid())
+  device_id    String
+  name         String
+  if_index     Int?
+  mac_address  String?
+  ip_address   String?
+  speed_mbps   Int?
+  status       String   @default("UNKNOWN")
+  if_alias     String?
+  description  String?
+  admin_status String?
+  duplex       String?
+  mtu          Int?
+  vlan_id      Int?
+  th_warn_pct  Float?
+  th_low_pct   Float?
+  created_at   DateTime @default(now())
+  updated_at   DateTime @default(now())
 
   device net_device @relation(fields: [device_id], references: [id], onDelete: Cascade)
 

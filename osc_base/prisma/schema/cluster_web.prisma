@@ -3,16 +3,30 @@
 // Dokumen: osc_docs/database/cluster_web.md
 
 model web_vhost {
-  id          String   @id @default(uuid())
-  company_id  String   @default("")
-  code        String
-  server_name String
-  listen_port Int      @default(443)
-  ssl         Boolean  @default(true)
-  root        String?
-  is_active   Boolean  @default(true)
-  created_at  DateTime @default(now())
-  updated_at  DateTime @default(now())
+  id             String   @id @default(uuid())
+  company_id     String   @default("")
+  code           String
+  server_name    String
+  listen_port    Int      @default(443)
+  ssl            Boolean  @default(true)
+  root           String?
+  is_active      Boolean  @default(true)
+  type           String?  @default("PROXY") // PROXY | STATIC | REDIRECT | DEAD | NOT_FOUND
+  cert_id        String?
+  access_list_id String?
+  upstream_id    String?
+  stream_id      String?
+  redirect_to    String?
+  advanced       String?  @db.Text
+  websocket      Boolean  @default(false)
+  hsts           Boolean  @default(false)
+  force_ssl      Boolean  @default(false)
+  proxy_headers  Json?
+  default_site   Boolean  @default(false)
+  enabled        Boolean  @default(true)
+  revision_id    String?
+  created_at     DateTime @default(now())
+  updated_at     DateTime @default(now())
 
   server_id String?
   server    web_server?    @relation(fields: [server_id], references: [id])
@@ -23,17 +37,32 @@ model web_vhost {
 }
 
 model web_certificate {
-  id          String    @id @default(uuid())
-  company_id  String    @default("")
-  common_name String
-  issuer      String?
-  serial      String?
-  not_before  DateTime?
-  not_after   DateTime?
-  fingerprint String?
-  status      String    @default("VALID") // VALID | EXPIRING | EXPIRED | REVOKED
-  created_at  DateTime  @default(now())
-  updated_at  DateTime  @default(now())
+  id               String    @id @default(uuid())
+  company_id       String    @default("")
+  common_name      String
+  issuer           String?
+  serial           String?
+  not_before       DateTime?
+  not_after        DateTime?
+  fingerprint      String?
+  status           String    @default("VALID") // VALID | EXPIRING | EXPIRED | REVOKED
+  server_id        String?
+  source           String?   @default("MANUAL") // MANUAL | ACME | SELF_SIGNED
+  provider         String? // LETSENCRYPT | ZEROSSL
+  challenge        String? // HTTP01 | DNS01
+  dns_provider_id  String?
+  auto_renew       Boolean   @default(false)
+  ari_enabled      Boolean   @default(false)
+  renew_at         DateTime?
+  cert_path        String?
+  key_path         String?
+  key_type         String?   @default("RSA") // RSA | EC
+  ocsp_must_staple Boolean   @default(false)
+  wildcard         Boolean   @default(false)
+  sans             Json?
+  last_error       String?   @db.Text
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @default(now())
 
   @@index([company_id])
   @@index([status])
@@ -41,14 +70,19 @@ model web_certificate {
 }
 
 model web_upstream {
-  id            String   @id @default(uuid())
-  vhost_id      String?
-  name          String
-  target_url    String
-  weight        Int      @default(1)
-  health_status String   @default("UNKNOWN") // UP | DOWN | UNKNOWN
-  created_at    DateTime @default(now())
-  updated_at    DateTime @default(now())
+  id             String   @id @default(uuid())
+  vhost_id       String?
+  name           String
+  target_url     String
+  weight         Int      @default(1)
+  health_status  String   @default("UNKNOWN") // UP | DOWN | UNKNOWN
+  server_id      String?
+  strategy       String?  @default("ROUND_ROBIN") // ROUND_ROBIN | LEAST_CONN | IP_HASH | HASH
+  targets        Json?
+  check_path     String?
+  check_interval Int?
+  created_at     DateTime @default(now())
+  updated_at     DateTime @default(now())
 
   vhost web_vhost? @relation(fields: [vhost_id], references: [id], onDelete: Cascade)
 
@@ -93,6 +127,8 @@ model web_access_list {
   company_id String   @default("")
   name       String
   rules      Json?
+  satisfy    String?  @default("ALL") // ALL | ANY
+  pass_auth  Boolean  @default(false)
   is_active  Boolean  @default(true)
   created_at DateTime @default(now())
   updated_at DateTime @default(now())

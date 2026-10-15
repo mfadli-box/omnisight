@@ -22,6 +22,7 @@
 | [app_web.md](app_web.md) | Rencana modul `WEB` — **Web server/reverse proxy + Domain & DNS (ala Nginx UI)**: site/stream/upstream/access-list, TLS+**ACME auto-renew**, **domain/WHOIS expiry**, record DNS. |
 | [app_amm.md](app_amm.md) | Rencana modul `AMM` — **Asset Management & CMDB (ala GLPI/Snipe-IT)**: lifecycle, penugasan/mutasi, relasi CMDB, lisensi/software, garansi/maintenance, label QR, export Excel. |
 | [app_sys.md](app_sys.md) | Rencana **admin lanjutan `APP06`–`APP11`**: notifikasi/template, integrasi HRIS/SSO, API key & webhook, audit & report, preferensi/branding, backup & restore. |
+| [app_collab.md](app_collab.md) | Rencana **File Manager & Kolaborasi**: manajemen berkas, chat internal, mail mandiri, pengumuman/news (melengkapi `APP06` & `DOC`). |
 
 ## 2. Ringkasan Status
 
@@ -39,25 +40,26 @@ lapisan sudah ada; **Rencana** = belum dimulai.
 | `APP` | Signature (admin) | `APP04` | Selesai | [modul](modules/app04.md) |
 | `APP` | Session / Token / Action (admin) | `APP05` | Selesai | [modul](modules/app05.md) |
 | `SYS` | Session Profile | `SYS01`–`SYS03` | Selesai | [modul](modules/sys.md) |
-| `APP` | Notification & Template (admin) | `APP06` | Rencana | [plan](app_sys.md) |
-| `APP` | Integration Hub HRIS/SSO (admin) | `APP07` | Rencana | [plan](app_sys.md) |
-| `APP` | API Key & Webhook (admin) | `APP08` | Rencana | [plan](app_sys.md) |
-| `APP` | Audit & Report (admin) | `APP09` | Rencana | [plan](app_sys.md) |
-| `APP` | Preference & Branding (admin) | `APP10` | Rencana | [plan](app_sys.md) |
-| `APP` | Backup & Restore (admin) | `APP11` | Rencana | [plan](app_sys.md) |
+| `APP` | Notification & Template (admin) | `APP06` | DB selesai | [plan](app_sys.md) |
+| `APP` | Integration Hub HRIS/SSO (admin) | `APP07` | DB selesai | [plan](app_sys.md) |
+| `APP` | API Key & Webhook (admin) | `APP08` | DB selesai | [plan](app_sys.md) |
+| `APP` | Audit & Report (admin) | `APP09` | DB selesai | [plan](app_sys.md) |
+| `APP` | Preference & Branding (admin) | `APP10` | DB selesai | [plan](app_sys.md) |
+| `APP` | Backup & Restore (admin) | `APP11` | DB selesai | [plan](app_sys.md) |
 | `AMM` | Asset Management & CMDB | — | DB selesai | [plan](app_amm.md) |
 | `NET` | Network & MikroTik (firewall + SNMP) | — | DB selesai | [plan](app_net.md) |
 | `VMS` | VM & Hypervisor Management | — | DB selesai | [plan](app_vms.md) |
-| `SEC` | Security Operations / SIEM (ala Wazuh) | — | Rencana | [plan](app_sec.md) |
-| `PAM` | Bastion / Privileged Access (ala JumpServer) | — | Rencana | [plan](app_pam.md) |
+| `SEC` | Security Operations / SIEM (ala Wazuh) | — | DB selesai | [plan](app_sec.md) |
+| `PAM` | Bastion / Privileged Access (ala JumpServer) | — | DB selesai | [plan](app_pam.md) |
 | `WAF` | Web Application Firewall | — | DB selesai | — |
 | `WEB` | Web Server/Proxy + Domain & DNS | — | DB selesai | [plan](app_web.md) |
-| `POD` | Container/Pod (K8s + Docker/Podman) | — | Sebagian | [plan](app_pod.md) |
+| `POD` | Container/Pod (K8s + Docker/Podman) | — | DB selesai · runtime rencana | [plan](app_pod.md) |
 | `JMS` | Job Management | — | DB selesai | — |
 | `BOT` | Bot/Agent | — | DB selesai | — |
 | `DSO` | DevOps/CI-CD | — | DB selesai | — |
-| `OBS` | Observability (monitoring ala Beszel) | — | Sebagian | [plan](app_obs.md) |
+| `OBS` | Observability (monitoring ala Beszel) | — | DB selesai · runtime rencana | [plan](app_obs.md) |
 | `DOC` | Document | — | DB selesai | — |
+| `FILE`/`CHAT`/`MAIL`/`NEWS` | File Manager & Kolaborasi | usulan `APP12`–`APP14` | Rencana (belum ada model) | [plan](app_collab.md) |
 
 ## 3. Konteks Cepat
 

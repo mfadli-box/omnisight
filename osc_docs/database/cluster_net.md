@@ -2,6 +2,8 @@
 
 > Dokumen detail cluster **NET** — Network Monitoring (`net_*`).
 > 🔗 Kembali ke [database/README.md](README.md).
+>
+> ✅ **Status: sudah dibangun.** Seluruh 32 model cluster `net_*` telah terpasang di `prisma/schema/cluster_net.prisma` beserta migrasinya. Catatan "rencana/belum dibangun" di bawah bersifat historis.
 
 ## 1. Ringkasan
 
@@ -37,10 +39,10 @@ net_subnet (1) ──► (N) net_device (1) ──► (N) net_interface
 
 ## 4. Rencana (manajemen MikroTik)
 
-Pengelolaan **MikroTik** (terutama firewall) direncanakan menambah kolom
+Pengelolaan **MikroTik** (terutama firewall) menambah kolom
 manajemen pada `net_device` (vendor/protokol/kredensial terenkripsi) serta tabel
 `net_firewall_rule`, `net_address_list_entry`, `net_config_backup`,
-`net_change`, dan `net_firewall_event` — **belum dibangun**, akses via agen
+`net_change`, dan `net_firewall_event` — **sudah dibangun**, akses via agen
 `osc_auto/agent_vm`.
 
 **SNMP ala LibreNMS** menambah `net_interface_stat` (+ `net_interface_stat_rollup`

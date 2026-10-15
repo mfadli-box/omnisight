@@ -109,34 +109,30 @@ Buka `http://localhost:37773` → login → `/board`.
 
 ## 5. Menjalankan Semua via Docker
 
-Compose saat ini hanya mendefinisikan `osc_base`. Backend & frontend dijalankan
-manual via image:
-
-```bash
-docker compose up -d             # database saja
-```
-
-Build image komponen:
+`docker-compose.yml` (root repo) mendefinisikan tiga service: `osc_base`
+(PostgreSQL 18), `osc_rest` (backend), dan `osc_site` (frontend), semuanya di
+network eksternal `blackbox`. Build image komponen lebih dulu:
 
 ```bash
 cd osc_rest && docker build -t osc_rest .
 cd osc_site && docker build -t osc_site .
+cd .. && docker compose up -d
 ```
 
-Jalankan manual (sementara, hingga service ditambahkan ke compose):
+Atau tanpa build manual (bila image sudah tersedia):
 
 ```bash
-docker run -d --network blackbox --name osc_rest -p 127.0.0.1:37772:37772 osc_rest
-docker run -d --network blackbox --name osc_site -p 127.0.0.1:37773:37773 osc_site
+docker compose up -d
+docker compose ps
 ```
 
 > Di produksi, **jangan** publikasikan `37772`/`37771` ke internet. Cukup
-> ekspos frontend `37773` di balik reverse proxy TLS (lihat `deploy/`).
-> Bila frontend berjalan dalam container, set `LISTEN_ADDR=0.0.0.0:37772`.
+> ekspos frontend `37773` di balik reverse proxy TLS (lihat
+> [../deploy/](../deploy/)). Bila frontend berjalan dalam container, set
+> `LISTEN_ADDR=0.0.0.0:37772`.
 
-Untuk merevisi `docker-compose.yml` (tambah service `osc_rest`, `osc_site`),
-ikuti pola service `osc_base` yang sudah ada: definisikan service, env dari
-`.env`, network `blackbox`, port mapping, healthcheck.
+Detail tambahan (env, override, agent) ada di
+[../docker-compose.md](../docker-compose.md).
 
 ## 6. Unit Test (Python) — `osc_docs/testing`
 

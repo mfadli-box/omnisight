@@ -2,6 +2,8 @@
 
 > Dokumen detail cluster **OBS** — Observability (`obs_*`).
 > 🔗 Kembali ke [database/README.md](README.md).
+>
+> ✅ **Status: sudah dibangun.** Seluruh 25 model cluster `obs_*` telah terpasang di `prisma/schema/cluster_obs.prisma` beserta migrasinya. Catatan "rencana/belum dibangun" di bawah bersifat historis.
 
 ## 1. Ringkasan
 
@@ -33,11 +35,11 @@ telemetry/log** dan dipurge retention (`RE_DAYS_OBS_METRIC`, `RE_DAYS_OBS_LOG`).
   `obs_notification`, `obs_silence`, **`obs_dashboard`, `obs_report`,
   `obs_maintenance`, `obs_status_page`, `obs_status_page_item`,
   `obs_status_page_incident`, `obs_service`, `obs_import_job`**)
-  masih **rencana** — lihat [../planning/app_obs.md](../planning/app_obs.md).
-  Dokumen ini akan diperbarui saat tabel tersebut dibangun.
+  sudah **dibangun** — lihat [../planning/app_obs.md](../planning/app_obs.md).
+  Seluruh tabel tersebut sudah dibangun.
 - `obs_vmhost`/`obs_vm` bertaut ke modul **VMS** (`vms_host`/`vms_guest`);
   `obs_vm_stat` time-series beretensi.
-- Perluasan model **rencana** (kekurangan audit Beszel/Uptime Kuma):
+- Perluasan model **sudah dibangun** (kekurangan audit Beszel/Uptime Kuma):
   - `obs_service` — unit **systemd** per sistem (status, `restart_count`,
     CPU/mem); log journal disimpan di `obs_log` (`source=systemd`), pemakaian ke
     `obs_metric` (`subkey=<unit>`).

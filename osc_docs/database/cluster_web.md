@@ -2,6 +2,8 @@
 
 > Dokumen detail cluster **WEB** — Web/Proxy (`web_*`).
 > 🔗 Kembali ke [database/README.md](README.md).
+>
+> ✅ **Status: sudah dibangun.** Seluruh 21 model cluster `web_*` telah terpasang di `prisma/schema/cluster_web.prisma` beserta migrasinya. Catatan "rencana/belum dibangun" di bawah bersifat historis.
 
 ## 1. Ringkasan
 
@@ -26,7 +28,7 @@ snippet/template/location, backup/export, deploy cluster, dan metrik node web.
 
 Modul `WEB` diproyeksikan menjadi **manajemen web server/reverse proxy + domain
 & DNS** (ala Nginx UI, lihat [../planning/app_web.md](../planning/app_web.md)).
-Model tambahan (**belum dibangun**):
+Model tambahan (**sudah dibangun**):
 
 | Model | Isi pokok |
 |---|---|
@@ -79,5 +81,5 @@ web_deploy ──► web_server (target) · web_vhost (asal)
   **cluster deploy/mirror** (`web_deploy`) apply per node.
 - Keamanan panel (2FA/passkey, allowlist IP, ban login) **diwarisi** auth platform
   ([../planning/app_sys.md](../planning/app_sys.md)) — bukan model `web_*`.
-- Model tambahan §2.4 **belum dibangun**; rincian [../planning/app_web.md](../planning/app_web.md).
+- Model tambahan §2.4 **sudah dibangun**; rincian [../planning/app_web.md](../planning/app_web.md).
 - Konvensi umum model: [README.md](README.md#4-konvensi-model).

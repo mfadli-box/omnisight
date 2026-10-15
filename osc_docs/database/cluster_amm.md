@@ -2,6 +2,8 @@
 
 > Dokumen detail cluster **AMM** — Asset Management (`amm_*`).
 > 🔗 Kembali ke [database/README.md](README.md) ·
+>
+> ✅ **Status: sudah dibangun.** Seluruh 45 model cluster `amm_*` telah terpasang di `prisma/schema/cluster_amm.prisma` beserta migrasinya. Catatan "rencana/belum dibangun" di bawah bersifat historis.
 > Data contoh & pemetaan field: [planning/additional.md](../planning/additional.md).
 
 ## 1. Ringkasan
@@ -47,8 +49,7 @@ padanya: perangkat POS, digital signage, akun toko, dan mesin EDC. Satu baris
 ### 2.8 Rencana — CMDB & Aset Lanjutan
 
 Modul `AMM` diproyeksikan menjadi **manajemen aset penuh + CMDB ringan** (lihat
-[../planning/app_amm.md](../planning/app_amm.md)). Model tambahan (**belum
-dibangun**):
+[../planning/app_amm.md](../planning/app_amm.md)). Model tambahan (**sudah dibangun**):
 
 | Model | Isi pokok |
 |---|---|
@@ -126,7 +127,7 @@ amm_api_token (1) ──► (N) amm_api_log
 - Kolom kredensial **wajib** dienkripsi sebelum disimpan (`password_enc`).
 - Export Excel massal (store aktif, 3 sheet) direncanakan di
   [planning/additional.md §6](../planning/additional.md#62-export-excel-3-sheet--bisa-keputusan-backend-excelize).
-- Model berikut **belum dibangun** (lengkap sesuai audit Snipe-IT/GLPI): 
+- Model berikut **sudah dibangun** (lengkap sesuai audit Snipe-IT/GLPI): 
   `amm_manufacturer`, `amm_asset_model`, `amm_department`, `amm_status_type`, 
   `amm_status_label`, `amm_fieldset`, `amm_fieldset_field`, `amm_fieldset_binding`, 
   `amm_asset_audit`, `amm_audit_item`, `amm_depreciation`, `amm_asset_assignment` 

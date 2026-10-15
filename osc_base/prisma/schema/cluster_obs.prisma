@@ -11,6 +11,9 @@ model obs_metric {
   unit        String?
   labels      Json?
   recorded_at DateTime @default(now())
+  system_id   String?
+  metric      String?
+  subkey      String?
   created_at  DateTime @default(now())
 
   @@index([company_id])
@@ -72,17 +75,35 @@ model obs_system {
 }
 
 model obs_check {
-  id         String   @id @default(uuid())
-  company_id String   @default("")
-  code       String
-  name       String
-  type       String   @default("HTTP") // HTTP | PING | TCP | DNS | SSL | ICMP
-  target     String
-  interval   Int      @default(60)
-  timeout    Int      @default(10)
-  is_active  Boolean  @default(true)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
+  id               String   @id @default(uuid())
+  company_id       String   @default("")
+  code             String
+  name             String
+  type             String   @default("HTTP") // HTTP | PING | TCP | DNS | SSL | ICMP | GRPC | MQTT | WS | SMTP | RADIUS | MYSQL | MARIADB | POSTGRES | MONGODB | REDIS
+  target           String
+  interval         Int      @default(60)
+  timeout          Int      @default(10)
+  is_active        Boolean  @default(true)
+  record_type      String?
+  expected         String?
+  http_options     Json?
+  http_method      String?
+  http_headers     Json?
+  http_body        String?  @db.Text
+  http_auth        Json?
+  status_range     String?
+  follow_redirects Boolean  @default(true)
+  tls_verify       Boolean  @default(true)
+  proxy            String?
+  push_token       String?
+  assertion        String?  @db.Text
+  json_path        String?
+  keyword          String?
+  db_dsn_enc       String?  @db.Text
+  tags             Json?
+  retry_count      Int      @default(0)
+  created_at       DateTime @default(now())
+  updated_at       DateTime @default(now())
 
   results obs_check_result[]
 
@@ -117,15 +138,20 @@ model obs_metric_rollup {
 }
 
 model obs_disk {
-  id          String   @id @default(uuid())
-  system_id   String
-  mount       String?
-  device      String?
-  fs_type     String?
-  total_gb    Float?
-  used_gb     Float?
-  health      String?
-  recorded_at DateTime @default(now())
+  id             String   @id @default(uuid())
+  system_id      String
+  mount          String?
+  device         String?
+  fs_type        String?
+  total_gb       Float?
+  used_gb        Float?
+  health         String?
+  emmc_life_time Float?
+  emmc_pre_eol   Boolean  @default(false)
+  mdraid_level   String?
+  mdraid_state   String?
+  scrub_state    String?
+  recorded_at    DateTime @default(now())
 
   @@index([system_id])
 }
@@ -231,6 +257,20 @@ model obs_notification {
   created_at DateTime  @default(now())
 
   @@index([company_id, created_at])
+}
+
+model obs_notify_channel {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  type       String   @default("WEBHOOK") // EMAIL | SMTP | WEBHOOK | NTFY | TELEGRAM | SLACK | DISCORD | GOTIFY | PUSHOVER | TEAMS | MATRIX | MATTERMOST | PUSHBULLET | SIGNAL | TWILIO
+  config     Json? // terenkripsi
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@unique([company_id, name])
+  @@index([company_id])
 }
 
 model obs_silence {

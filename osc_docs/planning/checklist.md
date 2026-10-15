@@ -101,14 +101,14 @@ Sebuah aplikasi dinyatakan **Selesai** bila seluruh lapisan berikut terpenuhi:
 - [x] DB — tabel aset lokasi: `amm_asset_device`, `amm_digital_signage`,
       `amm_store_account`, `amm_store_edc` (lihat
       [additional.md](additional.md)).
-- [ ] DB — CMDB/lanjutan: perluas `amm_asset` + `amm_asset_assignment`,
+- [x] DB — CMDB/lanjutan: perluas `amm_asset` + `amm_asset_assignment`,
       `amm_asset_relation`, `amm_license`, `amm_license_seat`, `amm_software`,
       `amm_maintenance` (lihat [app_amm.md](app_amm.md)).
-- [ ] DB — **paritas Snipe-IT (MAJOR)**: `amm_asset_model`, `amm_manufacturer`,
+- [x] DB — **paritas Snipe-IT (MAJOR)**: `amm_asset_model`, `amm_manufacturer`,
       `amm_fieldset`/`amm_fieldset_field`/`amm_fieldset_binding`,
       `amm_asset_audit`/`amm_audit_item`, `amm_depreciation`, `amm_department`,
       `amm_status_type`/`amm_status_label`.
-- [ ] DB — custom fields, supplier/kontrak & stok: `amm_custom_field`,
+- [x] DB — custom fields, supplier/kontrak & stok: `amm_custom_field`,
       `amm_custom_value`, `amm_supplier`, `amm_contract`, `amm_contract_asset`,
       `amm_consumable`, `amm_consumable_txn`, `amm_accessory`,
       `amm_accessory_assignment`, `amm_accessory_txn`, `amm_component`,
@@ -133,7 +133,7 @@ Sebuah aplikasi dinyatakan **Selesai** bila seluruh lapisan berikut terpenuhi:
 
 #### `NET` — Network & MikroTik (firewall)
 - [x] DB — `net_subnet`, `net_device`, `net_interface`.
-- [ ] DB — manajemen MikroTik: kolom manajemen + **SNMP** di `net_device`; tabel `net_firewall_rule`, `net_address_list_entry`, `net_config_backup`, `net_change`, `net_firewall_event`, `net_interface_stat`, `net_interface_stat_rollup`, `net_sensor`, `net_sensor_stat_rollup`, `net_syslog_event`, `net_topology_link`, `net_discovery`, `net_device_group`, `net_alert_rule`/`net_alert`, `net_maintenance_window`, `net_billing`, `net_availability`/`net_ping_result`, `net_vlan`, `net_ip_address`, `net_entity_physical`, `net_config_revision`, `net_custom_oid`, `net_api_token` (lihat [app_net.md](app_net.md)). ⏸️ `net_blocklist`/`net_block_entry`/`net_script` ditangguhkan.
+- [x] DB — manajemen MikroTik: kolom manajemen + **SNMP** di `net_device`; tabel `net_firewall_rule`, `net_address_list_entry`, `net_config_backup`, `net_change`, `net_firewall_event`, `net_interface_stat`, `net_interface_stat_rollup`, `net_sensor`, `net_sensor_stat_rollup`, `net_syslog_event`, `net_topology_link`, `net_discovery`, `net_device_group`, `net_alert_rule`/`net_alert`, `net_maintenance_window`, `net_billing`, `net_availability`/`net_ping_result`, `net_vlan`, `net_ip_address`, `net_entity_physical`, `net_config_revision`, `net_custom_oid`, `net_api_token` (lihat [app_net.md](app_net.md)). ⏸️ `net_blocklist`/`net_block_entry`/`net_script` ditangguhkan.
 - [ ] Backend — skeleton `net/` + klien RouterOS di **agen `osc_auto/agent_vm`** (**keduanya**: API biner v6/v7 + REST v7) + endpoint `/rest/agent/net/*` + uji koneksi.
 - [ ] Backend — inventaris & monitoring (resource, interface, counter) read.
 - [ ] Backend — firewall CRUD (filter/NAT/mangle/raw), enable/disable, reorder, clone/reset-counter, time-based rules, address-list; **safe apply** (snapshot/dry-run/rollback otomatis) + audit `net_change`.
@@ -147,8 +147,8 @@ Sebuah aplikasi dinyatakan **Selesai** bila seluruh lapisan berikut terpenuhi:
 
 #### `VMS` — VM & Hypervisor Management
 - [x] DB — `vms_host`, `vms_guest`, `vms_finding`.
-- [ ] DB — perluas `vms_host`/`vms_guest` (mgmt/SNMP-like); tabel `vms_snapshot`, `vms_task`, `vms_template`, `vms_nic`, `vms_storage`, `vms_iso`, `vms_backup` (lihat [app_vms.md](app_vms.md)).
-- [ ] DB — **paritas Proxmox/Incus (MAJOR)**: `vms_fw_rule`/`vms_security_group`, `vms_sdn`, `vms_pool`, `vms_cluster`/`vms_node`, `vms_ha`, `vms_replication`, `vms_passthrough`; perluas `vms_guest` (boot/hotplug/agent/cloud-init meta+network), `vms_snapshot` (RAM/live), `vms_backup` (retensi/verifikasi/enkripsi).
+- [x] DB — perluas `vms_host`/`vms_guest` (mgmt/SNMP-like); tabel `vms_snapshot`, `vms_task`, `vms_template`, `vms_nic`, `vms_storage`, `vms_iso`, `vms_backup` (lihat [app_vms.md](app_vms.md)).
+- [x] DB — **paritas Proxmox/Incus (MAJOR)**: `vms_fw_rule`/`vms_security_group`, `vms_sdn`, `vms_pool`, `vms_cluster`/`vms_node`, `vms_ha`, `vms_replication`, `vms_passthrough`; perluas `vms_guest` (boot/hotplug/agent/cloud-init meta+network), `vms_snapshot` (RAM/live), `vms_backup` (retensi/verifikasi/enkripsi).
 - [ ] Backend — skeleton `vms/` + driver hypervisor di agen (`vmhost`, Incus/LXD dulu) + endpoint `/rest/agent/vms/*`; sync inventaris.
 - [ ] Backend — power (start/stop/reboot/suspend), snapshot, clone, resize, console (noVNC/SPICE opsional), tasks; audit (`vms_task` + `USLogs`).
 - [ ] Backend — **provisioning**: create VM (ISO/template) + cloud-init (user-data + meta/network), NIC/bridge/VLAN/SDN, storage pool & ISO library, backup/restore VM (retensi/verifikasi/enkripsi).
@@ -160,13 +160,13 @@ Sebuah aplikasi dinyatakan **Selesai** bila seluruh lapisan berikut terpenuhi:
 
 #### `POD` — Container/Pod (K8s + Docker/Podman)
 - [x] DB — Kubernetes: `pod_cluster`, `pod_node`, `pod_workload`.
-- [ ] DB — runtime Docker/Podman: `pod_engine`, `pod_stack`,
+- [x] DB — runtime Docker/Podman: `pod_engine`, `pod_stack`,
       `pod_stack_revision`, `pod_service`, `pod_container`, `pod_image`,
       `pod_volume`, `pod_network`, `pod_registry`, `pod_action`, `pod_env_var`,
       `pod_git_credential`, `pod_git_sync`, `pod_build`, `pod_backup`,
       `pod_scan`, `pod_scan_finding`, `pod_template`, `pod_template_registry`,
       `pod_exec_session` (+ `pod_pod`, `pod_secret`, `pod_disk_usage`; migrasi).
-- [ ] DB — **paritas Dockge/Arcane**: `pod_update_check`, `pod_heal_policy`,
+- [x] DB — **paritas Dockge/Arcane**: `pod_update_check`, `pod_heal_policy`,
       `pod_backup_schedule`, `pod_system_backup`, `pod_patch`, `pod_scan_schedule`,
       `pod_threat_intel`, `pod_registry_repository`/`pod_registry_tag`,
       `pod_port_binding`, `pod_gpu`, `pod_notification_channel`/
@@ -200,12 +200,12 @@ Sebuah aplikasi dinyatakan **Selesai** bila seluruh lapisan berikut terpenuhi:
 
 #### `SEC` — Security Operations / SIEM (ala Wazuh)
 - [x] DB — `sec_waf_rule`, `sec_waf_event` (perimeter/WAF, sudah ada).
-- [ ] DB — SIEM/HIDS: `sec_agent`, `sec_decoder`, `sec_rule`, `sec_event`,
+- [x] DB — SIEM/HIDS: `sec_agent`, `sec_decoder`, `sec_rule`, `sec_event`,
       `sec_event_alert`, `sec_fim_event`, `sec_sca_policy`, `sec_sca_result`,
       `sec_vuln`, `sec_incident`, `sec_incident_event`, `sec_response_action`,
       `sec_compliance_report`, `sec_log_source`, `sec_rule_feed`, `sec_intel_feed`,
       `sec_intel_ioc`, `sec_forwarder` (lihat [app_sec.md](app_sec.md)).
-- [ ] DB — **paritas Wazuh (MAJOR: syscollector + rule DSL)**: `sec_syscollector_*`,
+- [x] DB — **paritas Wazuh (MAJOR: syscollector + rule DSL)**: `sec_syscollector_*`,
       `sec_agent_group`, `sec_cdb_list`/`sec_cdb_entry`, `sec_malware_event`,
       `sec_vuln_feed`, `sec_container_event`, `sec_osquery_query`, `sec_live_query`,
       `sec_response_script`, `sec_rbac_grant`, `sec_cloud_account`/`sec_cloud_finding`.
@@ -218,10 +218,10 @@ Sebuah aplikasi dinyatakan **Selesai** bila seluruh lapisan berikut terpenuhi:
 - [ ] Test.
 
 #### `PAM` — Bastion / Privileged Access (ala JumpServer)
-- [ ] DB — `pam_asset`, `pam_account`, `pam_policy`, `pam_grant`,
+- [x] DB — `pam_asset`, `pam_account`, `pam_policy`, `pam_grant`,
       `pam_command_filter`, `pam_session`, `pam_command`, `pam_access_request`,
       `pam_gateway` + migrasi `cluster_pam.prisma` (lihat [app_pam.md](app_pam.md)).
-- [ ] DB — **paritas JumpServer**: `pam_login_acl`, `pam_lockout`,
+- [x] DB — **paritas JumpServer**: `pam_login_acl`, `pam_lockout`,
       `pam_account_template`, `pam_command_filter_binding`, `pam_approval_flow`/
       `pam_approval_step`/`pam_access_request_approval`, `pam_apikey`,
       `pam_health_check`, `pam_discovery_job`, `pam_ticket_provider`.
@@ -234,11 +234,11 @@ Sebuah aplikasi dinyatakan **Selesai** bila seluruh lapisan berikut terpenuhi:
 
 #### `WEB` — Web Server/Proxy + Domain & DNS (ala Nginx UI)
 - [x] DB — `web_vhost`, `web_certificate`, `web_upstream`.
-- [ ] DB — `web_server`, `web_stream`, `web_access_list`, `web_access_entry`,
+- [x] DB — `web_server`, `web_stream`, `web_access_list`, `web_access_entry`,
       `web_acme_account`, `web_dns_provider`, `web_domain`, `web_dns_record`,
       `web_config_revision`, `web_change`, `web_access_log`,
       `web_access_stat` + perluas `web_vhost`/`web_upstream`/`web_certificate` (lihat [app_web.md](app_web.md)).
-- [ ] DB — **paritas Nginx UI/NPM**: `web_location`, `web_snippet`, `web_template`,
+- [x] DB — **paritas Nginx UI/NPM**: `web_location`, `web_snippet`, `web_template`,
       `web_server_metric`, `web_backup`, `web_deploy`; perluas `web_access_list`
       (satisfy/pass-auth) & `web_certificate` (RSA/EC, OCSP, ARI, wildcard/SAN).
 - [ ] Backend — skeleton `web/` + `mechanic/nginx/` (generator config, safe apply) + capability agen `web` (`/rest/agent/web/*`).
@@ -273,7 +273,7 @@ Sebuah aplikasi dinyatakan **Selesai** bila seluruh lapisan berikut terpenuhi:
 
 #### `OBS` — Observability & Server/Container Monitoring (pengganti Beszel)
 - [x] DB — `obs_metric`, `obs_log`, `obs_alert`.
-- [ ] DB — monitoring: `obs_system`, `obs_metric_rollup`, `obs_disk`,
+- [x] DB — monitoring: `obs_system`, `obs_metric_rollup`, `obs_disk`,
       `obs_container_stat`, `obs_vmhost`, `obs_vm`, `obs_vm_stat`, `obs_check`,
       `obs_check_group`, `obs_check_result`, `obs_alert_rule`, `obs_notification`,
       `obs_silence`, `obs_dashboard`, `obs_report`, `obs_maintenance`,
@@ -309,12 +309,28 @@ Sebuah aplikasi dinyatakan **Selesai** bila seluruh lapisan berikut terpenuhi:
 Rencana rinci: [app_sys.md](app_sys.md) (lihat juga
 [roadmap Fase 6](roadmap.md#fase-6--lanjutan-admin-rencana)).
 
+- [x] DB — `app_notify_channel`, `app_notify_template`, `app_notify_rule`,
+      `app_notify_message`, `app_api_key`, `app_webhook`, `app_webhook_delivery`,
+      `app_integration`, `app_integration_sync`, `app_preference`, `app_report`,
+      `app_backup`, `app_backup_item` (cluster `app_*`).
 - [ ] `APP06` — **Notification & Template**: dispatcher + channel/template/rule + log; halaman `APP06`.
 - [ ] `APP07` — **Integration Hub (HRIS/SSO)**: HRIS sync + SSO/OIDC/LDAP; halaman `APP07`.
 - [ ] `APP08` — **API Key & Webhook**: kunci API (scope) + webhook keluar + delivery/retry (HMAC); halaman `APP08`.
 - [ ] `APP09` — **Audit & Report**: penampil audit + report tersimpan/ekspor; halaman `APP09`.
 - [ ] `APP10` — **Preference & Branding**: preferensi user + setting company; halaman `APP10`.
 - [ ] `APP11` — **Backup & Restore**: export/import konfigurasi + dry-run restore + jadwal `JMS`; halaman `APP11`.
+
+### B.6 Backlog — File Manager & Kolaborasi (belum ada model)
+
+Rencana rinci: [app_collab.md](app_collab.md).
+
+- [ ] DB — File Manager: `doc_folder`, `doc_file`, `doc_file_version`,
+      `doc_share`, `doc_quota`.
+- [ ] DB — Chat: `chat_room`, `chat_member`, `chat_message`, `chat_reaction`.
+- [ ] DB — Mail: `mail_account`, `mail_message`, `mail_attachment`.
+- [ ] DB — Announcement/News: `app_announcement`, `app_announcement_read`.
+- [ ] Backend — skeleton `doc/`, `chat/`, `mail/`, `app/` + WebSocket chat + SMTP.
+- [ ] Frontend — halaman File Manager, `CHAT`, `MAIL`, `NEWS`.
 
 ---
 

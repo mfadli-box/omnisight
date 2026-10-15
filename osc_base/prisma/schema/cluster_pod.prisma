@@ -138,19 +138,26 @@ model pod_service {
 }
 
 model pod_container {
-  id           String    @id @default(uuid())
-  service_id   String?
-  stack_id     String?
-  name         String
-  container_id String?
-  image        String
-  status       String    @default("UNKNOWN")
-  ip           String?
-  ports        Json?
-  started_at   DateTime?
-  stopped_at   DateTime?
-  created_at   DateTime  @default(now())
-  updated_at   DateTime  @default(now())
+  id                 String    @id @default(uuid())
+  service_id         String?
+  stack_id           String?
+  name               String
+  container_id       String?
+  image              String
+  status             String    @default("UNKNOWN")
+  ip                 String?
+  ports              Json?
+  started_at         DateTime?
+  stopped_at         DateTime?
+  update_strategy    String?   @default("MANUAL") // MANUAL | DIGEST | SEMVER
+  version_constraint String?
+  tag_pattern        String?
+  latest_version     String?
+  auto_heal          Boolean   @default(false)
+  patch_available    Boolean   @default(false)
+  patched_tag        String?
+  created_at         DateTime  @default(now())
+  updated_at         DateTime  @default(now())
 
   service pod_service? @relation(fields: [service_id], references: [id], onDelete: Cascade)
   images  pod_image[]
@@ -159,14 +166,20 @@ model pod_container {
 }
 
 model pod_image {
-  id           String   @id @default(uuid())
-  container_id String?
-  repo         String
-  tag          String
-  digest       String?
-  size_bytes   Int?
-  created_at   DateTime @default(now())
-  updated_at   DateTime @default(now())
+  id                 String   @id @default(uuid())
+  container_id       String?
+  repo               String
+  tag                String
+  digest             String?
+  size_bytes         Int?
+  update_strategy    String?  @default("MANUAL") // MANUAL | DIGEST | SEMVER
+  version_constraint String?
+  tag_pattern        String?
+  latest_version     String?
+  patch_available    Boolean  @default(false)
+  patched_tag        String?
+  created_at         DateTime @default(now())
+  updated_at         DateTime @default(now())
 
   container pod_container? @relation(fields: [container_id], references: [id], onDelete: Cascade)
 
@@ -242,30 +255,38 @@ model pod_build {
 }
 
 model pod_backup {
-  id         String   @id @default(uuid())
-  company_id String   @default("")
-  name       String
-  kind       String   @default("STACK") // STACK | VOLUME | SYSTEM
-  target_id  String?
-  path       String?  @db.Text
-  size_bytes Int?
-  checksum   String?
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
+  id               String   @id @default(uuid())
+  company_id       String   @default("")
+  name             String
+  kind             String   @default("STACK") // STACK | VOLUME | SYSTEM
+  target_id        String?
+  path             String?  @db.Text
+  size_bytes       Int?
+  checksum         String?
+  s3_config        Json?
+  selective        Json?
+  schedule_id      String?
+  safety_backup_id String?
+  created_at       DateTime @default(now())
+  updated_at       DateTime @default(now())
 
   @@index([company_id])
 }
 
 model pod_scan {
-  id          String    @id @default(uuid())
-  company_id  String    @default("")
-  target      String
-  status      String    @default("PENDING") // PENDING | RUNNING | DONE | FAILED
-  started_at  DateTime?
-  finished_at DateTime?
-  report      String?   @db.Text
-  created_at  DateTime  @default(now())
-  updated_at  DateTime  @default(now())
+  id           String    @id @default(uuid())
+  company_id   String    @default("")
+  target       String
+  status       String    @default("PENDING") // PENDING | RUNNING | DONE | FAILED
+  started_at   DateTime?
+  finished_at  DateTime?
+  report       String?   @db.Text
+  risk_score   Float?
+  kev_count    Int?
+  epss_max     Float?
+  trivy_server String?
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @default(now())
 
   findings pod_scan_finding[]
 
@@ -281,6 +302,9 @@ model pod_scan_finding {
   version     String?
   fixed       String?
   description String?  @db.Text
+  in_kev      Boolean?
+  epss        Float?
+  trend       String?
   created_at  DateTime @default(now())
 
   scan pod_scan @relation(fields: [scan_id], references: [id], onDelete: Cascade)
@@ -303,30 +327,38 @@ model pod_template {
 }
 
 model pod_git_credential {
-  id           String   @id @default(uuid())
-  company_id   String   @default("")
-  name         String
-  auth_type    String   @default("HTTPS") // HTTPS | SSH
-  username     String?
-  password_enc String?  @db.Text
-  key_enc      String?  @db.Text
-  is_active    Boolean  @default(true)
-  created_at   DateTime @default(now())
-  updated_at   DateTime @default(now())
+  id            String   @id @default(uuid())
+  company_id    String   @default("")
+  name          String
+  auth_type     String   @default("HTTPS") // HTTPS | SSH
+  username      String?
+  password_enc  String?  @db.Text
+  key_enc       String?  @db.Text
+  is_active     Boolean  @default(true)
+  gpg_key_enc   String?  @db.Text
+  commit_name   String?
+  commit_email  String?
+  host_key_mode String? // STRICT | INSECURE | ACCEPT_NEW
+  gpg_sign      Boolean  @default(false)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @default(now())
 
   @@index([company_id])
 }
 
 model pod_git_sync {
-  id          String    @id @default(uuid())
-  stack_id    String?
-  company_id  String    @default("")
-  repo_url    String
-  branch      String    @default("main")
-  last_synced DateTime?
-  status      String    @default("IDLE") // IDLE | SYNCING | ERROR
-  created_at  DateTime  @default(now())
-  updated_at  DateTime  @default(now())
+  id             String    @id @default(uuid())
+  stack_id       String?
+  company_id     String    @default("")
+  repo_url       String
+  branch         String    @default("main")
+  last_synced    DateTime?
+  status         String    @default("IDLE") // IDLE | SYNCING | ERROR
+  pre_deploy     String?   @db.Text
+  env_git_policy String?   @default("IGNORE") // IGNORE | TRACK | FORBID
+  gpg_sign       Boolean   @default(false)
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @default(now())
 
   @@index([company_id])
 }
