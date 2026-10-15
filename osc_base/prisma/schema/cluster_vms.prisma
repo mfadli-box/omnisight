@@ -41,8 +41,9 @@ model vms_guest {
   created_at  DateTime @default(now())
   updated_at  DateTime @default(now())
 
-  host     vms_host      @relation(fields: [host_id], references: [id], onDelete: Cascade)
-  findings vms_finding[]
+  host      vms_host       @relation(fields: [host_id], references: [id], onDelete: Cascade)
+  findings  vms_finding[]
+  snapshots vms_snapshot[]
 
   @@unique([host_id, code])
   @@index([host_id])
@@ -69,4 +70,17 @@ model vms_finding {
   @@index([guest_id])
   @@index([status])
   @@index([severity])
+}
+
+model vms_snapshot {
+  id         String   @id @default(uuid())
+  guest_id   String
+  company_id String   @default("")
+  name       String
+  size_bytes Int?
+  created_at DateTime @default(now())
+
+  guest      vms_guest @relation(fields: [guest_id], references: [id], onDelete: Cascade)
+
+  @@index([guest_id])
 }
