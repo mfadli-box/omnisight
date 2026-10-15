@@ -212,17 +212,17 @@ model pod_env_var {
 }
 
 model pod_registry {
-  id         String   @id @default(uuid())
-  company_id String   @default("")
-  name       String
-  url        String
-  auth       String?  @default("NONE") // NONE | BASIC | TOKEN
-  username   String?
-  password_enc String? @db.Text
-  token_enc  String?  @db.Text
-  is_active  Boolean  @default(true)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
+  id           String   @id @default(uuid())
+  company_id   String   @default("")
+  name         String
+  url          String
+  auth         String?  @default("NONE") // NONE | BASIC | TOKEN
+  username     String?
+  password_enc String?  @db.Text
+  token_enc    String?  @db.Text
+  is_active    Boolean  @default(true)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @default(now())
 
   @@index([company_id])
 }
@@ -257,17 +257,17 @@ model pod_backup {
 }
 
 model pod_scan {
-  id         String   @id @default(uuid())
-  company_id String   @default("")
-  target     String
-  status     String   @default("PENDING") // PENDING | RUNNING | DONE | FAILED
-  started_at DateTime?
+  id          String    @id @default(uuid())
+  company_id  String    @default("")
+  target      String
+  status      String    @default("PENDING") // PENDING | RUNNING | DONE | FAILED
+  started_at  DateTime?
   finished_at DateTime?
-  report     String?  @db.Text
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
+  report      String?   @db.Text
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @default(now())
 
-  findings   pod_scan_finding[]
+  findings pod_scan_finding[]
 
   @@index([company_id])
 }
@@ -283,7 +283,7 @@ model pod_scan_finding {
   description String?  @db.Text
   created_at  DateTime @default(now())
 
-  scan        pod_scan @relation(fields: [scan_id], references: [id], onDelete: Cascade)
+  scan pod_scan @relation(fields: [scan_id], references: [id], onDelete: Cascade)
 
   @@index([scan_id])
 }
@@ -318,15 +318,297 @@ model pod_git_credential {
 }
 
 model pod_git_sync {
-  id           String   @id @default(uuid())
-  stack_id     String?
-  company_id   String   @default("")
-  repo_url     String
-  branch       String   @default("main")
-  last_synced  DateTime?
-  status       String   @default("IDLE") // IDLE | SYNCING | ERROR
-  created_at   DateTime @default(now())
-  updated_at   DateTime @default(now())
+  id          String    @id @default(uuid())
+  stack_id    String?
+  company_id  String    @default("")
+  repo_url    String
+  branch      String    @default("main")
+  last_synced DateTime?
+  status      String    @default("IDLE") // IDLE | SYNCING | ERROR
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @default(now())
+
+  @@index([company_id])
+}
+
+model pod_pod {
+  id         String   @id @default(uuid())
+  engine_id  String?
+  code       String
+  name       String
+  namespace  String   @default("default")
+  status     String   @default("UNKNOWN")
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([engine_id])
+}
+
+model pod_action {
+  id          String    @id @default(uuid())
+  company_id  String    @default("")
+  target_type String
+  target_id   String?
+  action      String
+  status      String    @default("PENDING") // PENDING | RUNNING | DONE | FAILED
+  user_id     String?
+  message     String?   @db.Text
+  started_at  DateTime?
+  finished_at DateTime?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @default(now())
+
+  @@index([company_id, created_at])
+}
+
+model pod_exec_session {
+  id           String    @id @default(uuid())
+  container_id String?
+  user_id      String?
+  command      String?
+  started_at   DateTime  @default(now())
+  ended_at     DateTime?
+  created_at   DateTime  @default(now())
+
+  @@index([container_id])
+}
+
+model pod_secret {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  value_enc  String?  @db.Text
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model pod_disk_usage {
+  id          String   @id @default(uuid())
+  engine_id   String?
+  target      String
+  total_gb    Float?
+  used_gb     Float?
+  free_gb     Float?
+  recorded_at DateTime @default(now())
+
+  @@index([engine_id, recorded_at])
+}
+
+model pod_update_check {
+  id               String   @id @default(uuid())
+  engine_id        String?
+  image            String
+  current_digest   String?
+  latest_digest    String?
+  update_available Boolean  @default(false)
+  checked_at       DateTime @default(now())
+  created_at       DateTime @default(now())
+
+  @@index([engine_id])
+}
+
+model pod_heal_policy {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  target_id  String?
+  condition  Json?
+  action     String   @default("RESTART")
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model pod_backup_schedule {
+  id             String   @id @default(uuid())
+  company_id     String   @default("")
+  name           String
+  target_id      String?
+  cron           String?
+  retention_days Int      @default(7)
+  is_active      Boolean  @default(true)
+  created_at     DateTime @default(now())
+  updated_at     DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model pod_system_backup {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  engine_id  String?
+  path       String?  @db.Text
+  size_bytes Int?
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model pod_patch {
+  id          String   @id @default(uuid())
+  image_id    String?
+  scan_id     String?
+  status      String   @default("PENDING")
+  patched_tag String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now())
+
+  @@index([image_id])
+}
+
+model pod_scan_schedule {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  target     String?
+  cron       String?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model pod_threat_intel {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  cve        String
+  in_kev     Boolean  @default(false)
+  epss       Float?
+  source     String?
+  updated_at DateTime @default(now())
+  created_at DateTime @default(now())
+
+  @@index([company_id, cve])
+}
+
+model pod_registry_repository {
+  id          String   @id @default(uuid())
+  registry_id String
+  name        String
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now())
+
+  @@index([registry_id])
+}
+
+model pod_registry_tag {
+  id            String   @id @default(uuid())
+  repository_id String
+  tag           String
+  digest        String?
+  size_bytes    Int?
+  created_at    DateTime @default(now())
+  updated_at    DateTime @default(now())
+
+  @@index([repository_id])
+}
+
+model pod_port_binding {
+  id             String   @id @default(uuid())
+  container_id   String?
+  host_ip        String?
+  host_port      Int
+  container_port Int
+  protocol       String   @default("tcp")
+  created_at     DateTime @default(now())
+  updated_at     DateTime @default(now())
+
+  @@index([container_id])
+}
+
+model pod_gpu {
+  id         String   @id @default(uuid())
+  engine_id  String?
+  vendor     String?
+  model      String?
+  count      Int      @default(1)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([engine_id])
+}
+
+model pod_notification_channel {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  type       String   @default("WEBHOOK")
+  config_enc String?  @db.Text
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model pod_notification_template {
+  id         String   @id @default(uuid())
+  channel_id String?
+  code       String
+  subject    String?
+  body       String?  @db.Text
+  format     String   @default("TEXT")
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([channel_id])
+}
+
+model pod_log_setting {
+  id             String   @id @default(uuid())
+  engine_id      String?
+  level          String   @default("INFO")
+  retention_days Int      @default(7)
+  created_at     DateTime @default(now())
+  updated_at     DateTime @default(now())
+
+  @@index([engine_id])
+}
+
+model pod_api_key {
+  id           String    @id @default(uuid())
+  company_id   String    @default("")
+  name         String
+  key_hash     String    @unique
+  scopes       Json?
+  revoked_at   DateTime?
+  last_used_at DateTime?
+  is_active    Boolean   @default(true)
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @default(now())
+
+  @@index([company_id])
+}
+
+model pod_webhook {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  url        String   @db.Text
+  secret_enc String?  @db.Text
+  events     Json?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model pod_template_registry {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  url        String?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
 
   @@index([company_id])
 }

@@ -80,7 +80,202 @@ model vms_snapshot {
   size_bytes Int?
   created_at DateTime @default(now())
 
-  guest      vms_guest @relation(fields: [guest_id], references: [id], onDelete: Cascade)
+  guest vms_guest @relation(fields: [guest_id], references: [id], onDelete: Cascade)
 
   @@index([guest_id])
+}
+
+model vms_node {
+  id         String   @id @default(uuid())
+  cluster_id String?
+  name       String
+  role       String   @default("WORKER")
+  status     String   @default("UNKNOWN")
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([cluster_id])
+}
+
+model vms_cluster {
+  id            String   @id @default(uuid())
+  company_id    String   @default("")
+  code          String
+  name          String
+  quorum_status String?
+  is_active     Boolean  @default(true)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @default(now())
+
+  @@unique([company_id, code])
+  @@index([company_id])
+}
+
+model vms_storage {
+  id         String   @id @default(uuid())
+  host_id    String?
+  name       String
+  kind       String   @default("LOCAL") // LOCAL | NFS | CEPH | ZFS
+  total_gb   Float?
+  used_gb    Float?
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([host_id])
+}
+
+model vms_pool {
+  id         String   @id @default(uuid())
+  host_id    String?
+  name       String
+  content    String?
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([host_id])
+}
+
+model vms_nic {
+  id         String   @id @default(uuid())
+  guest_id   String
+  name       String
+  mac        String?
+  ip_address String?
+  vlan_id    Int?
+  bridge     String?
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([guest_id])
+}
+
+model vms_backup {
+  id         String   @id @default(uuid())
+  guest_id   String?
+  company_id String   @default("")
+  name       String
+  path       String?  @db.Text
+  size_bytes Int?
+  status     String   @default("DONE")
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model vms_task {
+  id          String    @id @default(uuid())
+  company_id  String    @default("")
+  kind        String
+  target      String?
+  status      String    @default("PENDING")
+  progress    Int       @default(0)
+  started_at  DateTime?
+  finished_at DateTime?
+  message     String?   @db.Text
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @default(now())
+
+  @@index([company_id])
+}
+
+model vms_ha {
+  id         String   @id @default(uuid())
+  guest_id   String
+  enabled    Boolean  @default(false)
+  node_name  String?
+  state      String   @default("STOPPED")
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([guest_id])
+}
+
+model vms_replication {
+  id             String    @id @default(uuid())
+  guest_id       String
+  target_host_id String?
+  interval_sec   Int       @default(300)
+  status         String    @default("IDLE")
+  last_sync_at   DateTime?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @default(now())
+
+  @@index([guest_id])
+}
+
+model vms_sdn {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  kind       String   @default("VXLAN")
+  vxlan_id   Int?
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model vms_iso {
+  id         String   @id @default(uuid())
+  host_id    String?
+  name       String
+  path       String?
+  size_bytes Int?
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([host_id])
+}
+
+model vms_template {
+  id         String   @id @default(uuid())
+  host_id    String?
+  name       String
+  os_hint    String?
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([host_id])
+}
+
+model vms_passthrough {
+  id         String   @id @default(uuid())
+  host_id    String?
+  guest_id   String?
+  kind       String   @default("GPU")
+  device     String?
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([host_id])
+}
+
+model vms_fw_rule {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  guest_id   String?
+  direction  String   @default("IN") // IN | OUT
+  action     String   @default("ACCEPT") // ACCEPT | DROP | REJECT
+  protocol   String?
+  src        String?
+  dst        String?
+  port       String?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+  @@index([guest_id])
+}
+
+model vms_security_group {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  rules      Json?
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
 }

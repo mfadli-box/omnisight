@@ -103,3 +103,327 @@ model sec_incident {
   @@unique([company_id, code])
   @@index([company_id])
 }
+
+model sec_agent_group {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  agent_conf String?  @db.Text
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model sec_decoder {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  code       String
+  name       String
+  content    String?  @db.Text
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@unique([company_id, code])
+  @@index([company_id])
+}
+
+model sec_event_alert {
+  id         String   @id @default(uuid())
+  event_id   String?
+  rule_id    String?
+  severity   String   @default("MEDIUM")
+  status     String   @default("NEW") // NEW | ACK | CLOSED
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([event_id])
+}
+
+model sec_incident_event {
+  id          String   @id @default(uuid())
+  incident_id String
+  event_id    String?
+  created_at  DateTime @default(now())
+
+  @@index([incident_id])
+}
+
+model sec_fim_event {
+  id          String   @id @default(uuid())
+  agent_id    String?
+  path        String
+  action      String   @default("MODIFIED") // ADDED | MODIFIED | DELETED
+  checksum    String?
+  user_name   String?
+  occurred_at DateTime @default(now())
+
+  @@index([agent_id, occurred_at])
+}
+
+model sec_sca_policy {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  code       String
+  name       String
+  content    String?  @db.Text
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@unique([company_id, code])
+  @@index([company_id])
+}
+
+model sec_sca_result {
+  id          String   @id @default(uuid())
+  policy_id   String?
+  agent_id    String?
+  passed      Int      @default(0)
+  failed      Int      @default(0)
+  score       Float?
+  version     String?
+  recorded_at DateTime @default(now())
+
+  @@index([agent_id])
+}
+
+model sec_vuln {
+  id                String    @id @default(uuid())
+  company_id        String    @default("")
+  agent_id          String?
+  cve               String
+  severity          String    @default("UNKNOWN")
+  package           String?
+  installed_version String?
+  fixed_version     String?
+  status            String    @default("OPEN")
+  detected_at       DateTime  @default(now())
+  resolved_at       DateTime?
+
+  @@index([company_id])
+  @@index([agent_id])
+}
+
+model sec_vuln_feed {
+  id         String   @id @default(uuid())
+  name       String
+  source     String?
+  updated_at DateTime @default(now())
+  created_at DateTime @default(now())
+}
+
+model sec_intel_feed {
+  id         String   @id @default(uuid())
+  name       String
+  url        String?
+  kind       String   @default("IOC")
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+}
+
+model sec_intel_ioc {
+  id         String   @id @default(uuid())
+  feed_id    String?
+  ioc_type   String
+  value      String
+  severity   String?
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([feed_id])
+}
+
+model sec_rule_feed {
+  id         String   @id @default(uuid())
+  name       String
+  url        String?
+  updated_at DateTime @default(now())
+  created_at DateTime @default(now())
+}
+
+model sec_compliance_report {
+  id           String   @id @default(uuid())
+  company_id   String   @default("")
+  standard     String
+  score        Float?
+  details      Json?
+  generated_at DateTime @default(now())
+  created_at   DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model sec_container_event {
+  id           String   @id @default(uuid())
+  company_id   String   @default("")
+  container_id String?
+  event_type   String
+  process_name String?
+  image        String?
+  severity     String   @default("INFO")
+  occurred_at  DateTime @default(now())
+
+  @@index([company_id, occurred_at])
+}
+
+model sec_malware_event {
+  id          String   @id @default(uuid())
+  agent_id    String?
+  path        String?
+  signature   String?
+  action      String   @default("DETECTED")
+  occurred_at DateTime @default(now())
+
+  @@index([agent_id])
+}
+
+model sec_cdb_list {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model sec_cdb_entry {
+  id         String   @id @default(uuid())
+  list_id    String
+  key        String
+  value      String?
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([list_id])
+}
+
+model sec_cloud_account {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  provider   String
+  name       String
+  config_enc String?  @db.Text
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model sec_cloud_finding {
+  id         String   @id @default(uuid())
+  account_id String?
+  title      String
+  severity   String   @default("MEDIUM")
+  resource   String?
+  status     String   @default("OPEN")
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([account_id])
+}
+
+model sec_forwarder {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  target     String
+  kind       String   @default("SYSLOG") // SYSLOG | FILE | HTTP
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model sec_log_source {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  kind       String   @default("AGENT") // AGENT | AGENTLESS | API
+  target     String?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model sec_rbac_grant {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  user_id    String?
+  role       String
+  scopes     Json?
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model sec_response_action {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  action     String
+  params     Json?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model sec_response_script {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  content    String?  @db.Text
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model sec_live_query {
+  id         String   @id @default(uuid())
+  agent_id   String?
+  query      String   @db.Text
+  status     String   @default("PENDING")
+  result     String?  @db.Text
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([agent_id])
+}
+
+model sec_osquery_query {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  query      String   @db.Text
+  schedule   String?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model sec_syscollector_hardware {
+  id          String   @id @default(uuid())
+  agent_id    String?
+  board       String?
+  cpu         String?
+  memory_mb   Int?
+  disks       Json?
+  recorded_at DateTime @default(now())
+
+  @@index([agent_id])
+}

@@ -149,12 +149,477 @@ model amm_manufacturer {
 }
 
 model amm_asset_model {
-  id             String   @id @default(uuid())
+  id              String   @id @default(uuid())
   manufacturer_id String?
-  name           String
-  is_active      Boolean  @default(true)
+  name            String
+  is_active       Boolean  @default(true)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @default(now())
+
+  @@index([manufacturer_id])
+}
+
+model amm_department {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  parent_id  String?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model amm_status_type {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model amm_status_label {
+  id         String   @id @default(uuid())
+  type_id    String?
+  name       String
+  color      String?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([type_id])
+}
+
+model amm_supplier {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  contact    String?
+  email      String?
+  phone      String?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model amm_contract {
+  id          String    @id @default(uuid())
+  company_id  String    @default("")
+  supplier_id String?
+  code        String
+  name        String
+  start_date  DateTime?
+  end_date    DateTime?
+  value       Decimal?  @db.Decimal(18, 2)
+  is_active   Boolean   @default(true)
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @default(now())
+
+  @@unique([company_id, code])
+  @@index([company_id])
+}
+
+model amm_contract_asset {
+  id          String   @id @default(uuid())
+  contract_id String
+  asset_id    String
+  created_at  DateTime @default(now())
+
+  @@index([contract_id])
+  @@index([asset_id])
+}
+
+model amm_license {
+  id              String    @id @default(uuid())
+  company_id      String    @default("")
+  software_id     String?
+  name            String
+  license_key_enc String?   @db.Text
+  seats           Int       @default(1)
+  expires_at      DateTime?
+  is_active       Boolean   @default(true)
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @default(now())
+
+  @@index([company_id])
+}
+
+model amm_license_seat {
+  id          String   @id @default(uuid())
+  license_id  String
+  asset_id    String?
+  user_id     String?
+  assigned_at DateTime @default(now())
+  created_at  DateTime @default(now())
+
+  @@index([license_id])
+}
+
+model amm_software {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  version    String?
+  publisher  String?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model amm_maintenance {
+  id           String    @id @default(uuid())
+  company_id   String    @default("")
+  asset_id     String?
+  kind         String    @default("PREVENTIVE") // PREVENTIVE | CORRECTIVE
+  title        String
+  scheduled_at DateTime?
+  completed_at DateTime?
+  status       String    @default("SCHEDULED")
+  cost         Decimal?  @db.Decimal(18, 2)
+  vendor       String?
+  notes        String?   @db.Text
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @default(now())
+
+  @@index([company_id])
+  @@index([asset_id])
+}
+
+model amm_asset_assignment {
+  id          String    @id @default(uuid())
+  company_id  String    @default("")
+  asset_id    String
+  user_id     String?
+  area_id     String?
+  assigned_at DateTime  @default(now())
+  returned_at DateTime?
+  note        String?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @default(now())
+
+  @@index([company_id])
+  @@index([asset_id])
+}
+
+model amm_asset_relation {
+  id         String   @id @default(uuid())
+  asset_id   String
+  related_id String
+  relation   String   @default("CONNECT_TO") // CONNECT_TO | CONNECT_WITH | PART_OF
+  created_at DateTime @default(now())
+
+  @@index([asset_id])
+}
+
+model amm_custom_field {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  entity     String
+  code       String
+  label      String
+  field_type String   @default("TEXT") // TEXT | NUMBER | DATE | BOOL | SELECT
+  options    Json?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@unique([company_id, entity, code])
+  @@index([company_id])
+}
+
+model amm_custom_value {
+  id         String   @id @default(uuid())
+  field_id   String
+  entity     String
+  entity_id  String
+  value      String?  @db.Text
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([field_id])
+  @@index([entity, entity_id])
+}
+
+model amm_fieldset {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model amm_fieldset_field {
+  id          String   @id @default(uuid())
+  fieldset_id String
+  label       String
+  field_type  String   @default("TEXT")
+  options     Json?
+  required    Boolean  @default(false)
+  sort        Int      @default(0)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now())
+
+  @@index([fieldset_id])
+}
+
+model amm_fieldset_binding {
+  id             String   @id @default(uuid())
+  fieldset_id    String
+  asset_type_id  String?
+  asset_model_id String?
+  created_at     DateTime @default(now())
+
+  @@index([fieldset_id])
+}
+
+model amm_asset_audit {
+  id          String    @id @default(uuid())
+  company_id  String    @default("")
+  code        String
+  name        String
+  status      String    @default("DRAFT") // DRAFT | IN_PROGRESS | DONE
+  started_at  DateTime?
+  finished_at DateTime?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @default(now())
+
+  @@unique([company_id, code])
+  @@index([company_id])
+}
+
+model amm_audit_item {
+  id                String   @id @default(uuid())
+  audit_id          String
+  asset_id          String
+  expected_location String?
+  found_location    String?
+  status            String   @default("PENDING") // PENDING | FOUND | MISSING | MISMATCH
+  note              String?  @db.Text
+  created_at        DateTime @default(now())
+  updated_at        DateTime @default(now())
+
+  @@index([audit_id])
+}
+
+model amm_depreciation {
+  id                 String    @id @default(uuid())
+  company_id         String    @default("")
+  asset_id           String?
+  method             String    @default("STRAIGHT_LINE") // STRAIGHT_LINE | DECLINING
+  purchase_cost      Decimal?  @db.Decimal(18, 2)
+  salvage_value      Decimal?  @db.Decimal(18, 2)
+  useful_life_months Int?
+  start_date         DateTime?
+  created_at         DateTime  @default(now())
+  updated_at         DateTime  @default(now())
+
+  @@index([company_id])
+}
+
+model amm_consumable {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  qty        Int      @default(0)
+  min_qty    Int      @default(0)
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model amm_consumable_txn {
+  id            String   @id @default(uuid())
+  consumable_id String
+  kind          String   @default("OUT") // IN | OUT
+  qty           Int
+  user_id       String?
+  note          String?
+  created_at    DateTime @default(now())
+
+  @@index([consumable_id])
+}
+
+model amm_accessory {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  qty        Int      @default(0)
+  min_qty    Int      @default(0)
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model amm_accessory_assignment {
+  id           String    @id @default(uuid())
+  accessory_id String
+  asset_id     String?
+  user_id      String?
+  qty          Int       @default(1)
+  assigned_at  DateTime  @default(now())
+  returned_at  DateTime?
+  created_at   DateTime  @default(now())
+
+  @@index([accessory_id])
+}
+
+model amm_accessory_txn {
+  id           String   @id @default(uuid())
+  accessory_id String
+  kind         String   @default("OUT") // IN | OUT
+  qty          Int
+  user_id      String?
+  note         String?
+  created_at   DateTime @default(now())
+
+  @@index([accessory_id])
+}
+
+model amm_component {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  qty        Int      @default(0)
+  min_qty    Int      @default(0)
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model amm_component_assignment {
+  id           String    @id @default(uuid())
+  component_id String
+  asset_id     String?
+  qty          Int       @default(1)
+  assigned_at  DateTime  @default(now())
+  removed_at   DateTime?
+  created_at   DateTime  @default(now())
+
+  @@index([component_id])
+}
+
+model amm_kit {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model amm_kit_item {
+  id         String   @id @default(uuid())
+  kit_id     String
+  item_type  String
+  item_id    String
+  qty        Int      @default(1)
+  created_at DateTime @default(now())
+
+  @@index([kit_id])
+}
+
+model amm_kit_checkout {
+  id             String    @id @default(uuid())
+  kit_id         String
+  user_id        String?
+  checked_out_at DateTime  @default(now())
+  checked_in_at  DateTime?
+  created_at     DateTime  @default(now())
+
+  @@index([kit_id])
+}
+
+model amm_reservation {
+  id             String   @id @default(uuid())
+  company_id     String   @default("")
+  asset_id       String
+  user_id        String?
+  reserved_from  DateTime
+  reserved_until DateTime
+  status         String   @default("ACTIVE")
   created_at     DateTime @default(now())
   updated_at     DateTime @default(now())
 
-  @@index([manufacturer_id])
+  @@index([company_id])
+}
+
+model amm_asset_request {
+  id            String   @id @default(uuid())
+  company_id    String   @default("")
+  requester_id  String?
+  asset_type_id String?
+  reason        String?  @db.Text
+  status        String   @default("PENDING") // PENDING | APPROVED | REJECTED | FULFILLED
+  created_at    DateTime @default(now())
+  updated_at    DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model amm_eula {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  title      String
+  body       String?  @db.Text
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model amm_eula_acceptance {
+  id          String   @id @default(uuid())
+  eula_id     String
+  user_id     String
+  accepted_at DateTime @default(now())
+  created_at  DateTime @default(now())
+
+  @@index([eula_id])
+}
+
+model amm_api_token {
+  id           String    @id @default(uuid())
+  company_id   String    @default("")
+  name         String
+  token_hash   String    @unique
+  scopes       Json?
+  revoked_at   DateTime?
+  last_used_at DateTime?
+  is_active    Boolean   @default(true)
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @default(now())
+
+  @@index([company_id])
+}
+
+model amm_api_log {
+  id         String   @id @default(uuid())
+  token_id   String?
+  method     String?
+  path       String?
+  status     Int?
+  ip         String?
+  created_at DateTime @default(now())
+
+  @@index([created_at])
 }

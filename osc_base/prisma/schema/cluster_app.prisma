@@ -515,3 +515,32 @@ model app_backup_item {
 
   @@index([backup_id])
 }
+
+model app_company_setting {
+  id         String   @id @default(uuid())
+  company_id String
+  key        String
+  value      String?  @db.Text
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@unique([company_id, key])
+  @@index([company_id])
+}
+
+model app_employee {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  user_id    String?
+  reg_no     String?
+  name       String
+  department String?
+  position   String?
+  area_id    String?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+  @@index([user_id])
+}

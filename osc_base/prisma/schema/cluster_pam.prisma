@@ -47,17 +47,17 @@ model pam_account {
 }
 
 model pam_policy {
-  id             String   @id @default(uuid())
-  company_id     String   @default("")
-  code           String
-  name           String
-  protocols      Json?
-  require_approval Boolean @default(false)
-  require_mfa    Boolean @default(false)
-  max_session_min Int     @default(480)
-  is_active      Boolean @default(true)
-  created_at     DateTime @default(now())
-  updated_at     DateTime @default(now())
+  id               String   @id @default(uuid())
+  company_id       String   @default("")
+  code             String
+  name             String
+  protocols        Json?
+  require_approval Boolean  @default(false)
+  require_mfa      Boolean  @default(false)
+  max_session_min  Int      @default(480)
+  is_active        Boolean  @default(true)
+  created_at       DateTime @default(now())
+  updated_at       DateTime @default(now())
 
   @@unique([company_id, code])
   @@index([company_id])
@@ -77,4 +77,224 @@ model pam_session {
   updated_at DateTime  @default(now())
 
   @@index([company_id, started_at])
+}
+
+model pam_account_template {
+  id             String   @id @default(uuid())
+  company_id     String   @default("")
+  code           String
+  username       String?
+  auth_type      String   @default("PASSWORD")
+  secret_enc     String?  @db.Text
+  key_enc        String?  @db.Text
+  passphrase_enc String?  @db.Text
+  privileged     Boolean  @default(false)
+  is_active      Boolean  @default(true)
+  created_at     DateTime @default(now())
+  updated_at     DateTime @default(now())
+
+  @@unique([company_id, code])
+  @@index([company_id])
+}
+
+model pam_grant {
+  id          String    @id @default(uuid())
+  company_id  String    @default("")
+  user_id     String
+  asset_id    String?
+  account_id  String?
+  policy_id   String?
+  valid_from  DateTime  @default(now())
+  valid_until DateTime?
+  is_active   Boolean   @default(true)
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @default(now())
+
+  @@index([company_id, user_id])
+}
+
+model pam_command_filter {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  code       String
+  name       String
+  mode       String   @default("BLACKLIST") // ALLOW | BLACKLIST
+  patterns   Json?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@unique([company_id, code])
+  @@index([company_id])
+}
+
+model pam_command_filter_binding {
+  id         String   @id @default(uuid())
+  filter_id  String
+  policy_id  String?
+  created_at DateTime @default(now())
+
+  @@index([filter_id])
+}
+
+model pam_command {
+  id          String   @id @default(uuid())
+  session_id  String
+  command     String   @db.Text
+  output      String?  @db.Text
+  exit_code   Int?
+  executed_at DateTime @default(now())
+
+  @@index([session_id])
+}
+
+model pam_approval_flow {
+  id            String   @id @default(uuid())
+  company_id    String   @default("")
+  code          String
+  name          String
+  min_approvers Int      @default(1)
+  is_active     Boolean  @default(true)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @default(now())
+
+  @@unique([company_id, code])
+  @@index([company_id])
+}
+
+model pam_approval_step {
+  id               String   @id @default(uuid())
+  flow_id          String
+  step_order       Int      @default(1)
+  approver_role_id String?
+  approver_user_id String?
+  created_at       DateTime @default(now())
+
+  @@index([flow_id])
+}
+
+model pam_access_request {
+  id            String    @id @default(uuid())
+  company_id    String    @default("")
+  user_id       String
+  asset_id      String?
+  account_id    String?
+  policy_id     String?
+  reason        String?   @db.Text
+  desired_from  DateTime?
+  desired_until DateTime?
+  status        String    @default("PENDING") // PENDING | APPROVED | REJECTED | EXPIRED
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @default(now())
+
+  @@index([company_id])
+}
+
+model pam_access_request_approval {
+  id          String    @id @default(uuid())
+  request_id  String
+  approver_id String?
+  step_id     String?
+  decision    String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  comment     String?   @db.Text
+  decided_at  DateTime?
+  created_at  DateTime  @default(now())
+
+  @@index([request_id])
+}
+
+model pam_gateway {
+  id             String   @id @default(uuid())
+  company_id     String   @default("")
+  code           String
+  name           String
+  listen_host    String?
+  listen_port    Int?
+  relay_agent_id String?
+  is_active      Boolean  @default(true)
+  created_at     DateTime @default(now())
+  updated_at     DateTime @default(now())
+
+  @@unique([company_id, code])
+  @@index([company_id])
+}
+
+model pam_login_acl {
+  id               String   @id @default(uuid())
+  company_id       String   @default("")
+  name             String
+  ip_cidr          String?
+  allowed_networks Json?
+  is_active        Boolean  @default(true)
+  created_at       DateTime @default(now())
+  updated_at       DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model pam_lockout {
+  id           String    @id @default(uuid())
+  company_id   String    @default("")
+  user_id      String?
+  fail_count   Int       @default(0)
+  last_fail_at DateTime?
+  locked_until DateTime?
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @default(now())
+
+  @@index([company_id])
+}
+
+model pam_health_check {
+  id            String    @id @default(uuid())
+  gateway_id    String?
+  status        String    @default("UNKNOWN")
+  last_check_at DateTime?
+  message       String?   @db.Text
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @default(now())
+
+  @@index([gateway_id])
+}
+
+model pam_discovery_job {
+  id          String    @id @default(uuid())
+  company_id  String    @default("")
+  target      String
+  status      String    @default("PENDING")
+  found       Int       @default(0)
+  started_at  DateTime?
+  finished_at DateTime?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @default(now())
+
+  @@index([company_id])
+}
+
+model pam_apikey {
+  id           String    @id @default(uuid())
+  company_id   String    @default("")
+  name         String
+  key_hash     String    @unique
+  scopes       Json?
+  revoked_at   DateTime?
+  last_used_at DateTime?
+  is_active    Boolean   @default(true)
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @default(now())
+
+  @@index([company_id])
+}
+
+model pam_ticket_provider {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  kind       String   @default("JIRA") // JIRA | SERVICENOW | CUSTOM
+  config_enc String?  @db.Text
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
 }

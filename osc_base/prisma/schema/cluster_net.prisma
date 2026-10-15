@@ -184,3 +184,332 @@ model net_alert_rule {
   @@unique([company_id, code])
   @@index([company_id])
 }
+
+model net_vlan {
+  id          String   @id @default(uuid())
+  company_id  String   @default("")
+  device_id   String?
+  vlan_id     Int
+  name        String?
+  description String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now())
+
+  @@index([company_id])
+  @@index([device_id])
+}
+
+model net_ip_address {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  device_id  String?
+  interface  String?
+  ip_address String
+  prefix     Int?
+  vlan_id    Int?
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+  @@index([device_id])
+}
+
+model net_interface_stat {
+  id             String   @id @default(uuid())
+  device_id      String
+  if_index       Int?
+  name           String?
+  in_octets      BigInt?
+  out_octets     BigInt?
+  in_errors      BigInt?
+  out_errors     BigInt?
+  speed_mbps     Int?
+  admin_status   String?
+  oper_status    String?
+  in_ucast_pkts  BigInt?
+  out_ucast_pkts BigInt?
+  recorded_at    DateTime @default(now())
+
+  @@index([device_id, recorded_at])
+}
+
+model net_interface_stat_rollup {
+  id           String   @id @default(uuid())
+  device_id    String
+  if_index     Int?
+  bucket       DateTime
+  in_octets    BigInt?
+  out_octets   BigInt?
+  in_errors    BigInt?
+  out_errors   BigInt?
+  in_peak_bps  BigInt?
+  out_peak_bps BigInt?
+  created_at   DateTime @default(now())
+
+  @@index([device_id, bucket])
+}
+
+model net_sensor {
+  id          String   @id @default(uuid())
+  company_id  String   @default("")
+  device_id   String?
+  name        String
+  kind        String   @default("TEMPERATURE") // TEMPERATURE | VOLTAGE | FAN | PSU | CURRENT | HUMIDITY
+  oid         String?
+  value       Float?
+  unit        String?
+  warn_high   Float?
+  warn_low    Float?
+  low_warn    Float?
+  recorded_at DateTime @default(now())
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now())
+
+  @@index([company_id])
+  @@index([device_id])
+}
+
+model net_sensor_stat_rollup {
+  id         String   @id @default(uuid())
+  sensor_id  String
+  bucket     DateTime
+  min_value  Float?
+  max_value  Float?
+  avg_value  Float?
+  created_at DateTime @default(now())
+
+  @@index([sensor_id, bucket])
+}
+
+model net_custom_oid {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  device_id  String?
+  name       String
+  oid        String
+  kind       String?
+  unit       String?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model net_topology_link {
+  id          String   @id @default(uuid())
+  company_id  String   @default("")
+  device_a_id String
+  device_b_id String?
+  local_if    String?
+  remote_if   String?
+  protocol    String   @default("LLDP") // LLDP | CDP | FDB
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model net_availability {
+  id          String   @id @default(uuid())
+  company_id  String   @default("")
+  device_id   String?
+  status      String   @default("UP") // UP | DOWN | UNKNOWN
+  down_reason String? // ICMP | SNMP
+  changed_at  DateTime @default(now())
+  created_at  DateTime @default(now())
+
+  @@index([company_id])
+  @@index([device_id])
+}
+
+model net_ping_result {
+  id          String   @id @default(uuid())
+  device_id   String?
+  target      String
+  success     Boolean  @default(false)
+  rtt_ms      Float?
+  packet_loss Float?
+  recorded_at DateTime @default(now())
+
+  @@index([device_id, recorded_at])
+}
+
+model net_alert_rule_binding {
+  id            String   @id @default(uuid())
+  alert_rule_id String
+  subject_type  String
+  subject_id    String?
+  created_at    DateTime @default(now())
+
+  @@index([alert_rule_id])
+}
+
+model net_alert {
+  id           String    @id @default(uuid())
+  company_id   String    @default("")
+  rule_id      String?
+  device_id    String?
+  severity     String    @default("WARNING")
+  message      String?   @db.Text
+  status       String    @default("ACTIVE") // ACTIVE | RESOLVED | ACKED
+  acked_by     String?
+  acked_at     DateTime?
+  triggered_at DateTime  @default(now())
+  resolved_at  DateTime?
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @default(now())
+
+  @@index([company_id, triggered_at])
+}
+
+model net_maintenance_window {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  title      String
+  scope      Json?
+  starts_at  DateTime
+  ends_at    DateTime
+  created_by String?
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model net_billing {
+  id            String   @id @default(uuid())
+  company_id    String   @default("")
+  device_id     String?
+  interface     String?
+  period        String
+  in_95pct_bps  BigInt?
+  out_95pct_bps BigInt?
+  total_gb      Float?
+  created_at    DateTime @default(now())
+  updated_at    DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model net_entity_physical {
+  id         String   @id @default(uuid())
+  device_id  String
+  ent_index  Int?
+  name       String?
+  class      String?
+  descr      String?
+  vendor     String?
+  model      String?
+  serial     String?
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([device_id])
+}
+
+model net_config_revision {
+  id           String   @id @default(uuid())
+  device_id    String
+  backup_id    String?
+  revision     Int      @default(1)
+  content_hash String?
+  message      String?
+  created_by   String?
+  created_at   DateTime @default(now())
+
+  @@index([device_id, created_at])
+}
+
+model net_firewall_event {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  device_id  String?
+  action     String?
+  src_addr   String?
+  dst_addr   String?
+  protocol   String?
+  dst_port   String?
+  rule_ref   String?
+  logged_at  DateTime @default(now())
+
+  @@index([company_id, logged_at])
+}
+
+model net_discovery {
+  id          String    @id @default(uuid())
+  company_id  String    @default("")
+  subnet_id   String?
+  method      String    @default("SNMP") // SNMP | ARP | ICMP
+  status      String    @default("PENDING") // PENDING | RUNNING | DONE | FAILED
+  found       Int       @default(0)
+  started_at  DateTime?
+  finished_at DateTime?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @default(now())
+
+  @@index([company_id])
+}
+
+model net_api_token {
+  id           String    @id @default(uuid())
+  company_id   String    @default("")
+  name         String
+  token_hash   String    @unique
+  scopes       Json?
+  revoked_at   DateTime?
+  last_used_at DateTime?
+  is_active    Boolean   @default(true)
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @default(now())
+
+  @@index([company_id])
+}
+
+model net_blocklist {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model net_block_entry {
+  id           String   @id @default(uuid())
+  blocklist_id String
+  ip           String?
+  mac          String?
+  reason       String?
+  created_at   DateTime @default(now())
+
+  @@index([blocklist_id])
+}
+
+model net_script {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  content    String?  @db.Text
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model net_address_list_entry {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  device_id  String?
+  list_name  String
+  address    String
+  comment    String?
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+  @@index([device_id])
+}

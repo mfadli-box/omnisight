@@ -14,9 +14,9 @@ model web_vhost {
   created_at  DateTime @default(now())
   updated_at  DateTime @default(now())
 
-  server_id   String?
-  server      web_server? @relation(fields: [server_id], references: [id])
-  upstreams   web_upstream[]
+  server_id String?
+  server    web_server?    @relation(fields: [server_id], references: [id])
+  upstreams web_upstream[]
 
   @@unique([company_id, server_name])
   @@index([company_id])
@@ -56,34 +56,247 @@ model web_upstream {
 }
 
 model web_server {
-  id           String   @id @default(uuid())
-  company_id   String   @default("")
-  code         String
-  name         String
-  hostname     String?
-  ip_address   String?
-  is_active    Boolean  @default(true)
-  last_synced  DateTime?
-  created_at   DateTime @default(now())
-  updated_at   DateTime @default(now())
+  id          String    @id @default(uuid())
+  company_id  String    @default("")
+  code        String
+  name        String
+  hostname    String?
+  ip_address  String?
+  is_active   Boolean   @default(true)
+  last_synced DateTime?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @default(now())
 
-  vhosts       web_vhost[]
+  vhosts web_vhost[]
 
   @@unique([company_id, code])
   @@index([company_id])
 }
 
 model web_domain {
-  id           String   @id @default(uuid())
-  company_id   String   @default("")
-  domain       String
-  registrar    String?
-  expires_at   DateTime?
-  auto_renew   Boolean  @default(false)
-  is_active    Boolean  @default(true)
-  created_at   DateTime @default(now())
-  updated_at   DateTime @default(now())
+  id         String    @id @default(uuid())
+  company_id String    @default("")
+  domain     String
+  registrar  String?
+  expires_at DateTime?
+  auto_renew Boolean   @default(false)
+  is_active  Boolean   @default(true)
+  created_at DateTime  @default(now())
+  updated_at DateTime  @default(now())
 
   @@unique([domain])
   @@index([company_id])
+}
+
+model web_access_list {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  rules      Json?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model web_access_entry {
+  id         String   @id @default(uuid())
+  list_id    String
+  ip_cidr    String?
+  username   String?
+  action     String   @default("ALLOW") // ALLOW | DENY
+  created_at DateTime @default(now())
+
+  @@index([list_id])
+}
+
+model web_access_log {
+  id         String   @id @default(uuid())
+  vhost_id   String?
+  method     String?
+  path       String?
+  status     Int?
+  bytes      Int?
+  ip         String?
+  user_agent String?
+  logged_at  DateTime @default(now())
+
+  @@index([vhost_id, logged_at])
+}
+
+model web_access_stat {
+  id         String   @id @default(uuid())
+  vhost_id   String?
+  bucket     DateTime
+  requests   Int      @default(0)
+  status_2xx Int      @default(0)
+  status_4xx Int      @default(0)
+  status_5xx Int      @default(0)
+  bytes      BigInt?
+  created_at DateTime @default(now())
+
+  @@index([vhost_id, bucket])
+}
+
+model web_acme_account {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  email      String
+  ca_url     String?  @default("https://acme-v02.api.letsencrypt.org/directory")
+  key_enc    String?  @db.Text
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model web_dns_provider {
+  id              String   @id @default(uuid())
+  company_id      String   @default("")
+  name            String
+  kind            String   @default("CLOUDFLARE") // CLOUDFLARE | ROUTE53 | DIGITALOCEAN
+  credentials_enc String?  @db.Text
+  is_active       Boolean  @default(true)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model web_dns_record {
+  id          String   @id @default(uuid())
+  provider_id String?
+  domain_id   String?
+  record_type String   @default("A")
+  name        String
+  content     String
+  ttl         Int      @default(300)
+  proxied     Boolean  @default(false)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now())
+
+  @@index([provider_id])
+  @@index([domain_id])
+}
+
+model web_location {
+  id         String   @id @default(uuid())
+  vhost_id   String
+  path       String
+  kind       String   @default("PROXY") // PROXY | STATIC | REDIRECT
+  target     String?
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([vhost_id])
+}
+
+model web_stream {
+  id          String   @id @default(uuid())
+  company_id  String   @default("")
+  name        String
+  listen_port Int
+  protocol    String   @default("TCP") // TCP | UDP
+  target      String?
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model web_snippet {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  content    String?  @db.Text
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model web_template {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  code       String
+  name       String
+  content    String?  @db.Text
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@unique([company_id, code])
+  @@index([company_id])
+}
+
+model web_config_revision {
+  id           String   @id @default(uuid())
+  server_id    String?
+  revision     Int      @default(1)
+  content      String?  @db.Text
+  content_hash String?
+  message      String?
+  created_by   String?
+  created_at   DateTime @default(now())
+
+  @@index([server_id, created_at])
+}
+
+model web_change {
+  id          String   @id @default(uuid())
+  company_id  String   @default("")
+  server_id   String?
+  action      String
+  target_type String?
+  target_ref  String?
+  before      Json?
+  after       Json?
+  status      String   @default("PENDING")
+  message     String?  @db.Text
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now())
+
+  @@index([company_id, created_at])
+}
+
+model web_deploy {
+  id          String    @id @default(uuid())
+  company_id  String    @default("")
+  server_id   String?
+  status      String    @default("PENDING")
+  message     String?   @db.Text
+  started_at  DateTime?
+  finished_at DateTime?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @default(now())
+
+  @@index([company_id])
+}
+
+model web_backup {
+  id         String   @id @default(uuid())
+  server_id  String?
+  company_id String   @default("")
+  name       String
+  path       String?  @db.Text
+  size_bytes Int?
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model web_server_metric {
+  id          String   @id @default(uuid())
+  server_id   String
+  cpu_pct     Float?
+  mem_pct     Float?
+  active_conn Int      @default(0)
+  recorded_at DateTime @default(now())
+
+  @@index([server_id, recorded_at])
 }

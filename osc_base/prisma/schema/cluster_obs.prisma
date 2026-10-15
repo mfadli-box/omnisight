@@ -102,3 +102,243 @@ model obs_check_result {
 
   @@index([check_id, created_at])
 }
+
+model obs_metric_rollup {
+  id         String   @id @default(uuid())
+  system_id  String?
+  metric     String
+  bucket     DateTime
+  min_value  Float?
+  max_value  Float?
+  avg_value  Float?
+  created_at DateTime @default(now())
+
+  @@index([system_id, metric, bucket])
+}
+
+model obs_disk {
+  id          String   @id @default(uuid())
+  system_id   String
+  mount       String?
+  device      String?
+  fs_type     String?
+  total_gb    Float?
+  used_gb     Float?
+  health      String?
+  recorded_at DateTime @default(now())
+
+  @@index([system_id])
+}
+
+model obs_container_stat {
+  id           String   @id @default(uuid())
+  system_id    String?
+  container_id String?
+  name         String?
+  cpu_pct      Float?
+  mem_mb       Float?
+  net_rx       BigInt?
+  net_tx       BigInt?
+  recorded_at  DateTime @default(now())
+
+  @@index([system_id, recorded_at])
+}
+
+model obs_vmhost {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  hypervisor String?
+  endpoint   String?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model obs_vm {
+  id         String   @id @default(uuid())
+  host_id    String?
+  company_id String   @default("")
+  name       String
+  status     String   @default("UNKNOWN")
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model obs_vm_stat {
+  id          String   @id @default(uuid())
+  vm_id       String
+  cpu_pct     Float?
+  mem_mb      Float?
+  disk_gb     Float?
+  recorded_at DateTime @default(now())
+
+  @@index([vm_id, recorded_at])
+}
+
+model obs_service {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  kind       String   @default("SYSTEMD") // SYSTEMD | DOCKER | TCP
+  target     String?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model obs_check_group {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model obs_alert_rule {
+  id           String   @id @default(uuid())
+  company_id   String   @default("")
+  name         String
+  metric       String
+  comparator   String   @default("GT")
+  threshold    Float
+  duration_sec Int      @default(0)
+  severity     String   @default("WARNING")
+  is_active    Boolean  @default(true)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model obs_notification {
+  id         String    @id @default(uuid())
+  company_id String    @default("")
+  channel_id String?
+  event      String?
+  target     String?
+  status     String    @default("QUEUED")
+  error      String?   @db.Text
+  sent_at    DateTime?
+  created_at DateTime  @default(now())
+
+  @@index([company_id, created_at])
+}
+
+model obs_silence {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  rule_id    String?
+  starts_at  DateTime
+  ends_at    DateTime
+  created_by String?
+  created_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model obs_dashboard {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  layout     Json?
+  is_default Boolean  @default(false)
+  created_by String?
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model obs_report {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  code       String
+  name       String
+  params     Json?
+  schedule   Json?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@unique([company_id, code])
+  @@index([company_id])
+}
+
+model obs_maintenance {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  title      String
+  scope      Json?
+  starts_at  DateTime
+  ends_at    DateTime
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
+
+model obs_status_page {
+  id            String   @id @default(uuid())
+  company_id    String   @default("")
+  code          String
+  name          String
+  custom_domain String?
+  is_active     Boolean  @default(true)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @default(now())
+
+  @@unique([company_id, code])
+  @@index([company_id])
+}
+
+model obs_status_page_item {
+  id         String   @id @default(uuid())
+  page_id    String
+  name       String
+  check_id   String?
+  group      String?
+  sort       Int      @default(0)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([page_id])
+}
+
+model obs_status_page_incident {
+  id              String    @id @default(uuid())
+  page_id         String
+  title           String
+  body            String?   @db.Text
+  status          String    @default("INVESTIGATING") // INVESTIGATING | IDENTIFIED | MONITORING | RESOLVED | SCHEDULED
+  impact          String    @default("NONE") // NONE | MINOR | MAJOR | CRITICAL | MAINTENANCE
+  is_announcement Boolean   @default(false)
+  starts_at       DateTime  @default(now())
+  resolves_at     DateTime?
+  published_at    DateTime?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @default(now())
+
+  @@index([page_id, starts_at])
+}
+
+model obs_import_job {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  source     String   @default("UPTIME_KUMA")
+  status     String   @default("PENDING")
+  stats      Json?
+  error      String?  @db.Text
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@index([company_id])
+}
