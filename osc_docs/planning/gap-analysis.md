@@ -1,7 +1,7 @@
 # Gap Analysis - Fitur yang Diminta
 
-> **Status terbaru (diperbarui):** lapisan database sudah **lengkap** (290 model
-> di 13 cluster). Gap yang tersisa bersifat **implementasi runtime** dan
+> **Status terbaru (diperbarui):** lapisan database sudah **lengkap** (304 model
+> di 14 cluster). Gap yang tersisa bersifat **implementasi runtime** dan
 > **fitur yang belum masuk perencanaan** (kini dicatat di
 > [app_collab.md](app_collab.md)). Lihat ringkasan di bawah.
 
@@ -28,10 +28,10 @@ di-link dari [docs README](../README.md). Masih minim — perlu diperkaya
 **Status**: DB siap untuk semua; runtime notifikasi & kolaborasi belum.
 - Notification: DB **lengkap** (`app_notify_*`, `obs_notify_channel`); runtime
   dispatcher **belum ada** (APP06).
-- Mail/SMTP: DB **sudah dibangun** (`mail_*`); runtime SMTP **belum ada** —
-  rencana di [app_collab.md §3.3](app_collab.md).
-- Chat: DB **sudah dibangun** (`chat_*`); runtime WebSocket **belum ada** —
-  rencana di [app_collab.md §3.2](app_collab.md).
+- Mail/SMTP: DB **sudah dibangun** (`tim_account`/`tim_email`/`tim_attachment`);
+  runtime SMTP **belum ada** — rencana di [app_collab.md §3.3](app_collab.md).
+- Chat: DB **sudah dibangun** (`tim_room`/`tim_member`/`tim_message`/`tim_reaction`);
+  runtime WebSocket **belum ada** — rencana di [app_collab.md §3.2](app_collab.md).
 - Announcement/News: DB **sudah dibangun** (`app_announcement*`); status page
   OBS tetap punya `is_announcement` — rencana di [app_collab.md §3.4](app_collab.md).
 

@@ -46,18 +46,31 @@ port database terekspos.
   `TRUSTED_PROXIES`.
 - **Perbandingan token agen** memakai `subtle.ConstantTimeCompare`.
 - **`USRole`** mengembalikan 403 (bukan 401) saat privilege kurang.
+- **Hash token sesi**: token login disimpan sebagai SHA-256 (`mechanic.HashToken`)
+  di `app_user_token.token`; lookup sesi & logout mencocokkan hash, bukan token
+  mentah (`memory.go`, `app00_handler.go`, `pub00_usecase.go`).
+- **Container non-root**: backend `osc_rest` berjalan sebagai user `omni`
+  (uid 10001) dan `no-new-privileges`; agen (`osc_auto`) non-root, read-only,
+  `tmpfs /tmp`, `cap_drop: ALL`, `no-new-privileges`.
 
 ### Sisa risiko / rekomendasi lanjutan
 
-- **Token sesi disimpan plaintext di DB** (`app_user_token.token`). Direkomendasikan
-  menyimpan hash (mis. SHA-256) dan melakukan lookup berdasarkan hash. Perlu
-  migrasi token yang ada.
+- **Mint token via APP05 masih menyimpan plaintext.** `app_user_token.token`/
+  `refresh_token` diisi apa adanya oleh `app05_repository.go` (`tokenCreate`)
+  dan ditampilkan `tokenList`/`tokenGet`. Login (PUB00) sudah hashing; samakan
+  APP05 (hash saat simpan, tampilkan sekali saja) atau pisahkan sebagai token
+  API dengan penyimpanan hash.
+- **`bot_agent.token` plaintext dengan default `uuid()`.** Token agen disimpan
+  mentah dan punya default yang dapat diprediksi bila tidak di-override.
+  Sebaiknya isi eksplisit acak (≥32 byte) dan/atau simpan hash; `CR_KEYS`
+  tetap dipakai untuk autentikasi grup `/rest/agent`.
 - **Captcha login masih di sisi klien** (`osc_site/src/app/login/page.tsx`) —
   hanya kosmetik. Proteksi brute-force nyata ada di rate-limit server.
 - **Lockout per-user** dapat dipakai untuk *account-lockout DoS*; pertimbangkan
   kombinasi per-IP + backoff eksponensial.
-- **Container backend berjalan sebagai root** — tambahkan `USER` non-root dan
-  filesystem read-only bila memungkinkan.
+- **Agen (scaffold) belum menerapkan mTLS.** Blueprint menyebut agen memakai
+  mTLS + token `bot_agent`; saat ini autentikasi agen hanya token (`CR_KEYS`).
+  Tambahkan mTLS sebelum agen operasional.
 - **CSP** masih mengizinkan `'unsafe-inline'` untuk script (kebutuhan Next).
   Dapat diperketat dengan nonce via `proxy.ts`.
 - **Tidak ada WAF/IDS** — direncanakan lewat modul `SEC`/`WEB`.

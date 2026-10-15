@@ -1,0 +1,33 @@
+# Dockerfile generik untuk semua agen OmniSight (osc_auto).
+# Pilih agen via build arg AGENT (agent_vm | agent_mx | agent_ws | agent_ci).
+#
+#   docker build -f Dockerfile.agent --build-arg AGENT=agent_vm .
+#
+# Build context = direktori osc_auto.
+
+# STAGE 1: kompilasi biner Go
+FROM golang:1.26.6-alpine AS builder
+WORKDIR /src
+COPY go.mod ./
+RUN go mod download
+COPY . .
+
+ARG AGENT=agent_vm
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-w -s" -o /out/agent ./${AGENT}
+
+# STAGE 2: runtime ringan & non-root
+FROM alpine:3.20
+RUN apk --no-cache add ca-certificates tzdata \
+    && addgroup -S agent -g 10001 \
+    && adduser -S agent -u 10001 -G agent
+
+COPY --from=builder /out/agent /usr/local/bin/agent
+
+# Agen tidak menyimpan state; filesystem read-only aman (lihat compose).
+USER agent
+EXPOSE 37775
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD wget -qO- http://127.0.0.1:37775/health || exit 1
+
+ENTRYPOINT ["/usr/local/bin/agent"]

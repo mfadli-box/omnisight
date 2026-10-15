@@ -92,13 +92,14 @@ endpoint. Daftar lengkap ada di
 | `DSO` | DevOps/CI-CD | `DSO01`.. |
 | `OBS` | Observability | `OBS01`.. |
 | `DOC` | Document | `DOC01`.. |
+| `TIM` | Tim & Kolaborasi (Chat + Mail) | `TIM01`.. |
 
 ## 5. Konvensi Database (Cluster)
 
 - Satu file Prisma = satu cluster = satu dokumen `cluster_<nama>.md`.
-- Prefix tabel per cluster: `app_*` (aplikasi/admin), rencana `amm_*`, `net_*`,
+- Prefix tabel per cluster: `app_*` (aplikasi/admin), `amm_*`, `net_*`,
   `sec_*`, `pam_*`, `obs_*`, `pod_*`, `web_*`, `vms_*`, `jms_*`, `doc_*`,
-  `dso_*`, `bot_*`.
+  `dso_*`, `bot_*`, `tim_*` (tim & kolaborasi: chat + mail).
 - Konvensi model: id `uuid`, kolom audit `created_at`/`updated_at`,
   `is_active` untuk soft state, uniqueness per company
   (`@@unique([company_id, code])`).

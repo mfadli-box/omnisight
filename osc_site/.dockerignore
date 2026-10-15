@@ -1,8 +1,11 @@
+.next
 next
 node_modules
 out
 build
 .git
+.env
+.env.*
 .dockerignore
 Dockerfile
 npm-debug.log

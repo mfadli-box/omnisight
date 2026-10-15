@@ -10,6 +10,7 @@ Platform DevSecOps berbasis monorepo: pengembangan (development), keamanan
 | [`osc_site/`](osc_site/) | Frontend | Next.js (App Router, React 19, Tailwind 4) |
 | [`osc_rest/`](osc_rest/) | Backend REST API | Golang (Gin, pgx) |
 | [`osc_base/`](osc_base/) | Database layer | Prisma 7 + PostgreSQL |
+| [`osc_auto/`](osc_auto/) | Agen per-VM/host (scaffold) | Golang |
 
 ## Alur
 
@@ -18,15 +19,16 @@ Platform DevSecOps berbasis monorepo: pengembangan (development), keamanan
      │  /proxy/guest · /proxy/pages
      ▼
 [osc_rest] (Golang REST API · :37772)
-     │
-     ▼
-[osc_base] (Prisma ⇄ PostgreSQL · :37771)
+     │                                  ▲
+     ▼                                  │ /rest/agent (token/mTLS)
+[osc_base] (Prisma ⇄ PostgreSQL · :37771)   [osc_auto] (agen per-VM)
 ```
 
 - `osc_site` berkomunikasi dengan backend lewat server proxy (`/proxy/...`)
   agar token tidak bocor ke browser.
 - `osc_rest` bertindak sebagai API tunggal di depan database.
 - `osc_base` menjadi single source of truth skema data.
+- `osc_auto` (agen) hanya bicara dengan `osc_rest`; **tidak** pernah akses DB.
 
 ## Dokumentasi
 
@@ -36,6 +38,8 @@ Seluruh dokumentasi teknis & development guide tersentral di **[`osc_docs/`](osc
 - [Backend — Golang](osc_docs/backend/README.md)
 - [Database — Prisma/Postgres](osc_docs/database/README.md)
 - [Menjalankan stack](osc_docs/development/run.md)
+- [Docker Compose (host & agen)](osc_docs/docker-compose.md)
+- [Agen — osc_auto](osc_auto/README.md)
 - [Konvensi API & kode](osc_docs/development/conventions.md)
 
 ## Mulai Cepat

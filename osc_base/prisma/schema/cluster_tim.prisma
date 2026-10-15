@@ -1,0 +1,123 @@
+// Cluster TIM — Tim & Kolaborasi (chat internal + mail mandiri).
+// Gabungan cluster CHAT + MAIL. Rencana: osc_docs/planning/app_collab.md
+// Dokumen: osc_docs/database/cluster_tim.md
+
+model tim_room {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  type       String   @default("GROUP") // DM | GROUP
+  name       String?
+  created_by String?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  members  tim_member[]
+  messages tim_message[]
+
+  @@index([company_id])
+}
+
+model tim_member {
+  id           String    @id @default(uuid())
+  room_id      String
+  user_id      String
+  role         String    @default("MEMBER") // MEMBER | ADMIN
+  last_read_at DateTime?
+  created_at   DateTime  @default(now())
+
+  room tim_room @relation(fields: [room_id], references: [id], onDelete: Cascade)
+
+  @@unique([room_id, user_id])
+  @@index([room_id])
+  @@index([user_id])
+}
+
+model tim_message {
+  id            String   @id @default(uuid())
+  room_id       String
+  sender_id     String
+  body          String?  @db.Text
+  attachment_id String?
+  sent_at       DateTime @default(now())
+  created_at    DateTime @default(now())
+
+  room      tim_room       @relation(fields: [room_id], references: [id], onDelete: Cascade)
+  reactions tim_reaction[]
+
+  @@index([room_id, sent_at])
+}
+
+model tim_reaction {
+  id         String   @id @default(uuid())
+  message_id String
+  user_id    String
+  emoji      String
+  created_at DateTime @default(now())
+
+  message tim_message @relation(fields: [message_id], references: [id], onDelete: Cascade)
+
+  @@unique([message_id, user_id, emoji])
+  @@index([message_id])
+}
+
+model tim_account {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  address    String
+  smtp_host  String?
+  smtp_port  Int?
+  smtp_tls   Boolean  @default(true)
+  imap_host  String?
+  imap_port  Int?
+  username   String?
+  secret_enc String?  @db.Text
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  messages tim_email[]
+
+  @@unique([company_id, address])
+  @@index([company_id])
+}
+
+model tim_email {
+  id         String    @id @default(uuid())
+  company_id String    @default("")
+  account_id String?
+  direction  String    @default("OUT") // IN | OUT
+  sender     String?
+  recipients Json?
+  cc         Json?
+  bcc        Json?
+  subject    String?
+  body       String?   @db.Text
+  status     String    @default("QUEUED") // QUEUED | SENT | FAILED | RECEIVED
+  error      String?   @db.Text
+  sent_at    DateTime?
+  created_at DateTime  @default(now())
+
+  account     tim_account?     @relation(fields: [account_id], references: [id])
+  attachments tim_attachment[]
+
+  @@index([company_id, created_at])
+  @@index([account_id])
+  @@index([direction])
+}
+
+model tim_attachment {
+  id         String   @id @default(uuid())
+  message_id String
+  file_id    String?
+  name       String
+  size_bytes BigInt?
+  mime       String?
+  path       String?  @db.Text
+  created_at DateTime @default(now())
+
+  message tim_email @relation(fields: [message_id], references: [id], onDelete: Cascade)
+
+  @@index([message_id])
+}

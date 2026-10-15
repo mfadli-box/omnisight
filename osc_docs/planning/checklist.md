@@ -87,11 +87,9 @@ Sebuah aplikasi dinyatakan **Selesai** bila seluruh lapisan berikut terpenuhi:
 
 ## B. Akan Dibuat
 
-> **Catatan:** seluruh **lapisan DB** untuk aplikasi di Fase 2–5 **sudah dibangun**
-> (cluster `amm/net/vms/pod/sec/web/jms/bot/dso/obs/doc`, migrasi
-> `20261009022147_planned_clusters`). Pengecualian: cluster **`pam`** (Bastion)
-> **belum dibangun** (rencana [app_pam.md](app_pam.md)). Sisa pekerjaan
-> per aplikasi: backend, frontend, dokumen, dan test.
+> **Catatan:** seluruh **lapisan DB** untuk aplikasi di Fase 2–7 **sudah dibangun**
+> (cluster `app/amm/net/vms/pod/sec/pam/web/jms/bot/dso/obs/doc/tim`).
+> Sisa pekerjaan per aplikasi: backend, frontend, dokumen, dan test.
 > Lihat [database/cluster_*.md](../database/README.md).
 
 ### B.1 Fase 2 — Aset & Inventaris
@@ -326,10 +324,11 @@ Rencana rinci: [app_collab.md](app_collab.md).
 
 - [x] DB — File Manager: `doc_folder`, `doc_file`, `doc_file_version`,
       `doc_share`, `doc_quota`.
-- [x] DB — Chat: `chat_room`, `chat_member`, `chat_message`, `chat_reaction`.
-- [x] DB — Mail: `mail_account`, `mail_message`, `mail_attachment`.
+- [x] DB — Tim (cluster `tim_*`, gabungan chat + mail): `tim_room`,
+      `tim_member`, `tim_message`, `tim_reaction`, `tim_account`, `tim_email`,
+      `tim_attachment`.
 - [x] DB — Announcement/News: `app_announcement`, `app_announcement_read`.
-- [ ] Backend — skeleton `doc/`, `chat/`, `mail/`, `app/` + WebSocket chat + SMTP.
+- [ ] Backend — skeleton `doc/`, `tim/`, `app/` + WebSocket chat + SMTP.
 - [ ] Frontend — halaman File Manager, `CHAT`, `MAIL`, `NEWS`.
 
 ---

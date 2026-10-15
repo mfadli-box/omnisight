@@ -31,4 +31,19 @@ cd osc_rest && go mod download && go run .
 cd osc_site && npm install && npm run dev
 ```
 
-Detail & troubleshooting: [osc_docs/development/run.md](osc_docs/development/run.md).
+Alternatif serba-Docker (database + backend + frontend + migrasi):
+
+```bash
+cp .env.example .env            # isi PG_PASS & RE_SECRET
+docker compose up -d --build    # osc_base, osc_rest, osc_site
+docker compose run --rm osc_migrate sh -c "npx prisma migrate deploy && npx prisma db seed"
+```
+
+Agen (opsional) — lihat [`osc_auto/README.md`](osc_auto/README.md):
+
+```bash
+cd osc_auto && cp .env.example .env && docker compose -f docker-compose.agent.yml up -d --build
+```
+
+Detail & troubleshooting: [osc_docs/development/run.md](osc_docs/development/run.md)
+dan [osc_docs/docker-compose.md](osc_docs/docker-compose.md).

@@ -109,14 +109,15 @@ Buka `http://localhost:37773` → login → `/board`.
 
 ## 5. Menjalankan Semua via Docker
 
-`docker-compose.yml` (root repo) mendefinisikan tiga service: `osc_base`
-(PostgreSQL 18), `osc_rest` (backend), dan `osc_site` (frontend), semuanya di
-network eksternal `blackbox`. Build image komponen lebih dulu:
+`docker-compose.yml` (root repo) mendefinisikan service `osc_base`
+(PostgreSQL 18), `osc_rest` (backend), `osc_site` (frontend), dan `osc_migrate`
+(utilitas Prisma, one-shot, profil `setup`) — semuanya di network eksternal
+`blackbox`. Build image komponen lebih dulu:
 
 ```bash
 cd osc_rest && docker build -t osc_rest .
 cd osc_site && docker build -t osc_site .
-cd .. && docker compose up -d
+cd .. && docker compose up -d --build
 ```
 
 Atau tanpa build manual (bila image sudah tersedia):
@@ -126,12 +127,26 @@ docker compose up -d
 docker compose ps
 ```
 
+Migrasi + seed via container:
+
+```bash
+docker compose run --rm osc_migrate
+docker compose run --rm osc_migrate sh -c "npx prisma migrate deploy && npx prisma db seed"
+```
+
+Menjalankan agen (opsional, terpisah):
+
+```bash
+cd osc_auto && cp .env.example .env    # isi OSC_AGENT_TOKEN
+docker compose -f docker-compose.agent.yml up -d --build
+```
+
 > Di produksi, **jangan** publikasikan `37772`/`37771` ke internet. Cukup
 > ekspos frontend `37773` di balik reverse proxy TLS (lihat
 > [../deploy/](../deploy/)). Bila frontend berjalan dalam container, set
 > `LISTEN_ADDR=0.0.0.0:37772`.
 
-Detail tambahan (env, override, agent) ada di
+Detail tambahan (env, override, agen) ada di
 [../docker-compose.md](../docker-compose.md).
 
 ## 6. Unit Test (Python) — `osc_docs/testing`

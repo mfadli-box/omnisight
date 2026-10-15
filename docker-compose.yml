@@ -1,7 +1,20 @@
+# Docker Compose — Stack OmniSight (host)
+#
+# Menjalankan: PostgreSQL (osc_base) + backend (osc_rest) + frontend (osc_site).
+# Agen per-VM dijalankan terpisah: lihat osc_auto/docker-compose.agent.yml.
+#
+# Pemakaian:
+#   1. cp .env.example .env  lalu isi nilai (minimal PG_PASS)
+#   2. docker compose up -d --build
+#   3. (sekali) terapkan migrasi + seed:
+#        docker compose run --rm osc_migrate            # migrate deploy
+#        docker compose run --rm osc_migrate sh -c "npx prisma migrate deploy && tsx prisma/seed.ts"
+#
+# Semua service bergabung ke network eksternal `blackbox` (subnet 172.99.0.0/16).
 networks:
   blackbox:
-    external:
-      name: blackbox
+    name: blackbox
+    external: true
 
 volumes:
   xbase:
@@ -10,7 +23,7 @@ volumes:
     driver: local
 
 services:
-  # ─── Database (Postgresql) ────────────────────────────────────
+  # ─── Database (PostgreSQL) ────────────────────────────────────
   osc_base:
     image: postgres:18-alpine
     container_name: osc_base
@@ -40,7 +53,7 @@ services:
       blackbox:
         ipv4_address: 172.99.66.1
 
-  # ─── Backend  (Go Gin) ───────────────────────────────────────
+  # ─── Backend (Go Gin) ─────────────────────────────────────────
   osc_rest:
     build:
       context: ./osc_rest
@@ -71,6 +84,14 @@ services:
       - "127.0.0.1:37772:37772"
     volumes:
       - files:/app/files
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:37772/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
     restart: always
     networks:
       blackbox:
@@ -82,7 +103,8 @@ services:
       context: ./osc_site
     container_name: osc_site
     depends_on:
-      - osc_rest
+      osc_rest:
+        condition: service_healthy
     environment:
       - TZ=${TZ:-Asia/Jakarta}
       - BE_POOL=http://osc_rest:37772
@@ -95,7 +117,35 @@ services:
       - "127.0.0.1:37773:37773"
     volumes:
       - files:/app/files
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:37773/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
     restart: always
     networks:
       blackbox:
         ipv4_address: 172.99.66.3
+
+  # ─── Migrasi & Seed Prisma (one-shot) ────────────────────────
+  # Profil `setup` agar tidak ikut `docker compose up` biasa.
+  osc_migrate:
+    build:
+      context: ./osc_base
+    image: omnisight/schema:latest
+    container_name: osc_migrate
+    depends_on:
+      osc_base:
+        condition: service_healthy
+    environment:
+      - TZ=${TZ:-Asia/Jakarta}
+      - DATABASE_URL=postgresql://${PG_USER:-dbe}:${PG_PASS}@osc_base:5432/${PG_DATA:-osc}?schema=public
+      - AD_MAIL=${AD_MAIL:-}
+      - AD_PASS=${AD_PASS:-}
+    profiles:
+      - setup
+    networks:
+      - blackbox

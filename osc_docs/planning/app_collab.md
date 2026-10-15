@@ -2,10 +2,10 @@
 
 > Rencana **modul kolaborasi & berkas** yang belum tercakup modul lain.
 > Melengkapi `APP06` (Notification) dan `DOC` (Document).
-> **Status DB: sudah dibangun** (`doc_folder/file/version/share/quota`, `chat_*`,
-> `mail_*`, `app_announcement*`) — lihat [cluster_doc.md](../database/cluster_doc.md),
-> [cluster_chat.md](../database/cluster_chat.md),
-> [cluster_mail.md](../database/cluster_mail.md). Backend/frontend menyusul.
+> **Status DB: sudah dibangun** (`doc_folder/file/version/share/quota`, `tim_*`,
+> `app_announcement*`) — lihat [cluster_doc.md](../database/cluster_doc.md) dan
+> [cluster_tim.md](../database/cluster_tim.md) (cluster TIM menggabungkan chat +
+> mail). Backend/frontend menyusul.
 > 🔗 Kembali ke [planning/README.md](README.md).
 
 ## 1. Latar Belakang
@@ -39,20 +39,20 @@ Semua model mengikuti konvensi [database/README.md](../database/README.md#4-konv
 | `doc_share` | Berbagi: `file_id`/`folder_id`, `grantee_user_id`?/`grantee_company_id`?, `access` (VIEW/EDIT), `token`?, `expires_at`?. |
 | `doc_quota` | Kuota per-user/company: `scope`, `owner_id`/`company_id`, `quota_bytes`, `used_bytes`. |
 
-### 3.2 Chat (cluster `chat_*` — baru)
+### 3.2 Chat (cluster `tim_*` — gabung dengan Mail)
 | Model | Keterangan |
 |---|---|
-| `chat_room` | Kanal/DM: `type` (DM/GROUP), `name`?, `company_id`, `created_by`. |
-| `chat_member` | Anggota: `room_id`, `user_id`, `role`, `last_read_at`. |
-| `chat_message` | Pesan: `room_id`, `sender_id`, `body`, `attachment_id`? (→ `doc_file`), `sent_at`. Indeks `[room_id, sent_at]` (retensi). |
-| `chat_reaction` | Reaksi: `message_id`, `user_id`, `emoji`. |
+| `tim_room` | Kanal/DM: `type` (DM/GROUP), `name`?, `company_id`, `created_by`. |
+| `tim_member` | Anggota: `room_id`, `user_id`, `role`, `last_read_at`. |
+| `tim_message` | Pesan: `room_id`, `sender_id`, `body`, `attachment_id`? (→ `doc_file`), `sent_at`. Indeks `[room_id, sent_at]` (retensi). |
+| `tim_reaction` | Reaksi: `message_id`, `user_id`, `emoji`. |
 
-### 3.3 Mail (cluster `mail_*` — baru, atau perluas `app_*`)
+### 3.3 Mail (cluster `tim_*` — digabung ke TIM)
 | Model | Keterangan |
 |---|---|
-| `mail_account` | Akun SMTP/IMAP: `name`, `address`, `smtp_host/port/tls`, `username`, `secret_enc`, `is_active`. |
-| `mail_message` | Pesan: `account_id`, `direction` (IN/OUT), `from`, `to` (Json), `cc`/`bcc` (Json)?, `subject`, `body`, `status`, `sent_at`. |
-| `mail_attachment` | Lampiran: `message_id`, `file_id`? (→ `doc_file`), `name`, `size`, `mime`. |
+| `tim_account` | Akun SMTP/IMAP: `name`, `address`, `smtp_host/port/tls`, `username`, `secret_enc`, `is_active`. |
+| `tim_email` | Pesan: `account_id`, `direction` (IN/OUT), `sender`, `recipients` (Json), `cc`/`bcc` (Json)?, `subject`, `body`, `status`, `sent_at`. |
+| `tim_attachment` | Lampiran: `message_id`, `file_id`? (→ `doc_file`), `name`, `size`, `mime`. |
 
 ### 3.4 Announcement/News (cluster `app_*` atau `news_*`)
 | Model | Keterangan |
@@ -88,8 +88,8 @@ Semua model mengikuti konvensi [database/README.md](../database/README.md#4-konv
 |---|---|
 | A | DB: model File Manager (`doc_*`) + Announcement (`app_announcement*`). |
 | B | Backend + UI File Manager & Announcement. |
-| C | Chat (model `chat_*` + WebSocket + UI). |
-| D | Mail (model `mail_*` + SMTP + UI). |
+| C | Chat (model `tim_room`/`tim_member`/`tim_message`/`tim_reaction` + WebSocket + UI). |
+| D | Mail (model `tim_account`/`tim_email`/`tim_attachment` + SMTP + UI). |
 
 > Non-goal awal: federasi eksternal (Matrix/XMPP), IMAP sync penuh, real-time
 > video. Fokus internal dulu.

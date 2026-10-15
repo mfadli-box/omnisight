@@ -58,8 +58,9 @@ lapisan sudah ada; **Rencana** = belum dimulai.
 | `BOT` | Bot/Agent | — | DB selesai | — |
 | `DSO` | DevOps/CI-CD | — | DB selesai | — |
 | `OBS` | Observability (monitoring ala Beszel) | — | DB selesai · runtime rencana | [plan](app_obs.md) |
-| `DOC` | Document | — | DB selesai | — |
-| `FILE`/`CHAT`/`MAIL`/`NEWS` | File Manager & Kolaborasi | usulan `APP12`–`APP14` | DB selesai · runtime rencana | [plan](app_collab.md) |
+| `DOC` | Document & File Manager | — | DB selesai | [plan](app_collab.md) |
+| `TIM` | Tim & Kolaborasi (Chat + Mail) | usulan `TIM01`.. | DB selesai · runtime rencana | [plan](app_collab.md) |
+| `NEWS` | Announcement/News | usulan `APP14` | DB selesai · runtime rencana | [plan](app_collab.md) |
 
 ## 3. Konteks Cepat
 

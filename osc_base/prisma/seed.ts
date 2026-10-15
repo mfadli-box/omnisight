@@ -61,7 +61,7 @@ type ModuleSeed = {
 const moduleGroups: { group: ModuleSeed; pages: ModuleSeed[] }[] = [
 ];
 
-async function seedDatModule() {
+async function seedAppModule() {
   let totalPages = 0;
   for (const { group, pages } of moduleGroups) {
     const groupModule = await prisma.app_module.upsert({
@@ -83,7 +83,7 @@ async function seedDatModule() {
 
 async function main() {
   await seedAdmin();
-  await seedDatModule();
+  await seedAppModule();
   console.log("\n=== All seed data inserted successfully ===");
 }
 

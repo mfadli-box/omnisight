@@ -42,16 +42,15 @@ osc_base/
 | `prisma/schema/cluster_dso.prisma` | [cluster_dso.md](cluster_dso.md) | DevOps/CI-CD (`dso_*`) |
 | `prisma/schema/cluster_obs.prisma` | [cluster_obs.md](cluster_obs.md) | Observability (`obs_*`) |
 | `prisma/schema/cluster_doc.prisma` | [cluster_doc.md](cluster_doc.md) | Document & File Manager (`doc_*`) |
-| `prisma/schema/cluster_chat.prisma` | [cluster_chat.md](cluster_chat.md) | Chat internal (`chat_*`) |
-| `prisma/schema/cluster_mail.prisma` | [cluster_mail.md](cluster_mail.md) | Mail mandiri (`mail_*`) |
+| `prisma/schema/cluster_tim.prisma` | [cluster_tim.md](cluster_tim.md) | Tim & kolaborasi: chat internal + mail mandiri (`tim_*`) |
 
 Konvensi: satu file Prisma = satu dokumen detail; cluster baru menambah satu
 file `cluster_<nama>.prisma` + satu dokumen `cluster_<nama>.md`.
 
-> **Cakupan saat ini:** 15 file `cluster_*.prisma` berisi **304 model** —
+> **Cakupan saat ini:** 14 file `cluster_*.prisma` berisi **304 model** —
 > seluruh perencanaan (fase 2–7) sudah diterjemahkan ke skema, termasuk field
 > perluasan (`perluas`), tabel lanjutan (syscollector SEC, notify channel OBS,
-> file manager `doc_*`, `chat_*`, `mail_*`, `app_announcement*`). Rincian per
+> file manager `doc_*`, tim `tim_*`, `app_announcement*`). Rincian per
 > cluster ada di masing-masing dokumen.
 
 ## 3. Konfigurasi Umum
@@ -96,7 +95,7 @@ updated_at  DateTime @default(now())
   `@@unique([company_id, code])`).
 - Prefix model: `app_*` untuk cluster aplikasi; `amm_*`, `net_*`, `vms_*`,
   `pod_*`, `sec_*`, `pam_*`, `web_*`, `jms_*`, `bot_*`, `dso_*`, `obs_*`,
-  `doc_*`, `chat_*`, `mail_*` untuk cluster lain (sesuai daftar retensi
+  `doc_*`, `tim_*` untuk cluster lain (sesuai daftar retensi
   `osc_rest/backbone/retention.go`).
 
 ## 5. Manajemen Migrasi
@@ -109,30 +108,25 @@ npx prisma migrate deploy         # terapkan ke environment lain
 npx prisma db seed                # seed admin + modul
 ```
 
+> **Reset baseline.** Riwayat migrasi lama (21 migrasi bertahap) telah
+> di-*squash* menjadi **satu migrasi baseline** yang merepresentasikan skema
+> final (14 cluster, 304 model). Database development di-drop lalu dibuat ulang
+> dari baseline ini. Alasan: skema sudah lengkap & stabil, sekaligus
+> menyatukan penggantian nama cluster CHAT+MAIL → TIM.
+
 Riwayat migrasi:
 
 | Migrasi | Isi |
 |---|---|
-| `20261006024400_init` | Seluruh model `cluster_app`. |
-| `20261009022147_planned_clusters` | Model awal cluster terencana: `amm`, `net`, `vms`, `pod`, `sec`, `web`, `jms`, `bot`, `dso`, `obs`, `doc`. |
-| `20261009022856_complete_cluster_app` | FK `app_user_session.user_id` → `app_user` + indeks `parent_id`/`user_id`. |
-| `20261014030000_cluster_pam` | Cluster `pam` (+ `pam_asset`, `pam_account`). |
-| `20261014033120_cluster_pam` | Koreksi/penyesuaian cluster `pam`. |
-| `20261014035328_cluster_app_extend` | Perluasan `app_*` (APP06–APP11: notifikasi, integrasi, api key/webhook, preferensi, report, backup). |
-| `20261014040328_cluster_pod_extend` | Runtime `pod_*` (engine, stack, service, container, image, volume, network, …). |
-| `20261014041828_cluster_net_extend` | Perluasan `net_*` (firewall, sensor, VLAN, IP, topologi, dll.). |
-| `20261014041922_cluster_obs_extend` | Perluasan `obs_*` (system, disk, container, vm, check, alert rule, dll.). |
-| `20261014042638_cluster_sec_extend` | Perluasan `sec_*` (SIEM/HIDS/XDR, FIM, SCA, vuln, intel, dll.). |
-| `20261014042743_cluster_web_extend2` | Perluasan `web_*` (server, domain, DNS, access, stream, dll.). |
-| `20261014042809_cluster_amm_extend` | Perluasan `amm_*` (CMDB, lisensi, fieldset, audit, consumable, kit, dll.). |
-| `20261014060911_cluster_pod_extend2` | Perluasan lanjutan `pod_*` (registry, build, scan, template, git, dll.). |
-| `20261014061652_cluster_net_extend2` | Perluasan lanjutan `net_*`. |
-| `20261015020127_cluster_pam_extend` | Perluasan `pam_*` (grant, command filter, approval, ACL, lockout, dll.). |
-| `20261015020201_cluster_sec_incident` | `sec_incident`/`sec_incident_event`. |
-| `20261015020338_cluster_vms_snapshot` | `vms_snapshot` + perluasan VMS. |
-| `20261015020738_extend_all_clusters_full_coverage` | Penutupan seluruh tabel cluster sesuai perencanaan penuh (paritas tool). |
-| `20261015091606_extend_models_planned_fields` | Field perluasan model (`net_device` SNMP/mgmt, `vms_host`/`vms_guest`, `web_vhost`/`upstream`/`certificate`, `pod_*`, `amm_asset`/`amm_asset_request`, SEC rule DSL) + `obs_notify_channel` + `sec_syscollector_*`. |
-| `20261015092316_cluster_chat_mail_file_news` | Cluster baru: File Manager (`doc_folder`, `doc_file`, `doc_file_version`, `doc_share`, `doc_quota`), Chat (`chat_*`), Mail (`mail_*`), Announcement/News (`app_announcement`, `app_announcement_read`). |
+| `20261015102113_init` | **Baseline tunggal.** Seluruh skema final: `cluster_app/amm/net/vms/pod/sec/pam/web/jms/bot/dso/obs/doc/tim` (304 model). |
+
+Membuat ulang DB dari nol (dev):
+
+```bash
+cd osc_base
+npx prisma migrate reset --force   # drop + apply baseline
+npx prisma db seed                 # seed admin + modul (jalankan eksplisit)
+```
 
 ## 6. Seed
 

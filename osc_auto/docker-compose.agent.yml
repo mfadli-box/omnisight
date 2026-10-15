@@ -1,44 +1,129 @@
-version: "3.9"
+# Docker Compose — Agen OmniSight (osc_auto)
+#
+# Menjalankan agen (biner per-VM) yang hanya berbicara dengan osc_rest via
+# grup `/rest/agent`. Agen tidak pernah mengakses database.
+#
+# Pemakaian:
+#   1. cp .env.example .env  lalu isi OSC_AGENT_TOKEN & OSC_REST_URL
+#   2. docker compose -f docker-compose.agent.yml up -d --build
+#
+# Catatan: berkas ini untuk menjalankan SEMUA agen di satu host (mode uji/lokal).
+# Di produksi, agen biasanya ditanam di VM target masing-masing (satu agen per
+# host) — cukup jalankan service yang relevan, mis.:
+#   docker compose -f docker-compose.agent.yml up -d agent_vm
+name: omnisight-agent
 
 networks:
   agent-net:
     name: agent-net
 
+x-agent-common: &agent-common
+  restart: always
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  read_only: true
+  tmpfs:
+    - /tmp
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  logging:
+    options:
+      max-size: "10m"
+      max-file: "3"
+  networks:
+    - agent-net
+
 services:
+  # ─── Agen per-VM: POD, NET, OBS, VMS, SEC, PAM, WEB ───────────
   agent_vm:
+    <<: *agent-common
     build:
-      context: ./agent_vm
+      context: .
+      dockerfile: Dockerfile.agent
+      args:
+        AGENT: agent_vm
+    image: omnisight/agent_vm:latest
     container_name: agent_vm
-    restart: always
-    privileged: false
     environment:
-      - TZ=Asia/Jakarta
-      - OSC_REST_URL=http://host.docker.internal:37772/rest/agent
-      - OSC_AGENT_TOKEN=${OSC_AGENT_TOKEN:-}
-      - OSC_AGENT_ID=${OSC_AGENT_ID:-agent-vm-01}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      TZ: ${TZ:-Asia/Jakarta}
+      OSC_AGENT_ID: ${OSC_AGENT_ID:-agent-vm-01}
+      OSC_AGENT_ROLE: vm
+      OSC_REST_URL: ${OSC_REST_URL:-http://host.docker.internal:37772/rest/agent}
+      OSC_AGENT_TOKEN: ${OSC_AGENT_TOKEN:-}
+      OSC_AGENT_INTERVAL: ${OSC_AGENT_INTERVAL:-30}
+      # Akses Docker/Podman untuk modul POD (butuh grup docker host).
+      DOCKER_HOST: unix:///var/run/docker.sock
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /etc/os-release:/etc/os-release:ro
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
-    networks:
-      - agent-net
+    # Jika agen perlu menulis ke socket Docker non-root, samakan GID docker host:
+    # group_add:
+    #   - "${DOCKER_GID:-999}"
 
+  # ─── Runner CI/CD (modul DSO) ─────────────────────────────────
   agent_ci:
+    <<: *agent-common
     build:
-      context: ./agent_ci
+      context: .
+      dockerfile: Dockerfile.agent
+      args:
+        AGENT: agent_ci
+    image: omnisight/agent_ci:latest
     container_name: agent_ci
-    restart: always
     environment:
-      - TZ=Asia/Jakarta
-      - OSC_REST_URL=http://host.docker.internal:37772/rest/agent
-      - OSC_AGENT_TOKEN=${OSC_AGENT_TOKEN:-}
-      - OSC_AGENT_ID=${OSC_AGENT_ID:-agent-ci-01}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      TZ: ${TZ:-Asia/Jakarta}
+      OSC_AGENT_ID: ${OSC_AGENT_ID_CI:-agent-ci-01}
+      OSC_AGENT_ROLE: ci
+      OSC_REST_URL: ${OSC_REST_URL:-http://host.docker.internal:37772/rest/agent}
+      OSC_AGENT_TOKEN: ${OSC_AGENT_TOKEN:-}
+      OSC_AGENT_INTERVAL: ${OSC_AGENT_INTERVAL:-30}
     volumes:
-      - ./agent_ci/workspace:/workspace
-    networks:
-      - agent-net
+      - ci-workspace:/workspace
+
+  # ─── Agen mail-relay (modul MAIL) — scaffold ──────────────────
+  agent_mx:
+    <<: *agent-common
+    build:
+      context: .
+      dockerfile: Dockerfile.agent
+      args:
+        AGENT: agent_mx
+    image: omnisight/agent_mx:latest
+    container_name: agent_mx
+    environment:
+      TZ: ${TZ:-Asia/Jakarta}
+      OSC_AGENT_ID: ${OSC_AGENT_ID_MX:-agent-mx-01}
+      OSC_AGENT_ROLE: mx
+      OSC_REST_URL: ${OSC_REST_URL:-http://host.docker.internal:37772/rest/agent}
+      OSC_AGENT_TOKEN: ${OSC_AGENT_TOKEN:-}
+      OSC_AGENT_INTERVAL: ${OSC_AGENT_INTERVAL:-30}
+    profiles:
+      - mx
+
+  # ─── Agen web-server (modul WEB/WAF) — scaffold ───────────────
+  agent_ws:
+    <<: *agent-common
+    build:
+      context: .
+      dockerfile: Dockerfile.agent
+      args:
+        AGENT: agent_ws
+    image: omnisight/agent_ws:latest
+    container_name: agent_ws
+    environment:
+      TZ: ${TZ:-Asia/Jakarta}
+      OSC_AGENT_ID: ${OSC_AGENT_ID_WS:-agent-ws-01}
+      OSC_AGENT_ROLE: ws
+      OSC_REST_URL: ${OSC_REST_URL:-http://host.docker.internal:37772/rest/agent}
+      OSC_AGENT_TOKEN: ${OSC_AGENT_TOKEN:-}
+      OSC_AGENT_INTERVAL: ${OSC_AGENT_INTERVAL:-30}
+    profiles:
+      - ws
+
+volumes:
+  ci-workspace:
+    driver: local
