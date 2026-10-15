@@ -42,18 +42,18 @@ model sec_waf_event {
 }
 
 model sec_agent {
-  id         String   @id @default(uuid())
-  company_id String   @default("")
+  id         String    @id @default(uuid())
+  company_id String    @default("")
   code       String
   name       String
-  status     String   @default("OFFLINE") // ONLINE | OFFLINE
+  status     String    @default("OFFLINE") // ONLINE | OFFLINE
   version    String?
   last_seen  DateTime?
-  is_active  Boolean  @default(true)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
+  is_active  Boolean   @default(true)
+  created_at DateTime  @default(now())
+  updated_at DateTime  @default(now())
 
-  events     sec_event[]
+  events sec_event[]
 
   @@unique([company_id, code])
   @@index([company_id])
@@ -83,8 +83,23 @@ model sec_event {
   source     String?
   created_at DateTime @default(now())
 
-  agent      sec_agent? @relation(fields: [agent_id], references: [id])
+  agent sec_agent? @relation(fields: [agent_id], references: [id])
 
   @@index([company_id, created_at])
   @@index([agent_id])
+}
+
+model sec_incident {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  code       String
+  title      String
+  severity   String   @default("MEDIUM") // LOW | MEDIUM | HIGH | CRITICAL
+  status     String   @default("OPEN") // OPEN | INVESTIGATING | RESOLVED | CLOSED
+  assignee   String?
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  @@unique([company_id, code])
+  @@index([company_id])
 }
