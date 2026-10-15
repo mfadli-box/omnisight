@@ -1,0 +1,62 @@
+// Cluster CHAT — Chat internal (kanal/DM, pesan realtime, reaksi).
+// Rencana: osc_docs/planning/app_collab.md
+// Dokumen: osc_docs/database/cluster_chat.md
+
+model chat_room {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  type       String   @default("GROUP") // DM | GROUP
+  name       String?
+  created_by String?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  members  chat_member[]
+  messages chat_message[]
+
+  @@index([company_id])
+}
+
+model chat_member {
+  id           String    @id @default(uuid())
+  room_id      String
+  user_id      String
+  role         String    @default("MEMBER") // MEMBER | ADMIN
+  last_read_at DateTime?
+  created_at   DateTime  @default(now())
+
+  room chat_room @relation(fields: [room_id], references: [id], onDelete: Cascade)
+
+  @@unique([room_id, user_id])
+  @@index([room_id])
+  @@index([user_id])
+}
+
+model chat_message {
+  id            String   @id @default(uuid())
+  room_id       String
+  sender_id     String
+  body          String?  @db.Text
+  attachment_id String?
+  sent_at       DateTime @default(now())
+  created_at    DateTime @default(now())
+
+  room      chat_room       @relation(fields: [room_id], references: [id], onDelete: Cascade)
+  reactions chat_reaction[]
+
+  @@index([room_id, sent_at])
+}
+
+model chat_reaction {
+  id         String   @id @default(uuid())
+  message_id String
+  user_id    String
+  emoji      String
+  created_at DateTime @default(now())
+
+  message chat_message @relation(fields: [message_id], references: [id], onDelete: Cascade)
+
+  @@unique([message_id, user_id, emoji])
+  @@index([message_id])
+}

@@ -1,0 +1,64 @@
+// Cluster MAIL — Mail mandiri (akun SMTP/IMAP, pesan, lampiran).
+// Rencana: osc_docs/planning/app_collab.md
+// Dokumen: osc_docs/database/cluster_mail.md
+
+model mail_account {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  name       String
+  address    String
+  smtp_host  String?
+  smtp_port  Int?
+  smtp_tls   Boolean  @default(true)
+  imap_host  String?
+  imap_port  Int?
+  username   String?
+  secret_enc String?  @db.Text
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  messages mail_message[]
+
+  @@unique([company_id, address])
+  @@index([company_id])
+}
+
+model mail_message {
+  id         String    @id @default(uuid())
+  company_id String    @default("")
+  account_id String?
+  direction  String    @default("OUT") // IN | OUT
+  sender     String?
+  recipients Json?
+  cc         Json?
+  bcc        Json?
+  subject    String?
+  body       String?   @db.Text
+  status     String    @default("QUEUED") // QUEUED | SENT | FAILED | RECEIVED
+  error      String?   @db.Text
+  sent_at    DateTime?
+  created_at DateTime  @default(now())
+
+  account     mail_account?     @relation(fields: [account_id], references: [id])
+  attachments mail_attachment[]
+
+  @@index([company_id, created_at])
+  @@index([account_id])
+  @@index([direction])
+}
+
+model mail_attachment {
+  id         String   @id @default(uuid())
+  message_id String
+  file_id    String?
+  name       String
+  size_bytes BigInt?
+  mime       String?
+  path       String?  @db.Text
+  created_at DateTime @default(now())
+
+  message mail_message @relation(fields: [message_id], references: [id], onDelete: Cascade)
+
+  @@index([message_id])
+}

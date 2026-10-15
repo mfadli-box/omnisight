@@ -59,7 +59,7 @@ lapisan sudah ada; **Rencana** = belum dimulai.
 | `DSO` | DevOps/CI-CD | — | DB selesai | — |
 | `OBS` | Observability (monitoring ala Beszel) | — | DB selesai · runtime rencana | [plan](app_obs.md) |
 | `DOC` | Document | — | DB selesai | — |
-| `FILE`/`CHAT`/`MAIL`/`NEWS` | File Manager & Kolaborasi | usulan `APP12`–`APP14` | Rencana (belum ada model) | [plan](app_collab.md) |
+| `FILE`/`CHAT`/`MAIL`/`NEWS` | File Manager & Kolaborasi | usulan `APP12`–`APP14` | DB selesai · runtime rencana | [plan](app_collab.md) |
 
 ## 3. Konteks Cepat
 

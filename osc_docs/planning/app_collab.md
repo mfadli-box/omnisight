@@ -1,8 +1,11 @@
 # Planning `File Manager` & `Kolaborasi` (Chat, Mail, Announcement/News)
 
 > Rencana **modul kolaborasi & berkas** yang belum tercakup modul lain.
-> Melengkapi `APP06` (Notification) dan `DOC` (Document). Status saat ini:
-> **belum ada model** — dokumen ini mencatat rencana sebelum dibangun.
+> Melengkapi `APP06` (Notification) dan `DOC` (Document).
+> **Status DB: sudah dibangun** (`doc_folder/file/version/share/quota`, `chat_*`,
+> `mail_*`, `app_announcement*`) — lihat [cluster_doc.md](../database/cluster_doc.md),
+> [cluster_chat.md](../database/cluster_chat.md),
+> [cluster_mail.md](../database/cluster_mail.md). Backend/frontend menyusul.
 > 🔗 Kembali ke [planning/README.md](README.md).
 
 ## 1. Latar Belakang

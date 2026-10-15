@@ -109,10 +109,10 @@ kontrol akses berbasis modul/area, sesi/token aman, dan audit trail.
 - Indeks `user_id` (pencarian balik berdasarkan user).
 - `comment` opsional; `onDelete: Cascade` dari `app_signature_form`.
 
-### 2.17 Rencana — Admin Lanjutan `APP06`–`APP11`
+### 2.17 Admin Lanjutan `APP06`–`APP11`
 
 Model baru (tetap prefix `app_*`) untuk Fase 6 — lihat
-[../planning/app_sys.md](../planning/app_sys.md). **Belum dibangun**:
+[../planning/app_sys.md](../planning/app_sys.md). **Sudah dibangun**:
 
 | Kode | Model | Isi pokok |
 |---|---|---|
@@ -122,6 +122,7 @@ Model baru (tetap prefix `app_*`) untuk Fase 6 — lihat
 | `APP09` | `app_report` (+ `app_user_action`) | Report tersimpan; audit memakai `app_user_action`. |
 | `APP10` | `app_preference`, `app_company_setting` | Preferensi user & setting per-company. |
 | `APP11` | `app_backup`, `app_backup_item` | Backup konfigurasi/metadata + item. |
+| `NEWS` | `app_announcement`, `app_announcement_read` | Pengumuman/news internal + pelacakan baca (lihat [../planning/app_collab.md](../planning/app_collab.md)). |
 
 ## 3. Relasi Inti
 

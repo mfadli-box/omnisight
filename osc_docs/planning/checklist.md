@@ -320,15 +320,15 @@ Rencana rinci: [app_sys.md](app_sys.md) (lihat juga
 - [ ] `APP10` — **Preference & Branding**: preferensi user + setting company; halaman `APP10`.
 - [ ] `APP11` — **Backup & Restore**: export/import konfigurasi + dry-run restore + jadwal `JMS`; halaman `APP11`.
 
-### B.6 Backlog — File Manager & Kolaborasi (belum ada model)
+### B.6 File Manager & Kolaborasi
 
 Rencana rinci: [app_collab.md](app_collab.md).
 
-- [ ] DB — File Manager: `doc_folder`, `doc_file`, `doc_file_version`,
+- [x] DB — File Manager: `doc_folder`, `doc_file`, `doc_file_version`,
       `doc_share`, `doc_quota`.
-- [ ] DB — Chat: `chat_room`, `chat_member`, `chat_message`, `chat_reaction`.
-- [ ] DB — Mail: `mail_account`, `mail_message`, `mail_attachment`.
-- [ ] DB — Announcement/News: `app_announcement`, `app_announcement_read`.
+- [x] DB — Chat: `chat_room`, `chat_member`, `chat_message`, `chat_reaction`.
+- [x] DB — Mail: `mail_account`, `mail_message`, `mail_attachment`.
+- [x] DB — Announcement/News: `app_announcement`, `app_announcement_read`.
 - [ ] Backend — skeleton `doc/`, `chat/`, `mail/`, `app/` + WebSocket chat + SMTP.
 - [ ] Frontend — halaman File Manager, `CHAT`, `MAIL`, `NEWS`.
 

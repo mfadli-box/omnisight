@@ -41,15 +41,18 @@ osc_base/
 | `prisma/schema/cluster_bot.prisma` | [cluster_bot.md](cluster_bot.md) | Bot/Agent (`bot_*`) |
 | `prisma/schema/cluster_dso.prisma` | [cluster_dso.md](cluster_dso.md) | DevOps/CI-CD (`dso_*`) |
 | `prisma/schema/cluster_obs.prisma` | [cluster_obs.md](cluster_obs.md) | Observability (`obs_*`) |
-| `prisma/schema/cluster_doc.prisma` | [cluster_doc.md](cluster_doc.md) | Document (`doc_*`) |
+| `prisma/schema/cluster_doc.prisma` | [cluster_doc.md](cluster_doc.md) | Document & File Manager (`doc_*`) |
+| `prisma/schema/cluster_chat.prisma` | [cluster_chat.md](cluster_chat.md) | Chat internal (`chat_*`) |
+| `prisma/schema/cluster_mail.prisma` | [cluster_mail.md](cluster_mail.md) | Mail mandiri (`mail_*`) |
 
 Konvensi: satu file Prisma = satu dokumen detail; cluster baru menambah satu
 file `cluster_<nama>.prisma` + satu dokumen `cluster_<nama>.md`.
 
-> **Cakupan saat ini:** 13 file `cluster_*.prisma` berisi **290 model** —
-> seluruh perencanaan (fase 2–6) sudah diterjemahkan ke skema, termasuk field
-> perluasan (`perluas`) dan tabel lanjutan (syscollector SEC, notify channel
-> OBS, dll.). Rincian per cluster ada di masing-masing dokumen.
+> **Cakupan saat ini:** 15 file `cluster_*.prisma` berisi **304 model** —
+> seluruh perencanaan (fase 2–7) sudah diterjemahkan ke skema, termasuk field
+> perluasan (`perluas`), tabel lanjutan (syscollector SEC, notify channel OBS,
+> file manager `doc_*`, `chat_*`, `mail_*`, `app_announcement*`). Rincian per
+> cluster ada di masing-masing dokumen.
 
 ## 3. Konfigurasi Umum
 
@@ -93,7 +96,7 @@ updated_at  DateTime @default(now())
   `@@unique([company_id, code])`).
 - Prefix model: `app_*` untuk cluster aplikasi; `amm_*`, `net_*`, `vms_*`,
   `pod_*`, `sec_*`, `pam_*`, `web_*`, `jms_*`, `bot_*`, `dso_*`, `obs_*`,
-  `doc_*` untuk cluster lain (sesuai daftar retensi
+  `doc_*`, `chat_*`, `mail_*` untuk cluster lain (sesuai daftar retensi
   `osc_rest/backbone/retention.go`).
 
 ## 5. Manajemen Migrasi
@@ -129,6 +132,7 @@ Riwayat migrasi:
 | `20261015020338_cluster_vms_snapshot` | `vms_snapshot` + perluasan VMS. |
 | `20261015020738_extend_all_clusters_full_coverage` | Penutupan seluruh tabel cluster sesuai perencanaan penuh (paritas tool). |
 | `20261015091606_extend_models_planned_fields` | Field perluasan model (`net_device` SNMP/mgmt, `vms_host`/`vms_guest`, `web_vhost`/`upstream`/`certificate`, `pod_*`, `amm_asset`/`amm_asset_request`, SEC rule DSL) + `obs_notify_channel` + `sec_syscollector_*`. |
+| `20261015092316_cluster_chat_mail_file_news` | Cluster baru: File Manager (`doc_folder`, `doc_file`, `doc_file_version`, `doc_share`, `doc_quota`), Chat (`chat_*`), Mail (`mail_*`), Announcement/News (`app_announcement`, `app_announcement_read`). |
 
 ## 6. Seed
 

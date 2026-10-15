@@ -57,3 +57,96 @@ model doc_sign {
   @@index([version_id])
   @@index([user_id])
 }
+
+model doc_folder {
+  id         String   @id @default(uuid())
+  company_id String   @default("")
+  parent_id  String?
+  name       String
+  path       String?
+  owner_id   String?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  parent   doc_folder?  @relation("FolderTree", fields: [parent_id], references: [id])
+  children doc_folder[] @relation("FolderTree")
+  files    doc_file[]
+
+  @@unique([company_id, parent_id, name])
+  @@index([company_id])
+  @@index([parent_id])
+}
+
+model doc_file {
+  id          String   @id @default(uuid())
+  company_id  String   @default("")
+  folder_id   String?
+  name        String
+  mime        String?
+  size_bytes  BigInt?
+  checksum    String?
+  storage     String   @default("LOCAL") // LOCAL | S3
+  path        String?  @db.Text
+  version     Int      @default(1)
+  owner_id    String?
+  scan_status String   @default("PENDING") // PENDING | CLEAN | INFECTED | SKIPPED
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now())
+
+  folder   doc_folder?        @relation(fields: [folder_id], references: [id])
+  versions doc_file_version[]
+
+  @@index([company_id])
+  @@index([folder_id])
+  @@index([owner_id])
+}
+
+model doc_file_version {
+  id         String   @id @default(uuid())
+  file_id    String
+  version    Int
+  size_bytes BigInt?
+  checksum   String?
+  path       String?  @db.Text
+  created_by String?
+  created_at DateTime @default(now())
+
+  file doc_file @relation(fields: [file_id], references: [id], onDelete: Cascade)
+
+  @@unique([file_id, version])
+  @@index([file_id])
+}
+
+model doc_share {
+  id                 String    @id @default(uuid())
+  company_id         String    @default("")
+  file_id            String?
+  folder_id          String?
+  grantee_user_id    String?
+  grantee_company_id String?
+  access             String    @default("VIEW") // VIEW | EDIT
+  token              String?
+  expires_at         DateTime?
+  created_at         DateTime  @default(now())
+
+  @@index([company_id])
+  @@index([file_id])
+  @@index([folder_id])
+  @@index([token])
+}
+
+model doc_quota {
+  id          String   @id @default(uuid())
+  company_id  String   @default("")
+  scope       String   @default("USER") // USER | COMPANY
+  owner_id    String?
+  quota_bytes BigInt?
+  used_bytes  BigInt   @default(0)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now())
+
+  @@unique([company_id, scope, owner_id])
+  @@index([company_id])
+}

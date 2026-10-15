@@ -17,7 +17,7 @@
 | 6 | Lanjutan admin | `APP06`–`APP11` | DB selesai |
 
 > **Status lapisan DB: lengkap.** Seluruh cluster (`cluster_*.prisma`) + field
-> perluasan sudah terpasang (290 model di 13 cluster). Fase 2–6 kini berada
+> perluasan sudah terpasang (304 model di 15 cluster). Fase 2–7 kini berada
 > pada tahap **implementasi backend + frontend**, bukan lagi perencanaan skema.
 > Lihat [database/README.md](../database/README.md).
 
@@ -108,18 +108,18 @@ Rentang `APP06`–`APP11` berisi **layanan admin bersama**. Rencana rinci:
 
 Kode final ditetapkan saat aplikasi mulai dikerjakan.
 
-## Fase 7 — Backlog: File Manager & Kolaborasi (Rencana, belum ada model)
+## Fase 7 — File Manager & Kolaborasi (DB selesai · implementasi rencana)
 
 Menutup gap [gap-analysis.md](gap-analysis.md): manajemen berkas pengguna,
 chat internal, mail mandiri, dan pengumuman/news. Rencana rinci:
-[app_collab.md](app_collab.md).
+[app_collab.md](app_collab.md). **DB sudah dibangun**; backend/frontend menyusul.
 
 | Kode | Aplikasi | Cakupan usulan | Model usulan |
 |---|---|---|---|
 | `DOC` (perluas) | File Manager | Folder/berkas, versi, share, kuota, preview, scan, S3 | `doc_folder`, `doc_file`, `doc_file_version`, `doc_share`, `doc_quota` |
-| `APP12` | Chat | Kanal/DM, pesan realtime (WS), lampiran, read-state | `chat_room`, `chat_member`, `chat_message`, `chat_reaction` |
-| `APP13` | Mail | Kotak masuk/keluar + SMTP mandiri | `mail_account`, `mail_message`, `mail_attachment` |
-| `APP14` | Announcement/News | Pengumuman internal + read-tracking | `app_announcement`, `app_announcement_read` |
+| `CHAT` | Chat | Kanal/DM, pesan realtime (WS), lampiran, read-state | `chat_room`, `chat_member`, `chat_message`, `chat_reaction` |
+| `MAIL` | Mail | Kotak masuk/keluar + SMTP mandiri | `mail_account`, `mail_message`, `mail_attachment` |
+| `NEWS` | Announcement/News | Pengumuman internal + read-tracking | `app_announcement`, `app_announcement_read` |
 
 ---
 

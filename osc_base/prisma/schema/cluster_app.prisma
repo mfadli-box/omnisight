@@ -544,3 +544,37 @@ model app_employee {
   @@index([company_id])
   @@index([user_id])
 }
+
+model app_announcement {
+  id          String    @id @default(uuid())
+  company_id  String    @default("")
+  title       String
+  body        String?   @db.Text
+  category    String?
+  target_type String    @default("ALL") // ALL | COMPANY | ROLE
+  target_id   String?
+  publish_at  DateTime?
+  expire_at   DateTime?
+  pinned      Boolean   @default(false)
+  created_by  String?
+  is_active   Boolean   @default(true)
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @default(now())
+
+  reads app_announcement_read[]
+
+  @@index([company_id])
+  @@index([publish_at])
+}
+
+model app_announcement_read {
+  id              String   @id @default(uuid())
+  announcement_id String
+  user_id         String
+  read_at         DateTime @default(now())
+
+  announcement app_announcement @relation(fields: [announcement_id], references: [id], onDelete: Cascade)
+
+  @@unique([announcement_id, user_id])
+  @@index([user_id])
+}

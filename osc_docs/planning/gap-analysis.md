@@ -9,10 +9,11 @@ Berdasarkan permintaan review, berikut hasil gap analysis untuk fitur User File 
 
 ## 1. User File Management
 
-**Status**: Ada (parsial, backend). 
+**Status**: DB siap; backend parsial.
 - Implementasi: `/files/[...path]` route di `osc_site/src/app/files/[...path]/route.ts` (auth + boundary check). 
-- Gap: Tidak ada manajemen file UI (upload/list/delete/share/rename/move/permission per-folder/company). Tidak ada quota, versioning, preview (selain pdf/png/jpg). Tidak ada antivirus/scanning. Tidak ada eksternal storage (S3). Model DB belum ada.
-- Rencana: **[app_collab.md §3.1](app_collab.md)** (model `doc_folder`, `doc_file`, `doc_file_version`, `doc_share`, `doc_quota`).
+- DB: **sudah dibangun** — `doc_folder`, `doc_file`, `doc_file_version`, `doc_share`, `doc_quota` (lihat [cluster_doc.md](../database/cluster_doc.md)).
+- Gap: Tidak ada manajemen file UI (upload/list/delete/share/rename/move/permission per-folder/company). Tidak ada quota/versioning runtime, preview (selain pdf/png/jpg), antivirus/scanning, eksternal storage (S3).
+- Rencana: **[app_collab.md §3.1](app_collab.md)**.
 
 ## 2. User Guide
 
@@ -24,13 +25,15 @@ di-link dari [docs README](../README.md). Masih minim — perlu diperkaya
 
 ## 3. Notification, Chat, Mail, Announcement/News
 
-**Status**: Sebagian — DB sudah siap untuk notifikasi; sisanya belum diplanning.
+**Status**: DB siap untuk semua; runtime notifikasi & kolaborasi belum.
 - Notification: DB **lengkap** (`app_notify_*`, `obs_notify_channel`); runtime
   dispatcher **belum ada** (APP06).
-- Mail/SMTP: tidak ada implementasi; rencana di [app_collab.md §3.3](app_collab.md).
-- Chat: tidak ada; rencana di [app_collab.md §3.2](app_collab.md).
-- Announcement/News: status page punya `is_announcement` (OBS); news feed
-  internal rencana di [app_collab.md §3.4](app_collab.md).
+- Mail/SMTP: DB **sudah dibangun** (`mail_*`); runtime SMTP **belum ada** —
+  rencana di [app_collab.md §3.3](app_collab.md).
+- Chat: DB **sudah dibangun** (`chat_*`); runtime WebSocket **belum ada** —
+  rencana di [app_collab.md §3.2](app_collab.md).
+- Announcement/News: DB **sudah dibangun** (`app_announcement*`); status page
+  OBS tetap punya `is_announcement` — rencana di [app_collab.md §3.4](app_collab.md).
 
 **Rekomendasi**: Prioritaskan APP06 (notifikasi runtime) + mail/SMTP.
 
