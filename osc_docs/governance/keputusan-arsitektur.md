@@ -323,6 +323,8 @@ Format ringkas: konteks, keputusan, konsekuensi, alternatif. Seluruh keputusan b
 
 - Pipeline preflight memakai GitHub Actions di `.github/workflows/preflight.yml`.
 - Job: `docs-and-secrets`, `rust`, `go`, `site`, `base`, `compose`.
+- Runner dipin ke `ubuntu-24.04`; `ubuntu-latest` tidak dipakai karena label itu mulai bermigrasi ke Ubuntu 26 pada 2026-10-19.
+- Action memakai runtime Node 24: `checkout@v5`, `setup-python@v6`, `setup-node@v5`, `setup-go@v6`; `dtolnay/rust-toolchain` composite.
 - Versi tool dipin: Rust `1.99.1`, Go `1.22` (dari `osc_auto/go.mod`), Node `22.23.4`, Next.js `16.4.3`, Prisma `6.7.0`.
 - Workflow hanya memakai izin `contents: read` dan tidak menyentuh rahasia.
 - Logika validasi tetap berada di skrip Python dan perintah build komponen; workflow hanya merangkai.

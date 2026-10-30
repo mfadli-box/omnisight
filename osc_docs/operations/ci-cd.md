@@ -34,6 +34,7 @@ Versi tool yang dipin pada WP-01:
 
 | Tool | Versi | Sumber pin |
 |---|---|---|
+| Runner CI | `ubuntu-24.04` | `runs-on` di workflow |
 | Rust | `1.99.1` | `dtolnay/rust-toolchain` di workflow |
 | Go | `1.22` | `osc_auto/go.mod` |
 | Node.js | `22.23.4` | `actions/setup-node` di workflow |
@@ -46,12 +47,15 @@ Aturan:
 
 - Perubahan versi tool atau image wajib memperbarui tabel ini dan lockfile terkait dalam PR yang sama.
 - Workflow tidak memuat rahasia; job yang membutuhkan database nyata memakai service container pada WP berikutnya.
+- Runner dipin ke `ubuntu-24.04`, bukan `ubuntu-latest`. Label `ubuntu-latest` mulai bermigrasi ke Ubuntu 26 pada 2026-10-19, sehingga label tersebut tidak lagi reproducible.
+- Action pihak ketiga wajib memakai runtime Node 24 atau composite. Action berbasis Node 20 tidak dipakai karena sudah deprecated.
+- Cache Go dimatikan selama `osc_auto/go.sum` belum ada. Setelah dependensi ditambahkan, aktifkan cache dengan `cache-dependency-path: osc_auto/go.sum`.
 - Logika validasi tetap berada di skrip Python dan perintah build komponen; workflow hanya merangkai agar mudah dipindahkan bila penyedia CI berubah.
 - Status WP-01: perintah padanan sudah dijalankan lokal dan lulus; eksekusi GitHub Actions pertama menunggu push ke repositori. Sampai itu terjadi, pipeline belum dianggap terbukti di CI dan WP-01 berstatus blocking.
 
 Risiko supply-chain yang diterima pada WP-01:
 
-- Action dipin ke tag mayor (`actions/checkout@v4`, `actions/setup-python@v5`, `actions/setup-node@v4`, `actions/setup-go@v5`) dan `dtolnay/rust-toolchain@master`, bukan commit SHA.
+- Action dipin ke tag mayor (`actions/checkout@v5`, `actions/setup-python@v6`, `actions/setup-node@v5`, `actions/setup-go@v6`), bukan commit SHA. Semua memakai runtime Node 24; `dtolnay/rust-toolchain@master` adalah composite action sehingga tidak terpengaruh deprecation Node 20.
 - Mitigasi saat ini: workflow hanya memakai izin `contents: read`, tidak memakai secret, dan toolchain tetap dipin ke versi eksplisit.
 - Sebelum rilis produksi (WP-12), action wajib dipin ke commit SHA dan diperbarui lewat review, bukan otomatis.
 
