@@ -1,0 +1,43 @@
+{
+  "error": {
+    "AA00-00-0000": "OK",
+    "AA00-00-0001": "Data yang dikirim tidak valid.",
+    "AA00-00-0002": "Sesi Anda tidak valid atau sudah berakhir. Silakan masuk lagi.",
+    "AA00-00-0003": "Permintaan tidak dapat diproses.",
+    "AA00-00-0004": "Data tidak ditemukan.",
+    "AA00-00-0005": "Data telah berubah. Muat ulang lalu coba lagi.",
+    "AA00-00-0006": "Terlalu banyak permintaan. Coba lagi nanti.",
+    "AA00-00-0007": "Permintaan ini bertentangan dengan permintaan sebelumnya. Periksa hasilnya sebelum mencoba lagi.",
+    "AA00-00-0008": "Metode atau format permintaan tidak didukung.",
+    "AA00-00-0009": "Permintaan terlalu besar.",
+    "AA00-00-0010": "Token keamanan tidak valid atau sudah berakhir. Muat ulang halaman lalu coba lagi.",
+    "AA00-00-0100": "Permintaan tidak dapat diproses.",
+    "AA00-00-0900": "Layanan pendukung sedang tidak tersedia. Coba lagi nanti.",
+    "AB-00-1004": "Email atau kata sandi salah.",
+    "AB-02-1003": "Anda tidak memiliki keanggotaan aktif di perusahaan ini.",
+    "AB-04-1001": "Email atau kata sandi salah.",
+    "AB-04-1002": "Layanan identitas sedang tidak tersedia. Coba lagi nanti.",
+    "AB-04-1005": "Terlalu banyak percobaan masuk. Tunggu lalu coba lagi.",
+    "AB-04-1006": "Layanan identitas mengembalikan respons yang tidak valid. Hubungi administrator.",
+    "AB-04-1007": "Akun Anda belum dikonfigurasi untuk perusahaan ini. Hubungi administrator.",
+    "AC-04-2001": "Aset ini sedang dipinjam.",
+    "AD-06-3001": "Perubahan ini memerlukan persetujuan.",
+    "AD-06-3002": "Perubahan firewall telah dikembalikan.",
+    "AF-04-4001": "Image harus dipin ke digest.",
+    "AF-04-4002": "Health check gagal dan deployment dikembalikan.",
+    "AH-04-5001": "Restore ini memerlukan persetujuan.",
+    "AI-02-6001": "Permintaan akses ini sudah kedaluwarsa."
+  },
+  "validation": {
+    "required": "Field ini wajib diisi.",
+    "invalid_format": "Format tidak valid.",
+    "out_of_scope": "Nilai berada di luar scope Anda.",
+    "not_found": "Nilai yang dirujuk tidak ditemukan.",
+    "duplicate": "Nilai ini sudah dipakai.",
+    "conflict": "Nilai ini bertentangan dengan status saat ini.",
+    "too_long": "Nilai ini terlalu panjang.",
+    "unsupported_value": "Nilai ini tidak didukung.",
+    "expired": "Nilai ini sudah kedaluwarsa.",
+    "not_allowed": "Aksi ini tidak diizinkan pada keadaan saat ini."
+  }
+}

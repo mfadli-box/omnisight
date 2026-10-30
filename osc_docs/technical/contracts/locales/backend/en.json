@@ -1,0 +1,43 @@
+{
+  "error": {
+    "AA00-00-0000": "OK",
+    "AA00-00-0001": "The submitted data is invalid.",
+    "AA00-00-0002": "Your session is invalid or has expired. Please sign in again.",
+    "AA00-00-0003": "The request could not be processed.",
+    "AA00-00-0004": "Data not found.",
+    "AA00-00-0005": "The data has changed. Reload and try again.",
+    "AA00-00-0006": "Too many requests. Please try again later.",
+    "AA00-00-0007": "This request conflicts with a previous request. Check the result before trying again.",
+    "AA00-00-0008": "The request method or format is not supported.",
+    "AA00-00-0009": "The request is too large.",
+    "AA00-00-0010": "Your security token is invalid or has expired. Reload the page and try again.",
+    "AA00-00-0100": "The request could not be processed.",
+    "AA00-00-0900": "A supporting service is currently unavailable. Please try again later.",
+    "AB-00-1004": "Email or password is incorrect.",
+    "AB-02-1003": "You do not have an active membership in this company.",
+    "AB-04-1001": "Email or password is incorrect.",
+    "AB-04-1002": "The identity service is currently unavailable. Please try again later.",
+    "AB-04-1005": "Too many sign-in attempts. Please wait and try again.",
+    "AB-04-1006": "The identity service returned an invalid response. Please contact an administrator.",
+    "AB-04-1007": "Your account is not configured for this company. Please contact an administrator.",
+    "AC-04-2001": "This asset is currently checked out.",
+    "AD-06-3001": "This change requires approval.",
+    "AD-06-3002": "The firewall change was rolled back.",
+    "AF-04-4001": "The image must be pinned to a digest.",
+    "AF-04-4002": "The health check failed and the deployment was rolled back.",
+    "AH-04-5001": "This restore requires approval.",
+    "AI-02-6001": "This access request has expired."
+  },
+  "validation": {
+    "required": "This field is required.",
+    "invalid_format": "The format is invalid.",
+    "out_of_scope": "The value is outside your scope.",
+    "not_found": "The referenced value was not found.",
+    "duplicate": "This value is already in use.",
+    "conflict": "This value conflicts with the current state.",
+    "too_long": "This value is too long.",
+    "unsupported_value": "This value is not supported.",
+    "expired": "This value has expired.",
+    "not_allowed": "This action is not allowed in the current state."
+  }
+}

@@ -1,0 +1,30 @@
+# Contoh konfigurasi agent-backup. Salin menjadi agent-backup.yaml.
+# Tidak boleh memuat password atau token.
+
+agent:
+  kind: backup
+  collector_url: https://collector.internal.example
+  heartbeat_seconds: 30
+  state_dir: /var/lib/omnisight
+  staging_dir: /var/lib/omnisight/staging
+  max_staging_mb: 256
+
+backup:
+  allowed_targets:
+    - cidr: 10.20.0.0/24
+      protocols:
+        - routeros
+        - ssh
+  schedule:
+    cron: "0 2 * * *"
+    timezone: Asia/Jakarta
+  encryption:
+    enabled: true
+    key_ref: vault://omnisight/backup-key
+  retention:
+    days: 90
+  max_concurrent_tasks: 1
+  task_timeout_seconds: 300
+
+security:
+  log_redaction: true

@@ -1,0 +1,36 @@
+# Contoh konfigurasi agent-network. Salin menjadi agent-network.yaml.
+# Tidak boleh memuat password atau token.
+
+agent:
+  kind: network
+  collector_url: https://collector.internal.example
+  heartbeat_seconds: 30
+  batch_max_bytes: 1048576
+  state_dir: /var/lib/omnisight
+
+network:
+  allowed_targets:
+    - cidr: 10.20.0.0/24
+      protocols:
+        - routeros
+        - snmp
+        - ssh
+  routeros:
+    api: rest
+    port: 443
+    tls_verify: true
+  snmp:
+    version: v2c
+  schedule:
+    inventory_minutes: 5
+    backup_minutes: 60
+
+security:
+  command_allowlist:
+    - read_identity
+    - read_interfaces
+    - read_firewall
+    - snapshot_config
+  max_concurrent_tasks: 2
+  task_timeout_seconds: 120
+  log_redaction: true

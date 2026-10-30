@@ -1,0 +1,2194 @@
+{
+  "version": "0.6.0",
+  "status": "approved",
+  "source": "osc_docs/security/matriks-izin.md",
+  "generated_from": [
+    "osc_docs/security/matriks-izin.md",
+    "osc_docs/product/peta-modul.md"
+  ],
+  "model": {
+    "actions": [
+      "read",
+      "post"
+    ],
+    "post_includes_read": true,
+    "permission_format": [
+      "<module>:<action>",
+      "<submodule>:<action>"
+    ],
+    "scope_types": [
+      "global",
+      "company",
+      "area",
+      "self",
+      "public",
+      "user",
+      "internal"
+    ],
+    "approval_levels": [
+      "none",
+      "policy",
+      "required",
+      "dual_control"
+    ],
+    "sensitivity_levels": [
+      "normal",
+      "high",
+      "critical"
+    ]
+  },
+  "modules": [
+    {
+      "code": "AA",
+      "name_en": "Dashboard",
+      "name_id": "Dashboard",
+      "api_prefix": "/dashboard",
+      "ui_prefix": "/dashboard"
+    },
+    {
+      "code": "AB",
+      "name_en": "Identity, Organization, and Access",
+      "name_id": "Identitas, Organisasi, dan Akses",
+      "api_prefix": "/identity",
+      "ui_prefix": "/identity"
+    },
+    {
+      "code": "AC",
+      "name_en": "Asset Management",
+      "name_id": "Manajemen Aset",
+      "api_prefix": "/assets",
+      "ui_prefix": "/assets"
+    },
+    {
+      "code": "AD",
+      "name_en": "Network and IPAM",
+      "name_id": "Jaringan dan IPAM",
+      "api_prefix": "/network",
+      "ui_prefix": "/network"
+    },
+    {
+      "code": "AE",
+      "name_en": "Infrastructure Monitoring",
+      "name_id": "Monitoring Infrastruktur",
+      "api_prefix": "/monitoring",
+      "ui_prefix": "/monitoring"
+    },
+    {
+      "code": "AF",
+      "name_en": "Container Operations",
+      "name_id": "Operasi Container",
+      "api_prefix": "/containers",
+      "ui_prefix": "/containers"
+    },
+    {
+      "code": "AG",
+      "name_en": "Edge, Domain, and Certificates",
+      "name_id": "Edge, Domain, dan Sertifikat",
+      "api_prefix": "/edge",
+      "ui_prefix": "/edge"
+    },
+    {
+      "code": "AH",
+      "name_en": "Backup and Configuration",
+      "name_id": "Backup dan Konfigurasi",
+      "api_prefix": "/backups",
+      "ui_prefix": "/backups"
+    },
+    {
+      "code": "AI",
+      "name_en": "Secure Access",
+      "name_id": "Akses Aman",
+      "api_prefix": "/access",
+      "ui_prefix": "/access"
+    },
+    {
+      "code": "AJ",
+      "name_en": "Service Desk and Contracts",
+      "name_id": "Layanan dan Kontrak",
+      "api_prefix": "/service-desk",
+      "ui_prefix": "/service-desk"
+    },
+    {
+      "code": "AK",
+      "name_en": "Content and Notifications",
+      "name_id": "Konten dan Notifikasi",
+      "api_prefix": "/content",
+      "ui_prefix": "/content"
+    },
+    {
+      "code": "AL",
+      "name_en": "Audit and Security",
+      "name_id": "Audit dan Keamanan",
+      "api_prefix": "/audit",
+      "ui_prefix": "/audit"
+    },
+    {
+      "code": "AM",
+      "name_en": "Platform Settings",
+      "name_id": "Pengaturan Platform",
+      "api_prefix": "/platform",
+      "ui_prefix": "/settings"
+    }
+  ],
+  "system_roles": {
+    "company_admin": {
+      "name_en": "Company Admin",
+      "name_id": "Admin Perusahaan",
+      "module_grants": {
+        "AA": "read",
+        "AB": "post",
+        "AC": "post",
+        "AD": "post",
+        "AE": "post",
+        "AF": "post",
+        "AG": "post",
+        "AH": "post",
+        "AI": "post",
+        "AJ": "post",
+        "AK": "post",
+        "AL": "read",
+        "AM": "post"
+      },
+      "notes": [
+        "Cannot approve own requests.",
+        "Cannot remove the last admin.",
+        "No global platform data."
+      ]
+    },
+    "area_manager": {
+      "name_en": "Area Manager",
+      "name_id": "Manajer Area",
+      "module_grants": {
+        "AA": "read",
+        "AB": "read",
+        "AC": "post",
+        "AD": "post*",
+        "AE": "post",
+        "AF": "post*",
+        "AG": "post*",
+        "AH": "read",
+        "AI": "post",
+        "AJ": "post",
+        "AK": "read",
+        "AL": "read",
+        "AM": "none"
+      },
+      "notes": [
+        "Area and descendants only.",
+        "Cannot manage roles, HRIS, or platform credentials."
+      ]
+    },
+    "noc_operator": {
+      "name_en": "NOC Operator",
+      "name_id": "Operator NOC",
+      "module_grants": {
+        "AA": "read",
+        "AB": "read",
+        "AC": "read",
+        "AD": "post*",
+        "AE": "post",
+        "AF": "post*",
+        "AG": "read",
+        "AH": "read",
+        "AI": "read",
+        "AJ": "post",
+        "AK": "read",
+        "AL": "read",
+        "AM": "none"
+      },
+      "notes": [
+        "May plan and execute after approval.",
+        "Cannot approve own requests."
+      ]
+    },
+    "field_technician": {
+      "name_en": "Field Technician",
+      "name_id": "Teknisi Lapangan",
+      "module_grants": {
+        "AA": "read",
+        "AB": "read",
+        "AC": "post",
+        "AD": "read",
+        "AE": "read",
+        "AF": "read",
+        "AG": "none",
+        "AH": "none",
+        "AI": "none",
+        "AJ": "post",
+        "AK": "read",
+        "AL": "none",
+        "AM": "none"
+      },
+      "notes": [
+        "Assets and tickets in the assigned area.",
+        "No bulk export or audit access."
+      ]
+    },
+    "viewer": {
+      "name_en": "Viewer",
+      "name_id": "Pengamat",
+      "module_grants": {
+        "AA": "read",
+        "AB": "read",
+        "AC": "read",
+        "AD": "read",
+        "AE": "read",
+        "AF": "read",
+        "AG": "read",
+        "AH": "read",
+        "AI": "none",
+        "AJ": "read",
+        "AK": "read",
+        "AL": "none",
+        "AM": "none"
+      },
+      "notes": [
+        "Read-only.",
+        "Audit requires explicit AL:read."
+      ]
+    },
+    "auditor": {
+      "name_en": "Auditor",
+      "name_id": "Auditor",
+      "module_grants": {
+        "AA": "read",
+        "AB": "read",
+        "AC": "read",
+        "AD": "read",
+        "AE": "read",
+        "AF": "read",
+        "AG": "read",
+        "AH": "read",
+        "AI": "read",
+        "AJ": "read",
+        "AK": "read",
+        "AL": "read",
+        "AM": "read"
+      },
+      "notes": [
+        "Reads audit and access reviews.",
+        "Does not write business data."
+      ]
+    },
+    "requester": {
+      "name_en": "Requester",
+      "name_id": "Pemohon",
+      "module_grants": {
+        "AA": "read_self",
+        "AB": "none",
+        "AC": "none",
+        "AD": "none",
+        "AE": "none",
+        "AF": "none",
+        "AG": "none",
+        "AH": "none",
+        "AI": "post_self",
+        "AJ": "post_self",
+        "AK": "read",
+        "AL": "none",
+        "AM": "none"
+      },
+      "notes": [
+        "Self-service only.",
+        "Cannot browse the directory or shared assets."
+      ]
+    }
+  },
+  "platform_roles": {
+    "platform_owner": {
+      "name_en": "Platform Owner",
+      "name_id": "Pemilik Platform",
+      "scope": "global",
+      "permissions": [
+        "AM:read",
+        "AM:post",
+        "AB:post",
+        "AM08:read",
+        "AM08:post"
+      ],
+      "limits": "AB:post applies only to company lifecycle and the first admin; business data requires impersonation."
+    },
+    "platform_support": {
+      "name_en": "Platform Support",
+      "name_id": "Dukungan Platform",
+      "scope": "global",
+      "permissions": [
+        "AA:read",
+        "AL:read",
+        "AM:read"
+      ],
+      "limits": "Cannot change company business data."
+    },
+    "platform_security": {
+      "name_en": "Platform Security",
+      "name_id": "Keamanan Platform",
+      "scope": "global",
+      "permissions": [
+        "AL:read",
+        "AL04:post",
+        "AL05:post",
+        "AM:read"
+      ],
+      "limits": "Cannot change company business configuration or start impersonation."
+    }
+  },
+  "submodules": [
+    {
+      "code": "AA01",
+      "module": "AA",
+      "name_en": "Summary",
+      "name_id": "Ringkasan",
+      "permissions": {
+        "read": "AA:read",
+        "post": null
+      },
+      "scope": [
+        "user"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": "Filtered by the user's effective scope.",
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AA02",
+      "module": "AA",
+      "name_en": "Service Health",
+      "name_id": "Kesehatan Layanan",
+      "permissions": {
+        "read": "AA:read",
+        "post": null
+      },
+      "scope": [
+        "company",
+        "global"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": "No internal hostnames in component data.",
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AA03",
+      "module": "AA",
+      "name_en": "Recent Activity",
+      "name_id": "Aktivitas Terbaru",
+      "permissions": {
+        "read": "AA:read",
+        "post": null
+      },
+      "scope": [
+        "company",
+        "area"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": "Audit filter follows the user's permissions.",
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AB01",
+      "module": "AB",
+      "name_en": "Companies and Areas",
+      "name_id": "Perusahaan dan Area",
+      "permissions": {
+        "read": "AB:read",
+        "post": "AB:post"
+      },
+      "scope": [
+        "global",
+        "company"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": "Company creation is platform-only; area management is company-scoped.",
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AB02",
+      "module": "AB",
+      "name_en": "Users and Invitations",
+      "name_id": "Pengguna dan Undangan",
+      "permissions": {
+        "read": "AB02:read",
+        "post": "AB02:post"
+      },
+      "scope": [
+        "company"
+      ],
+      "sensitivity": "high",
+      "approval": "none",
+      "sensitive_roles": [
+        "company_admin"
+      ],
+      "note": "Re-authentication and reason required.",
+      "sensitive_permission_replaces_module": true,
+      "platform_only": false
+    },
+    {
+      "code": "AB03",
+      "module": "AB",
+      "name_en": "Roles and Permissions",
+      "name_id": "Peran dan Izin",
+      "permissions": {
+        "read": "AB03:read",
+        "post": "AB03:post"
+      },
+      "scope": [
+        "company"
+      ],
+      "sensitivity": "high",
+      "approval": "none",
+      "sensitive_roles": [
+        "company_admin"
+      ],
+      "note": "Re-authentication; last admin cannot be removed.",
+      "sensitive_permission_replaces_module": true,
+      "platform_only": false
+    },
+    {
+      "code": "AB04",
+      "module": "AB",
+      "name_en": "HRIS Login",
+      "name_id": "Login HRIS",
+      "permissions": {
+        "read": "AB04:read",
+        "post": "AB04:post"
+      },
+      "scope": [
+        "company"
+      ],
+      "sensitivity": "critical",
+      "approval": "required",
+      "sensitive_roles": [
+        "company_admin"
+      ],
+      "note": "Re-authentication and approval required.",
+      "sensitive_permission_replaces_module": true,
+      "platform_only": false
+    },
+    {
+      "code": "AB05",
+      "module": "AB",
+      "name_en": "Sessions and Devices",
+      "name_id": "Sesi dan Perangkat",
+      "permissions": {
+        "read": "AB05:read",
+        "post": "AB05:post"
+      },
+      "scope": [
+        "company",
+        "self"
+      ],
+      "sensitivity": "high",
+      "approval": "none",
+      "sensitive_roles": [
+        "company_admin"
+      ],
+      "note": "Own sessions use self-service; other users require AB05:post.",
+      "sensitive_permission_replaces_module": true,
+      "platform_only": false
+    },
+    {
+      "code": "AB06",
+      "module": "AB",
+      "name_en": "Login History",
+      "name_id": "Riwayat Login",
+      "permissions": {
+        "read": "AB06:read",
+        "post": null
+      },
+      "scope": [
+        "company"
+      ],
+      "sensitivity": "high",
+      "approval": "none",
+      "sensitive_roles": [
+        "company_admin",
+        "auditor"
+      ],
+      "note": "Identifiers are masked.",
+      "sensitive_permission_replaces_module": true,
+      "platform_only": false
+    },
+    {
+      "code": "AB07",
+      "module": "AB",
+      "name_en": "Directory",
+      "name_id": "Direktori",
+      "permissions": {
+        "read": "AB:read",
+        "post": null
+      },
+      "scope": [
+        "company",
+        "area"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": "Searchable only within the user's scope.",
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AC01",
+      "module": "AC",
+      "name_en": "Categories and Models",
+      "name_id": "Kategori dan Model",
+      "permissions": {
+        "read": "AC:read",
+        "post": "AC:post"
+      },
+      "scope": [
+        "company",
+        "area"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": null,
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AC02",
+      "module": "AC",
+      "name_en": "Physical Assets",
+      "name_id": "Aset Fisik",
+      "permissions": {
+        "read": "AC:read",
+        "post": "AC:post"
+      },
+      "scope": [
+        "area"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": null,
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AC03",
+      "module": "AC",
+      "name_en": "Locations and Placement",
+      "name_id": "Lokasi dan Penempatan",
+      "permissions": {
+        "read": "AC:read",
+        "post": "AC:post"
+      },
+      "scope": [
+        "area"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": "Composite foreign key enforces company, area, and location consistency.",
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AC04",
+      "module": "AC",
+      "name_en": "Check-out / Check-in",
+      "name_id": "Check-out / Check-in",
+      "permissions": {
+        "read": "AC:read",
+        "post": "AC:post"
+      },
+      "scope": [
+        "area"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": null,
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AC05",
+      "module": "AC",
+      "name_en": "Movements and History",
+      "name_id": "Mutasi dan Riwayat",
+      "permissions": {
+        "read": "AC:read",
+        "post": null
+      },
+      "scope": [
+        "area"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": "History is append-only.",
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AC06",
+      "module": "AC",
+      "name_en": "Labels and QR",
+      "name_id": "Label dan QR",
+      "permissions": {
+        "read": "AC:read",
+        "post": "AC:post"
+      },
+      "scope": [
+        "area"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": "QR tokens contain no sensitive data.",
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AC07",
+      "module": "AC",
+      "name_en": "Asset Reports",
+      "name_id": "Laporan Aset",
+      "permissions": {
+        "read": "AC:read",
+        "post": null
+      },
+      "scope": [
+        "company",
+        "area"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": "Exports are audited.",
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AD01",
+      "module": "AD",
+      "name_en": "Sites, Racks, and Locations",
+      "name_id": "Site, Rack, dan Lokasi",
+      "permissions": {
+        "read": "AD:read",
+        "post": "AD:post"
+      },
+      "scope": [
+        "area"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": null,
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AD02",
+      "module": "AD",
+      "name_en": "Network Devices",
+      "name_id": "Perangkat Jaringan",
+      "permissions": {
+        "read": "AD:read",
+        "post": "AD:post"
+      },
+      "scope": [
+        "area"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": null,
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AD03",
+      "module": "AD",
+      "name_en": "IPAM and VLANs",
+      "name_id": "IPAM dan VLAN",
+      "permissions": {
+        "read": "AD:read",
+        "post": "AD:post"
+      },
+      "scope": [
+        "area"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": "Allocation conflicts are checked.",
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AD04",
+      "module": "AD",
+      "name_en": "Topology and Links",
+      "name_id": "Topologi dan Koneksi",
+      "permissions": {
+        "read": "AD:read",
+        "post": null
+      },
+      "scope": [
+        "area"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": null,
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AD05",
+      "module": "AD",
+      "name_en": "MikroTik Routers",
+      "name_id": "Router MikroTik",
+      "permissions": {
+        "read": "AD:read",
+        "post": "AD:post"
+      },
+      "scope": [
+        "area"
+      ],
+      "sensitivity": "high",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": "Credentials are vault references.",
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AD06",
+      "module": "AD",
+      "name_en": "Firewall and Rules",
+      "name_id": "Firewall dan Aturan",
+      "permissions": {
+        "read": "AD06:read",
+        "post": "AD06:post"
+      },
+      "scope": [
+        "area"
+      ],
+      "sensitivity": "critical",
+      "approval": "required",
+      "sensitive_roles": [
+        "company_admin",
+        "area_manager",
+        "noc_operator"
+      ],
+      "note": "Plan, approval, snapshot, execute, verify, and rollback.",
+      "sensitive_permission_replaces_module": true,
+      "platform_only": false
+    },
+    {
+      "code": "AD07",
+      "module": "AD",
+      "name_en": "RouterOS Maintenance",
+      "name_id": "Maintenance RouterOS",
+      "permissions": {
+        "read": "AD07:read",
+        "post": "AD07:post"
+      },
+      "scope": [
+        "area"
+      ],
+      "sensitivity": "critical",
+      "approval": "required",
+      "sensitive_roles": [
+        "company_admin",
+        "area_manager",
+        "noc_operator"
+      ],
+      "note": "Approval and snapshot required.",
+      "sensitive_permission_replaces_module": true,
+      "platform_only": false
+    },
+    {
+      "code": "AD08",
+      "module": "AD",
+      "name_en": "NetBox/LibreNMS Integration",
+      "name_id": "Integrasi NetBox/LibreNMS",
+      "permissions": {
+        "read": "AD:read",
+        "post": "AD:post"
+      },
+      "scope": [
+        "company"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": "Synchronization is idempotent; conflicts go to review.",
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AE01",
+      "module": "AE",
+      "name_en": "Hosts and Agents",
+      "name_id": "Host dan Agent",
+      "permissions": {
+        "read": "AE:read",
+        "post": null
+      },
+      "scope": [
+        "area"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": null,
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AE02",
+      "module": "AE",
+      "name_en": "Metrics and Charts",
+      "name_id": "Metrik dan Grafik",
+      "permissions": {
+        "read": "AE:read",
+        "post": null
+      },
+      "scope": [
+        "area"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": null,
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AE03",
+      "module": "AE",
+      "name_en": "Alerts and Thresholds",
+      "name_id": "Alert dan Ambang Batas",
+      "permissions": {
+        "read": "AE:read",
+        "post": "AE:post"
+      },
+      "scope": [
+        "area"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": null,
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AE04",
+      "module": "AE",
+      "name_en": "Incidents",
+      "name_id": "Insiden",
+      "permissions": {
+        "read": "AE:read",
+        "post": "AE:post"
+      },
+      "scope": [
+        "area"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": null,
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AE05",
+      "module": "AE",
+      "name_en": "LibreNMS Integration",
+      "name_id": "Integrasi LibreNMS",
+      "permissions": {
+        "read": "AE:read",
+        "post": "AE:post"
+      },
+      "scope": [
+        "company"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": null,
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AE06",
+      "module": "AE",
+      "name_en": "Wazuh Integration",
+      "name_id": "Integrasi Wazuh",
+      "permissions": {
+        "read": "AE06:read",
+        "post": "AE06:post"
+      },
+      "scope": [
+        "company"
+      ],
+      "sensitivity": "critical",
+      "approval": "required",
+      "sensitive_roles": [
+        "company_admin",
+        "noc_operator"
+      ],
+      "note": "Approval required for active response.",
+      "sensitive_permission_replaces_module": true,
+      "platform_only": false
+    },
+    {
+      "code": "AE07",
+      "module": "AE",
+      "name_en": "Metric Retention",
+      "name_id": "Retensi Metrik",
+      "permissions": {
+        "read": "AE:read",
+        "post": "AE:post"
+      },
+      "scope": [
+        "company"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": null,
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AF01",
+      "module": "AF",
+      "name_en": "Endpoints",
+      "name_id": "Endpoint",
+      "permissions": {
+        "read": "AF:read",
+        "post": "AF:post"
+      },
+      "scope": [
+        "area"
+      ],
+      "sensitivity": "high",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": "TLS and socket proxy required.",
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AF02",
+      "module": "AF",
+      "name_en": "Stacks and Compose",
+      "name_id": "Stack dan Compose",
+      "permissions": {
+        "read": "AF:read",
+        "post": "AF:post"
+      },
+      "scope": [
+        "area"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": "Compose validation and image digest required.",
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AF03",
+      "module": "AF",
+      "name_en": "Services and Containers",
+      "name_id": "Layanan dan Container",
+      "permissions": {
+        "read": "AF:read",
+        "post": null
+      },
+      "scope": [
+        "area"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": null,
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AF04",
+      "module": "AF",
+      "name_en": "Deploy and Rollback",
+      "name_id": "Deploy dan Rollback",
+      "permissions": {
+        "read": "AF04:read",
+        "post": "AF04:post"
+      },
+      "scope": [
+        "area"
+      ],
+      "sensitivity": "critical",
+      "approval": "required",
+      "sensitive_roles": [
+        "company_admin",
+        "area_manager",
+        "noc_operator"
+      ],
+      "note": "Approval, health check, and rollback.",
+      "sensitive_permission_replaces_module": true,
+      "platform_only": false
+    },
+    {
+      "code": "AF05",
+      "module": "AF",
+      "name_en": "Maintenance",
+      "name_id": "Maintenance",
+      "permissions": {
+        "read": "AF05:read",
+        "post": "AF05:post"
+      },
+      "scope": [
+        "area"
+      ],
+      "sensitivity": "high",
+      "approval": "policy",
+      "sensitive_roles": [
+        "company_admin",
+        "area_manager",
+        "noc_operator"
+      ],
+      "note": "Approval depends on the environment.",
+      "sensitive_permission_replaces_module": true,
+      "platform_only": false
+    },
+    {
+      "code": "AF06",
+      "module": "AF",
+      "name_en": "Host Overview",
+      "name_id": "Gambaran Host",
+      "permissions": {
+        "read": "AF:read",
+        "post": null
+      },
+      "scope": [
+        "area"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": null,
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AG01",
+      "module": "AG",
+      "name_en": "Domains",
+      "name_id": "Domain",
+      "permissions": {
+        "read": "AG:read",
+        "post": "AG:post"
+      },
+      "scope": [
+        "company"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": null,
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AG02",
+      "module": "AG",
+      "name_en": "Certificates",
+      "name_id": "Sertifikat",
+      "permissions": {
+        "read": "AG:read",
+        "post": "AG:post"
+      },
+      "scope": [
+        "company"
+      ],
+      "sensitivity": "high",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": "Private keys stay in the vault.",
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AG03",
+      "module": "AG",
+      "name_en": "Proxy Hosts",
+      "name_id": "Proxy Host",
+      "permissions": {
+        "read": "AG:read",
+        "post": "AG:post"
+      },
+      "scope": [
+        "company"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": null,
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AG04",
+      "module": "AG",
+      "name_en": "Nginx Configuration",
+      "name_id": "Konfigurasi Nginx",
+      "permissions": {
+        "read": "AG04:read",
+        "post": "AG04:post"
+      },
+      "scope": [
+        "company",
+        "area"
+      ],
+      "sensitivity": "critical",
+      "approval": "required",
+      "sensitive_roles": [
+        "company_admin",
+        "area_manager"
+      ],
+      "note": "Approval, nginx -t, and rollback.",
+      "sensitive_permission_replaces_module": true,
+      "platform_only": false
+    },
+    {
+      "code": "AG05",
+      "module": "AG",
+      "name_en": "Edge Nodes",
+      "name_id": "Edge Node",
+      "permissions": {
+        "read": "AG:read",
+        "post": "AG:post"
+      },
+      "scope": [
+        "company"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": null,
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AH01",
+      "module": "AH",
+      "name_en": "Configuration Sources",
+      "name_id": "Sumber Konfigurasi",
+      "permissions": {
+        "read": "AH:read",
+        "post": "AH:post"
+      },
+      "scope": [
+        "company",
+        "area"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": null,
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AH02",
+      "module": "AH",
+      "name_en": "Backup Schedules",
+      "name_id": "Jadwal Backup",
+      "permissions": {
+        "read": "AH:read",
+        "post": "AH:post"
+      },
+      "scope": [
+        "company",
+        "area"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": null,
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AH03",
+      "module": "AH",
+      "name_en": "Snapshots and Diff",
+      "name_id": "Snapshot dan Diff",
+      "permissions": {
+        "read": "AH:read",
+        "post": null
+      },
+      "scope": [
+        "company",
+        "area"
+      ],
+      "sensitivity": "high",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": "Encrypted snapshots; downloads are audited.",
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AH04",
+      "module": "AH",
+      "name_en": "Restore",
+      "name_id": "Restore",
+      "permissions": {
+        "read": "AH04:read",
+        "post": "AH04:post"
+      },
+      "scope": [
+        "company",
+        "area"
+      ],
+      "sensitivity": "critical",
+      "approval": "dual_control",
+      "sensitive_roles": [
+        "company_admin"
+      ],
+      "note": "Applicant and approver must be different users.",
+      "sensitive_permission_replaces_module": true,
+      "platform_only": false
+    },
+    {
+      "code": "AH05",
+      "module": "AH",
+      "name_en": "Verification",
+      "name_id": "Verifikasi",
+      "permissions": {
+        "read": "AH05:read",
+        "post": "AH05:post"
+      },
+      "scope": [
+        "company"
+      ],
+      "sensitivity": "high",
+      "approval": "required",
+      "sensitive_roles": [
+        "company_admin"
+      ],
+      "note": "Verification runs in an isolated environment.",
+      "sensitive_permission_replaces_module": true,
+      "platform_only": false
+    },
+    {
+      "code": "AI01",
+      "module": "AI",
+      "name_en": "Access Targets",
+      "name_id": "Target Akses",
+      "permissions": {
+        "read": "AI:read",
+        "post": "AI:post"
+      },
+      "scope": [
+        "company",
+        "area"
+      ],
+      "sensitivity": "high",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": "Credentials are vault references.",
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AI02",
+      "module": "AI",
+      "name_en": "Access Requests",
+      "name_id": "Permintaan Akses",
+      "permissions": {
+        "read": "AI02:read",
+        "post": "AI02:post"
+      },
+      "scope": [
+        "self",
+        "area"
+      ],
+      "sensitivity": "high",
+      "approval": "none",
+      "sensitive_roles": [
+        "company_admin",
+        "area_manager"
+      ],
+      "note": "Requester uses AI:post with self scope; approvers use AI02:read/post. Self-approval is rejected.",
+      "sensitive_permission_replaces_module": true,
+      "platform_only": false
+    },
+    {
+      "code": "AI03",
+      "module": "AI",
+      "name_en": "Active Sessions",
+      "name_id": "Sesi Aktif",
+      "permissions": {
+        "read": "AI:read",
+        "post": "AI:post"
+      },
+      "scope": [
+        "area"
+      ],
+      "sensitivity": "high",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": "Termination takes effect immediately.",
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AI04",
+      "module": "AI",
+      "name_en": "Recordings and Audit",
+      "name_id": "Rekaman dan Audit",
+      "permissions": {
+        "read": "AI:read",
+        "post": null
+      },
+      "scope": [
+        "company"
+      ],
+      "sensitivity": "high",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": "Metadata and recorded-session links are audited.",
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AI05",
+      "module": "AI",
+      "name_en": "Access Policies",
+      "name_id": "Kebijakan Akses",
+      "permissions": {
+        "read": "AI05:read",
+        "post": "AI05:post"
+      },
+      "scope": [
+        "company"
+      ],
+      "sensitivity": "high",
+      "approval": "none",
+      "sensitive_roles": [
+        "company_admin"
+      ],
+      "note": "Re-authentication required.",
+      "sensitive_permission_replaces_module": true,
+      "platform_only": false
+    },
+    {
+      "code": "AJ01",
+      "module": "AJ",
+      "name_en": "Tickets",
+      "name_id": "Tiket",
+      "permissions": {
+        "read": "AJ:read",
+        "post": "AJ:post"
+      },
+      "scope": [
+        "self",
+        "area"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": "Requesters see only their own tickets unless they hold area scope.",
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AJ02",
+      "module": "AJ",
+      "name_en": "Categories and SLA",
+      "name_id": "Kategori dan SLA",
+      "permissions": {
+        "read": "AJ:read",
+        "post": "AJ:post"
+      },
+      "scope": [
+        "company"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": null,
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AJ03",
+      "module": "AJ",
+      "name_en": "Contracts and Vendors",
+      "name_id": "Kontrak dan Vendor",
+      "permissions": {
+        "read": "AJ:read",
+        "post": "AJ:post"
+      },
+      "scope": [
+        "company"
+      ],
+      "sensitivity": "high",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": "Documents have restricted access.",
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AJ04",
+      "module": "AJ",
+      "name_en": "Knowledge Base",
+      "name_id": "Knowledge Base",
+      "permissions": {
+        "read": "AJ:read",
+        "post": "AJ:post"
+      },
+      "scope": [
+        "company",
+        "public"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": "HTML is sanitized.",
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AJ05",
+      "module": "AJ",
+      "name_en": "Service Reports",
+      "name_id": "Laporan Layanan",
+      "permissions": {
+        "read": "AJ:read",
+        "post": null
+      },
+      "scope": [
+        "company",
+        "area"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": null,
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AK01",
+      "module": "AK",
+      "name_en": "Articles and Pages",
+      "name_id": "Artikel dan Halaman",
+      "permissions": {
+        "read": "AK:read",
+        "post": "AK:post"
+      },
+      "scope": [
+        "company",
+        "public"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": "HTML is sanitized.",
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AK02",
+      "module": "AK",
+      "name_en": "Blog and Announcements",
+      "name_id": "Blog dan Pengumuman",
+      "permissions": {
+        "read": "AK:read",
+        "post": "AK:post"
+      },
+      "scope": [
+        "company",
+        "public"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": null,
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AK03",
+      "module": "AK",
+      "name_en": "Notification Templates",
+      "name_id": "Template Notifikasi",
+      "permissions": {
+        "read": "AK:read",
+        "post": "AK:post"
+      },
+      "scope": [
+        "company"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": "Template variables are validated.",
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AK04",
+      "module": "AK",
+      "name_en": "Delivery and History",
+      "name_id": "Kirim dan Riwayat",
+      "permissions": {
+        "read": "AK:read",
+        "post": null
+      },
+      "scope": [
+        "company"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": null,
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AK05",
+      "module": "AK",
+      "name_en": "User Preferences",
+      "name_id": "Preferensi Pengguna",
+      "permissions": {
+        "read": "AK:read",
+        "post": "AK:post"
+      },
+      "scope": [
+        "self"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": "Self-service only.",
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AL01",
+      "module": "AL",
+      "name_en": "Audit Trail",
+      "name_id": "Audit Trail",
+      "permissions": {
+        "read": "AL:read",
+        "post": null
+      },
+      "scope": [
+        "company"
+      ],
+      "sensitivity": "high",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": "Sensitive payload fields are redacted.",
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AL02",
+      "module": "AL",
+      "name_en": "Logins and Access",
+      "name_id": "Login dan Akses",
+      "permissions": {
+        "read": "AL:read",
+        "post": null
+      },
+      "scope": [
+        "company"
+      ],
+      "sensitivity": "high",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": "Identifiers are masked.",
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AL03",
+      "module": "AL",
+      "name_en": "Security Events",
+      "name_id": "Kejadian Keamanan",
+      "permissions": {
+        "read": "AL:read",
+        "post": "AL:post"
+      },
+      "scope": [
+        "company"
+      ],
+      "sensitivity": "high",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": "Triage is audited.",
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AL04",
+      "module": "AL",
+      "name_en": "Access Reviews",
+      "name_id": "Review Akses",
+      "permissions": {
+        "read": "AL04:read",
+        "post": "AL04:post"
+      },
+      "scope": [
+        "company"
+      ],
+      "sensitivity": "high",
+      "approval": "none",
+      "sensitive_roles": [
+        "company_admin",
+        "auditor"
+      ],
+      "note": "The reviewer cannot be the review target.",
+      "sensitive_permission_replaces_module": true,
+      "platform_only": false
+    },
+    {
+      "code": "AL05",
+      "module": "AL",
+      "name_en": "Export and Retention",
+      "name_id": "Ekspor dan Retensi",
+      "permissions": {
+        "read": "AL05:read",
+        "post": "AL05:post"
+      },
+      "scope": [
+        "company"
+      ],
+      "sensitivity": "critical",
+      "approval": "required",
+      "sensitive_roles": [
+        "company_admin",
+        "auditor"
+      ],
+      "note": "Approval, watermark, and export audit.",
+      "sensitive_permission_replaces_module": true,
+      "platform_only": false
+    },
+    {
+      "code": "AM01",
+      "module": "AM",
+      "name_en": "Integrations and Adapters",
+      "name_id": "Integrasi dan Adapter",
+      "permissions": {
+        "read": "AM:read",
+        "post": "AM:post"
+      },
+      "scope": [
+        "company"
+      ],
+      "sensitivity": "high",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": "Secrets are vault references.",
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AM02",
+      "module": "AM",
+      "name_en": "Credentials and Vault",
+      "name_id": "Kredensial dan Vault",
+      "permissions": {
+        "read": "AM02:read",
+        "post": "AM02:post"
+      },
+      "scope": [
+        "company"
+      ],
+      "sensitivity": "critical",
+      "approval": "required",
+      "sensitive_roles": [
+        "company_admin"
+      ],
+      "note": "Secret values are never returned.",
+      "sensitive_permission_replaces_module": true,
+      "platform_only": false
+    },
+    {
+      "code": "AM03",
+      "module": "AM",
+      "name_en": "Webhooks and API Keys",
+      "name_id": "Webhook dan API Key",
+      "permissions": {
+        "read": "AM03:read",
+        "post": "AM03:post"
+      },
+      "scope": [
+        "company"
+      ],
+      "sensitivity": "high",
+      "approval": "none",
+      "sensitive_roles": [
+        "company_admin"
+      ],
+      "note": "Keys are shown once and expire.",
+      "sensitive_permission_replaces_module": true,
+      "platform_only": false
+    },
+    {
+      "code": "AM04",
+      "module": "AM",
+      "name_en": "Scheduler",
+      "name_id": "Scheduler",
+      "permissions": {
+        "read": "AM:read",
+        "post": "AM:post"
+      },
+      "scope": [
+        "company"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": null,
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AM05",
+      "module": "AM",
+      "name_en": "Platform Settings",
+      "name_id": "Pengaturan Platform",
+      "permissions": {
+        "read": "AM:read",
+        "post": "AM:post"
+      },
+      "scope": [
+        "company"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": null,
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AM06",
+      "module": "AM",
+      "name_en": "Feature Flags",
+      "name_id": "Feature Flag",
+      "permissions": {
+        "read": "AM:read",
+        "post": "AM:post"
+      },
+      "scope": [
+        "company"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": null,
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AM07",
+      "module": "AM",
+      "name_en": "Branding and Theme",
+      "name_id": "Branding dan Tema",
+      "permissions": {
+        "read": "AM:read",
+        "post": "AM:post"
+      },
+      "scope": [
+        "company"
+      ],
+      "sensitivity": "normal",
+      "approval": "none",
+      "sensitive_roles": [],
+      "note": "Upload validation required.",
+      "sensitive_permission_replaces_module": false,
+      "platform_only": false
+    },
+    {
+      "code": "AM08",
+      "module": "AM",
+      "name_en": "Impersonation and Support",
+      "name_id": "Impersonasi dan Dukungan",
+      "permissions": {
+        "read": "AM08:read",
+        "post": "AM08:post"
+      },
+      "scope": [
+        "global"
+      ],
+      "sensitivity": "critical",
+      "approval": "required",
+      "sensitive_roles": [],
+      "note": "Platform owner only; MFA, reason, time limit, and permanent banner.",
+      "sensitive_permission_replaces_module": true,
+      "platform_only": true
+    }
+  ],
+  "sensitive_submodules": [
+    {
+      "code": "AB02",
+      "read": "AB02:read",
+      "post": "AB02:post",
+      "approval": "none",
+      "roles": [
+        "company_admin"
+      ],
+      "sensitivity": "high"
+    },
+    {
+      "code": "AB03",
+      "read": "AB03:read",
+      "post": "AB03:post",
+      "approval": "none",
+      "roles": [
+        "company_admin"
+      ],
+      "sensitivity": "high"
+    },
+    {
+      "code": "AB04",
+      "read": "AB04:read",
+      "post": "AB04:post",
+      "approval": "required",
+      "roles": [
+        "company_admin"
+      ],
+      "sensitivity": "critical"
+    },
+    {
+      "code": "AB05",
+      "read": "AB05:read",
+      "post": "AB05:post",
+      "approval": "none",
+      "roles": [
+        "company_admin"
+      ],
+      "sensitivity": "high"
+    },
+    {
+      "code": "AB06",
+      "read": "AB06:read",
+      "post": null,
+      "approval": "none",
+      "roles": [
+        "company_admin",
+        "auditor"
+      ],
+      "sensitivity": "high"
+    },
+    {
+      "code": "AD06",
+      "read": "AD06:read",
+      "post": "AD06:post",
+      "approval": "required",
+      "roles": [
+        "company_admin",
+        "area_manager",
+        "noc_operator"
+      ],
+      "sensitivity": "critical"
+    },
+    {
+      "code": "AD07",
+      "read": "AD07:read",
+      "post": "AD07:post",
+      "approval": "required",
+      "roles": [
+        "company_admin",
+        "area_manager",
+        "noc_operator"
+      ],
+      "sensitivity": "critical"
+    },
+    {
+      "code": "AE06",
+      "read": "AE06:read",
+      "post": "AE06:post",
+      "approval": "required",
+      "roles": [
+        "company_admin",
+        "noc_operator"
+      ],
+      "sensitivity": "critical"
+    },
+    {
+      "code": "AF04",
+      "read": "AF04:read",
+      "post": "AF04:post",
+      "approval": "required",
+      "roles": [
+        "company_admin",
+        "area_manager",
+        "noc_operator"
+      ],
+      "sensitivity": "critical"
+    },
+    {
+      "code": "AF05",
+      "read": "AF05:read",
+      "post": "AF05:post",
+      "approval": "policy",
+      "roles": [
+        "company_admin",
+        "area_manager",
+        "noc_operator"
+      ],
+      "sensitivity": "high"
+    },
+    {
+      "code": "AG04",
+      "read": "AG04:read",
+      "post": "AG04:post",
+      "approval": "required",
+      "roles": [
+        "company_admin",
+        "area_manager"
+      ],
+      "sensitivity": "critical"
+    },
+    {
+      "code": "AH04",
+      "read": "AH04:read",
+      "post": "AH04:post",
+      "approval": "dual_control",
+      "roles": [
+        "company_admin"
+      ],
+      "sensitivity": "critical"
+    },
+    {
+      "code": "AH05",
+      "read": "AH05:read",
+      "post": "AH05:post",
+      "approval": "required",
+      "roles": [
+        "company_admin"
+      ],
+      "sensitivity": "high"
+    },
+    {
+      "code": "AI02",
+      "read": "AI02:read",
+      "post": "AI02:post",
+      "approval": "none",
+      "roles": [
+        "company_admin",
+        "area_manager"
+      ],
+      "sensitivity": "high"
+    },
+    {
+      "code": "AI05",
+      "read": "AI05:read",
+      "post": "AI05:post",
+      "approval": "none",
+      "roles": [
+        "company_admin"
+      ],
+      "sensitivity": "high"
+    },
+    {
+      "code": "AL04",
+      "read": "AL04:read",
+      "post": "AL04:post",
+      "approval": "none",
+      "roles": [
+        "company_admin",
+        "auditor"
+      ],
+      "sensitivity": "high"
+    },
+    {
+      "code": "AL05",
+      "read": "AL05:read",
+      "post": "AL05:post",
+      "approval": "required",
+      "roles": [
+        "company_admin",
+        "auditor"
+      ],
+      "sensitivity": "critical"
+    },
+    {
+      "code": "AM02",
+      "read": "AM02:read",
+      "post": "AM02:post",
+      "approval": "required",
+      "roles": [
+        "company_admin"
+      ],
+      "sensitivity": "critical"
+    },
+    {
+      "code": "AM03",
+      "read": "AM03:read",
+      "post": "AM03:post",
+      "approval": "none",
+      "roles": [
+        "company_admin"
+      ],
+      "sensitivity": "high"
+    },
+    {
+      "code": "AM08",
+      "read": "AM08:read",
+      "post": "AM08:post",
+      "approval": "required",
+      "roles": [],
+      "sensitivity": "critical"
+    }
+  ],
+  "self_service": [
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/me",
+      "scope": "self",
+      "permission": "session:self"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/auth/me",
+      "scope": "self",
+      "permission": "session:self"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/sessions",
+      "scope": "self",
+      "permission": "session:self"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/sessions/{id}/revoke",
+      "scope": "self",
+      "permission": "session:self"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/mfa/enroll",
+      "scope": "self",
+      "permission": "session:self"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/mfa/verify",
+      "scope": "self",
+      "permission": "session:self"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/assets/mine",
+      "scope": "self",
+      "permission": "session:self"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/content/preferences",
+      "scope": "self",
+      "permission": "AK:post"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/service-desk/tickets/mine",
+      "scope": "self",
+      "permission": "AJ:read"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/access/requests/mine",
+      "scope": "self",
+      "permission": "AI:post"
+    }
+  ],
+  "permission_codes": [
+    "AA:read",
+    "AB02:post",
+    "AB02:read",
+    "AB03:post",
+    "AB03:read",
+    "AB04:post",
+    "AB04:read",
+    "AB05:post",
+    "AB05:read",
+    "AB06:read",
+    "AB:post",
+    "AB:read",
+    "AC:post",
+    "AC:read",
+    "AD06:post",
+    "AD06:read",
+    "AD07:post",
+    "AD07:read",
+    "AD:post",
+    "AD:read",
+    "AE06:post",
+    "AE06:read",
+    "AE:post",
+    "AE:read",
+    "AF04:post",
+    "AF04:read",
+    "AF05:post",
+    "AF05:read",
+    "AF:post",
+    "AF:read",
+    "AG04:post",
+    "AG04:read",
+    "AG:post",
+    "AG:read",
+    "AH04:post",
+    "AH04:read",
+    "AH05:post",
+    "AH05:read",
+    "AH:post",
+    "AH:read",
+    "AI02:post",
+    "AI02:read",
+    "AI05:post",
+    "AI05:read",
+    "AI:post",
+    "AI:read",
+    "AJ:post",
+    "AJ:read",
+    "AK:post",
+    "AK:read",
+    "AL04:post",
+    "AL04:read",
+    "AL05:post",
+    "AL05:read",
+    "AL:post",
+    "AL:read",
+    "AM02:post",
+    "AM02:read",
+    "AM03:post",
+    "AM03:read",
+    "AM08:post",
+    "AM08:read",
+    "AM:post",
+    "AM:read"
+  ]
+}

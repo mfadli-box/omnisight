@@ -1,0 +1,117 @@
+name: omnisight-agent-container
+
+services:
+  socket-proxy:
+    image: "${OSC_SOCKET_PROXY_IMAGE:-tecnativa/docker-socket-proxy:0.2.0}"
+    container_name: omnisight-socket-proxy
+    restart: unless-stopped
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      CONTAINERS: "1"
+      IMAGES: "1"
+      NETWORKS: "1"
+      VOLUMES: "1"
+      INFO: "1"
+      VERSION: "1"
+      PING: "1"
+      EVENTS: "1"
+      POST: "${OSC_SOCKET_PROXY_POST:-0}"
+      EXEC: "0"
+      BUILD: "0"
+      SECRETS: "0"
+      CONFIGS: "0"
+      SWARM: "0"
+      SYSTEM: "0"
+      AUTH: "0"
+      DISTRIBUTION: "0"
+    volumes:
+      - "${OSC_ENGINE_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock:ro"
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=8m
+    networks:
+      - agent-internal
+    mem_limit: 64m
+    cpus: "0.25"
+    pids_limit: 64
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:2375/_ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  agent-container:
+    image: "${OSC_AGENT_IMAGE:-ghcr.io/omnisight/agent-container:1.0.0}"
+    container_name: omnisight-agent-container
+    restart: unless-stopped
+    init: true
+    read_only: true
+    user: "65532:65532"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      OSC_AGENT_KIND: container
+      OSC_COLLECTOR_URL: "${OSC_COLLECTOR_URL:?OSC_COLLECTOR_URL wajib diisi}"
+      OSC_AGENT_ID: "${OSC_AGENT_ID:?OSC_AGENT_ID wajib diisi}"
+      OSC_STATE_DIR: /var/lib/omnisight
+      OSC_CONTAINER_API_URL: "http://socket-proxy:2375"
+      OSC_TLS_CA_FILE: /run/secrets/collector_ca
+      OSC_TLS_CERT_FILE: /run/secrets/agent_cert
+      OSC_TLS_KEY_FILE: /run/secrets/agent_key
+      OSC_LOG_LEVEL: "${OSC_LOG_LEVEL:-info}"
+    volumes:
+      - agent-container-state:/var/lib/omnisight
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    secrets:
+      - collector_ca
+      - agent_cert
+      - agent_key
+    networks:
+      - agent-internal
+      - agent-egress
+    depends_on:
+      socket-proxy:
+        condition: service_healthy
+    mem_limit: 256m
+    cpus: "0.50"
+    pids_limit: 128
+    stop_grace_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/omnisight-agent", "health", "--local"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+networks:
+  agent-internal:
+    internal: true
+  agent-egress: {}
+
+volumes:
+  agent-container-state:
+
+secrets:
+  collector_ca:
+    file: ./secrets/collector_ca.pem
+  agent_cert:
+    file: ./secrets/agent_cert.pem
+  agent_key:
+    file: ./secrets/agent_key.pem

@@ -1,0 +1,64 @@
+name: omnisight-agent-backup
+
+services:
+  agent-backup:
+    image: "${OSC_AGENT_IMAGE:-ghcr.io/omnisight/agent-backup:1.0.0}"
+    container_name: omnisight-agent-backup
+    restart: unless-stopped
+    init: true
+    read_only: true
+    user: "65532:65532"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      OSC_AGENT_KIND: backup
+      OSC_COLLECTOR_URL: "${OSC_COLLECTOR_URL:?OSC_COLLECTOR_URL wajib diisi}"
+      OSC_AGENT_ID: "${OSC_AGENT_ID:?OSC_AGENT_ID wajib diisi}"
+      OSC_STATE_DIR: /var/lib/omnisight
+      OSC_STAGING_DIR: /var/lib/omnisight/staging
+      OSC_CONFIG_FILE: /etc/omnisight/agent.yaml
+      OSC_TLS_CA_FILE: /run/secrets/collector_ca
+      OSC_TLS_CERT_FILE: /run/secrets/agent_cert
+      OSC_TLS_KEY_FILE: /run/secrets/agent_key
+      OSC_VAULT_TOKEN_FILE: /run/secrets/vault_token
+      OSC_LOG_LEVEL: "${OSC_LOG_LEVEL:-info}"
+    volumes:
+      - ./config/agent-backup.yaml:/etc/omnisight/agent.yaml:ro
+      - agent-backup-state:/var/lib/omnisight
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    secrets:
+      - collector_ca
+      - agent_cert
+      - agent_key
+      - vault_token
+    mem_limit: 256m
+    cpus: "0.50"
+    pids_limit: 128
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/omnisight-agent", "health", "--local"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  agent-backup-state:
+
+secrets:
+  collector_ca:
+    file: ./secrets/collector_ca.pem
+  agent_cert:
+    file: ./secrets/agent_cert.pem
+  agent_key:
+    file: ./secrets/agent_key.pem
+  vault_token:
+    file: ./secrets/vault_token
