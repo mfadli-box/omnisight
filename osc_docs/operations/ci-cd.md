@@ -1,10 +1,10 @@
 # CI/CD dan Gerbang Rilis
 
-Status: Disetujui (0.6)
+Status: Disetujui (0.6); revisi 2026-10-30 mencatat penyedia CI dan versi pin dari WP-01
 
 Dokumen ini mengatur pipeline integrasi dan pengiriman OmniSight: build, tes, pemindaian, artefak, deploy staging, promosi, dan rilis produksi. Pipeline adalah pelaksana aturan di [unit test](../qaqc/unit-test/README.md), [UAT](../qaqc/acceptance/README.md), [keamanan](../security/README.md), dan [operasi](README.md).
 
-Dokumen ini belum berisi konfigurasi pipeline nyata; konfigurasi dibuat pada WP-01 di [rencana implementasi](../governance/rencana-implementasi.md).
+Dokumen ini belum berisi konfigurasi pipeline lengkap untuk seluruh tahap. Pipeline preflight yang nyata ada di `.github/workflows/preflight.yml` dan dijelaskan pada bagian 2; tahap build, integration, security, E2E, package, dan deploy menyusul pada WP berikutnya.
 
 ## 1. Prinsip
 
@@ -17,7 +17,45 @@ Dokumen ini belum berisi konfigurasi pipeline nyata; konfigurasi dibuat pada WP-
 7. **Dokumentasi ikut diuji**: tautan, kode, izin, UAT, dan katalog bahasa diperiksa otomatis.
 8. **Rollback direncanakan**: setiap rilis punya artefak sebelumnya dan langkah kembali.
 
-## 2. Branch dan rilis
+## 2. Penyedia CI, workflow, dan versi pin
+
+Penyedia CI awal adalah **GitHub Actions** (ADR-014). Workflow preflight berada di `.github/workflows/preflight.yml` dan berjalan pada `push` ke `main` serta setiap pull request, dengan izin `contents: read` saja.
+
+| Job | Isi |
+|---|---|
+| `docs-and-secrets` | `validate_docs.py`, `validate_contracts.py`, `scan_secrets.py` |
+| `rust` | `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`, `cargo build --release` |
+| `go` | `go vet`, `go test ./...`, `go build ./...` |
+| `site` | `npm ci`, `npm run lint` (`tsc --noEmit`), `npm test`, `npm run build` |
+| `base` | `npm ci`, `prisma validate` dengan `DATABASE_URL` placeholder |
+| `compose` | `docker compose config` pada `deploy/compose/core.compose.yaml` |
+
+Versi tool yang dipin pada WP-01:
+
+| Tool | Versi | Sumber pin |
+|---|---|---|
+| Rust | `1.99.1` | `dtolnay/rust-toolchain` di workflow |
+| Go | `1.22` | `osc_auto/go.mod` |
+| Node.js | `22.23.4` | `actions/setup-node` di workflow |
+| Next.js | `16.4.3` | `osc_site/package.json` |
+| Prisma | `6.7.0` | `osc_base/package.json` |
+| PostgreSQL (dev) | `17.11-alpine3.24` | `deploy/compose/core.compose.yaml` |
+| PgBouncer (dev) | `v1.26.1-p0` | `deploy/compose/core.compose.yaml` |
+
+Aturan:
+
+- Perubahan versi tool atau image wajib memperbarui tabel ini dan lockfile terkait dalam PR yang sama.
+- Workflow tidak memuat rahasia; job yang membutuhkan database nyata memakai service container pada WP berikutnya.
+- Logika validasi tetap berada di skrip Python dan perintah build komponen; workflow hanya merangkai agar mudah dipindahkan bila penyedia CI berubah.
+- Status WP-01: perintah padanan sudah dijalankan lokal dan lulus; eksekusi GitHub Actions pertama menunggu push ke repositori. Sampai itu terjadi, pipeline belum dianggap terbukti di CI dan WP-01 berstatus blocking.
+
+Risiko supply-chain yang diterima pada WP-01:
+
+- Action dipin ke tag mayor (`actions/checkout@v4`, `actions/setup-python@v5`, `actions/setup-node@v4`, `actions/setup-go@v5`) dan `dtolnay/rust-toolchain@master`, bukan commit SHA.
+- Mitigasi saat ini: workflow hanya memakai izin `contents: read`, tidak memakai secret, dan toolchain tetap dipin ke versi eksplisit.
+- Sebelum rilis produksi (WP-12), action wajib dipin ke commit SHA dan diperbarui lewat review, bukan otomatis.
+
+## 3. Branch dan rilis
 
 | Aturan | Nilai |
 |---|---|
@@ -36,7 +74,7 @@ Aturan:
 - Jangan force-push ke `main` atau tag rilis.
 - Jangan merge dengan tes flaky; perbaiki atau hapus tes tersebut.
 
-## 3. Tahap pipeline
+## 4. Tahap pipeline
 
 ```text
 preflight → build → unit → integration → security → E2E → package → staging → UAT → production
@@ -55,7 +93,7 @@ preflight → build → unit → integration → security → E2E → package �
 | UAT | Skenario global dan modul di staging | S1/S2 terbuka atau bukti tidak lengkap |
 | Production | Deploy manual dengan approval dan change record | Gate tidak lengkap atau approval tidak ada |
 
-## 4. Gerbang per pull request
+## 5. Gerbang per pull request
 
 Wajib lulus sebelum merge:
 
@@ -69,7 +107,7 @@ Wajib lulus sebelum merge:
 - [ ] Review minimal satu orang; reviewer area untuk perubahan sensitif.
 - [ ] Tidak ada perubahan konfigurasi produksi atau rahasia di PR.
 
-## 5. Gerbang rilis
+## 6. Gerbang rilis
 
 Wajib lulus sebelum tag dan deploy produksi:
 
@@ -83,7 +121,7 @@ Wajib lulus sebelum tag dan deploy produksi:
 - [ ] Change record, rollback plan, dan jadwal disetujui.
 - [ ] Dokumentasi dan changelog diperbarui.
 
-## 6. Build per komponen
+## 7. Build per komponen
 
 | Komponen | Perintah inti | Catatan |
 |---|---|---|
@@ -101,7 +139,7 @@ Aturan:
 - Build tidak mengunduh artefak tak bertanda tangan saat runtime.
 - Build frontend tidak memakai `NEXT_PUBLIC_*` untuk rahasia.
 
-## 7. Tes dan data
+## 8. Tes dan data
 
 - Unit test tidak memakai layanan nyata; integration memakai PostgreSQL sementara dan wiremock.
 - E2E memakai data sintetis dua perusahaan dan dua area.
@@ -110,7 +148,7 @@ Aturan:
 - Tes flaky diberi karantina maksimal 7 hari dengan tiket; setelah itu diperbaiki atau dihapus.
 - Jangan menonaktifkan tes untuk melewati gate tanpa persetujuan QA dan Tech Lead.
 
-## 8. Keamanan pipeline
+## 9. Keamanan pipeline
 
 - Secret scanning pada commit dan PR.
 - Dependency audit per ekosistem: Rust, Go, Node.js.
@@ -123,7 +161,7 @@ Aturan:
 - Log pipeline tidak mencetak environment, token, atau isi secret.
 - Pull request dari fork tidak mendapat akses secret.
 
-## 9. Migrasi database di pipeline
+## 10. Migrasi database di pipeline
 
 Urutan:
 
@@ -142,7 +180,7 @@ Aturan:
 - Rollback aplikasi ke image sebelumnya; database tidak di-rollback tanpa prosedur restore.
 - Job migrasi gagal menghentikan deploy, bukan dilewati.
 
-## 10. Deploy staging
+## 11. Deploy staging
 
 - Otomatis dari `main` setelah package lulus.
 - Memakai compose/quadlet yang sama dengan produksi, beda nilai env dan secret.
@@ -150,7 +188,7 @@ Aturan:
 - Smoke test: login, dashboard, satu endpoint per modul, health internal, audit event.
 - Hasil UAT dan artefak disimpan per build.
 
-## 11. Deploy produksi
+## 12. Deploy produksi
 
 - Manual dengan approval dan change record.
 - Deploy image digest yang sama dengan staging.
@@ -159,7 +197,7 @@ Aturan:
 - Setelah deploy, pantau kode error, latency, alert, dan outbox.
 - Jika gagal, rollback aplikasi dan buka insiden.
 
-## 12. Artefak dan retensi
+## 13. Artefak dan retensi
 
 | Artefak | Retensi awal |
 |---|---|
@@ -176,7 +214,7 @@ Aturan:
 - Release manifest mencatat commit, tag, digest, SBOM, dan hasil gate.
 - Artefak dapat diunduh oleh auditor bila disetujui.
 
-## 13. Rollback dan hotfix
+## 14. Rollback dan hotfix
 
 - Rollback aplikasi memakai image digest sebelumnya.
 - Pastikan migrasi masih kompatibel dengan versi lama.
@@ -184,7 +222,7 @@ Aturan:
 - Hotfix produksi tetap memerlukan change record dan smoke test.
 - Setelah hotfix, tambahkan tes regresi dan perbarui dokumentasi.
 
-## 14. Metrik pipeline
+## 15. Metrik pipeline
 
 - Waktu pipeline dan waktu deploy.
 - Tingkat kegagalan pipeline.
@@ -195,7 +233,7 @@ Aturan:
 
 Metrik dipakai untuk perbaikan, bukan untuk menekan tim melewati gerbang.
 
-## 15. Checklist
+## 16. Checklist
 
 - [ ] `main` dilindungi dan checks wajib aktif.
 - [ ] Build reproducible dengan dependency terkunci.
@@ -208,12 +246,13 @@ Metrik dipakai untuk perbaikan, bukan untuk menekan tim melewati gerbang.
 - [ ] Artefak dan release manifest tersimpan.
 - [ ] Dokumen dan registry diperbarui pada PR yang sama.
 
-## 16. Dokumen terkait
+## 17. Dokumen terkait
 
 - [Operasi dan deployment](README.md)
 - [Alert dan eskalasi](alert-dan-eskalasi.md)
 - [Impor data](impor-data.md)
 - [Rencana implementasi](../governance/rencana-implementasi.md)
+- [Keputusan arsitektur](../governance/keputusan-arsitektur.md)
 - [Unit test](../qaqc/unit-test/README.md)
 - [UAT](../qaqc/acceptance/README.md)
 - [Keamanan](../security/README.md)

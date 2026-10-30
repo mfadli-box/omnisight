@@ -1,0 +1,38 @@
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+deploy/secrets/*
+!deploy/secrets/README.md
+!deploy/secrets/*.example
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+
+# Build output
+target/
+node_modules/
+.next/
+out/
+dist/
+*.log
+*.tsbuildinfo
+osc_auto/osc-auto
+osc_auto/osc-auto.exe
+
+# Tool caches
+.cache/
+.venv/
+__pycache__/
+*.pyc
+
+# OS/editor
+.DS_Store
+.idea/
+.vscode/
+
+# Local tool state
+.qoder/settings.local.json

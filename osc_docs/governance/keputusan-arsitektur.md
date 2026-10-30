@@ -310,3 +310,28 @@ Format ringkas: konteks, keputusan, konsekuensi, alternatif. Seluruh keputusan b
 - Cache halaman terautentikasi harus privat karena bahasa berasal dari cookie.
 
 **Alternatif:** bahasa per perusahaan saja (tidak fleksibel untuk pengguna campuran), endpoint terpisah per bahasa (duplikasi kontrak), terjemahan di klien saja (pesan backend tetap satu bahasa).
+
+---
+
+## ADR-014: GitHub Actions sebagai penyedia CI awal
+
+**Status:** Disetujui (2026-10-30)
+
+**Konteks:** Dokumentasi 0.6 mewajibkan pipeline preflight tetapi tidak menentukan penyedia CI. WP-01 membutuhkan pipeline yang dapat dijalankan tanpa menunggu keputusan platform, sementara repositori belum memiliki pipeline lain.
+
+**Keputusan:**
+
+- Pipeline preflight memakai GitHub Actions di `.github/workflows/preflight.yml`.
+- Job: `docs-and-secrets`, `rust`, `go`, `site`, `base`, `compose`.
+- Versi tool dipin: Rust `1.99.1`, Go `1.22` (dari `osc_auto/go.mod`), Node `22.23.4`, Next.js `16.4.3`, Prisma `6.7.0`.
+- Workflow hanya memakai izin `contents: read` dan tidak menyentuh rahasia.
+- Logika validasi tetap berada di skrip Python dan perintah build komponen; workflow hanya merangkai.
+
+**Konsekuensi:**
+
+- Positif: pipeline aktif tanpa biaya tambahan dan cocok dengan repositori yang sudah di GitHub.
+- Negatif: workflow terikat pada sintaks GitHub Actions; pindah penyedia berarti menulis ulang lapisan orkestrasi.
+- Negatif: action masih dipin ke tag mayor, bukan commit SHA; SHA pinning ditunda sampai WP-12 dengan mitigasi izin minimal dan tanpa secret.
+- Status verifikasi: padanan perintah sudah dijalankan lokal dan lulus; eksekusi GitHub Actions pertama menunggu push ke repositori.
+
+**Alternatif:** GitLab CI, Woodpecker, Jenkins (perlu infrastruktur dan keputusan platform lebih dulu); tanpa CI (melanggar gerbang dokumentasi).

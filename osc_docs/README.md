@@ -67,8 +67,8 @@ Status tiap dokumen mengikuti salah satu label berikut:
 - Pipeline CI/CD dan rencana implementasi WP-01 sampai WP-12 menetapkan gerbang build, tes, keamanan, deploy, dan urutan pekerjaan.
 - Semua tautan internal dan pagar kode divalidasi dengan skrip Python.
 - Kontrak mesin-terbaca ditambahkan di `technical/contracts/`: izin, kode error, katalog `en`/`id`, OpenAPI 3.1, dan fondasi Prisma. Disetujui bersama 0.6 pada G0.
-- G0 disetujui pada 2026-10-30; implementasi boleh dimulai dari WP-01.
-- Belum ada implementasi kode.
+- WP-01 menyediakan scaffold repo, compose development, dan workflow preflight; belum ada modul domain, autentikasi, RLS, atau tabel domain.
+- WP-01 belum selesai: workflow preflight belum pernah berjalan di GitHub, sehingga kriteria "build kosong lulus di CI" belum terbukti. Padanan perintah sudah lulus secara lokal.
 
 ## Peta dokumen
 

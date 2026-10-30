@@ -56,6 +56,17 @@ old_status = [p.relative_to(ROOT) for p in MD if "Status: Review (0.5)" in p.rea
 if old_status:
     errors.append(f"stale 0.5 status in {len(old_status)} files: {old_status}")
 
+# 3b. Semantic drift: no "no implementation" claim once scaffolds exist.
+scaffold_paths = [ROOT / "osc_rest" / "Cargo.toml", ROOT / "osc_site" / "package.json"]
+if all(p.exists() for p in scaffold_paths):
+    stale_no_code = [
+        p.relative_to(ROOT)
+        for p in MD
+        if "Belum ada implementasi kode." in p.read_text(encoding="utf-8")
+    ]
+    if stale_no_code:
+        errors.append(f"stale 'no implementation' claim in {stale_no_code}")
+
 # 4. Submodule coverage.
 peta = (DOCS / "product/peta-modul.md").read_text(encoding="utf-8")
 peta_codes = sorted(set(re.findall(r"^\| (A[A-M]\d{2}) \|", peta, re.M)))

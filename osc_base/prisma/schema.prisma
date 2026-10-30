@@ -1,0 +1,11 @@
+// WP-01: Prisma scaffold only. Domain models are intentionally absent.
+// Schema core/audit/platform and migrations are added in WP-02.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}

@@ -1,0 +1,122 @@
+name: omnisight-dev
+
+services:
+  postgres:
+    image: postgres:17.11-alpine3.24
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB via --env-file}
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER via --env-file}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD via --env-file}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - data-net
+    security_opt:
+      - no-new-privileges:true
+
+  pgbouncer:
+    image: edoburu/pgbouncer:v1.26.1-p0
+    restart: unless-stopped
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: ${POSTGRES_USER:?set POSTGRES_USER via --env-file}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD via --env-file}
+      DB_NAME: ${POSTGRES_DB:?set POSTGRES_DB via --env-file}
+      LISTEN_PORT: "6432"
+      AUTH_TYPE: scram-sha-256
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: "100"
+      DEFAULT_POOL_SIZE: "20"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -h 127.0.0.1 -p 6432 -U "$${DB_USER}" -d "$${DB_NAME}"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - data-net
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  osc-rest:
+    build:
+      context: ../../osc_rest
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      OSC_REST_BIND: ${OSC_REST_BIND:-0.0.0.0:8080}
+      DATABASE_URL: postgresql://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@pgbouncer:6432/${POSTGRES_DB:?}
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl -fsS http://127.0.0.1:8080/internal/healthz >/dev/null
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - app-net
+      - data-net
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  osc-site:
+    build:
+      context: ../../osc_site
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      OSC_REST_INTERNAL_URL: http://osc-rest:8080
+    depends_on:
+      osc-rest:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${OSC_SITE_PORT:-3000}:3000"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q -O /dev/null http://127.0.0.1:3000/ || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - edge-net
+      - app-net
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  postgres-data:
+
+networks:
+  edge-net:
+  app-net:
+    internal: true
+  data-net:
+    internal: true

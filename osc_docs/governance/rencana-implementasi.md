@@ -36,6 +36,8 @@ Dokumentasi 0.6 disetujui pada **2026-10-30 (G0)**. Rencana ini berlaku dan impl
 
 Pemetaan kasar ke roadmap produk: Tahap 1 (MVP) mencakup WP-01 sampai WP-06, ditambah agent host dan container dasar dari WP-08/WP-09; Tahap 2 mencakup WP-07, sisa WP-09, dan WP-10; Tahap 3 mencakup WP-11 dan WP-12. Urutan WP tetap mengikuti dependensi, bukan tanggal.
 
+Status WP-01 per 2026-10-30: **blocking**. Artefak sudah ada dan verifikasi lokal lulus, tetapi CI GitHub belum pernah berjalan; WP-01 belum selesai sampai push pertama dan run preflight lulus.
+
 ## 3. Rincian work package
 
 ### WP-01 Fondasi
@@ -54,6 +56,13 @@ Kriteria keluar:
 - Compose dev dapat dijalankan dan health internal merespons.
 - Tidak ada rahasia di repositori atau log.
 - Validator dokumen menggagalkan tautan rusak dan registry tidak konsisten.
+
+Status 2026-10-30 (**blocking**):
+
+- Struktur repo, compose dev, Dockerfile, workflow preflight, `.env.example`, dan validator sudah ada.
+- Workflow dan perintah padanannya dijalankan lokal dan lulus, tetapi **GitHub Actions belum pernah berjalan** karena belum ada push. Kriteria "build kosong lulus di CI" belum terbukti, sehingga WP-01 belum selesai.
+- Compose dev sudah diverifikasi lalu dihentikan dengan `down`; volume `omnisight-dev_postgres-data` sengaja dipertahankan. Hapus dengan `down -v` hanya bila data development memang boleh hilang.
+- Sesuai batas WP-01, domain, auth, JWT, RLS, dan tabel domain belum dibuat; semuanya dimulai di WP-02/WP-03.
 
 ### WP-02 Skema inti
 
@@ -284,7 +293,7 @@ Sebuah WP selesai bila:
 
 - [x] Dokumentasi 0.6 disetujui pemilik area (G0, 2026-10-30).
 - [ ] Tidak ada keputusan terbuka yang memblokir skema atau auth.
-- [ ] Repositori dan pipeline siap.
+- [ ] Pipeline preflight sudah berjalan di GitHub (menunggu push pertama; padanan lokal sudah lulus).
 - [ ] Environment staging tersedia.
 - [ ] Pemilik WP dan reviewer ditunjuk.
 - [ ] Data uji sintetis disiapkan.

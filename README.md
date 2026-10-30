@@ -2,7 +2,7 @@
 
 OmniSight adalah rencana platform DevSecOps satu pintu untuk mengelola identitas, aset, jaringan, monitoring, container, akses aman, layanan, konten, dan audit dalam satu portal. Platform dirancang untuk dipakai oleh satu perusahaan maupun banyak perusahaan (multi-tenant), dengan pembatasan akses sampai tingkat area.
 
-Status saat ini: **dokumentasi 0.6 disetujui pada 2026-10-30 (G0)**. Implementasi dimulai dari `osc_base` (skema dan migrasi), lalu `osc_rest`, `osc_site`, `osc_auto`, dan agent. Belum ada kode produksi pada saat persetujuan ini dicatat.
+Status saat ini: **dokumentasi 0.6 disetujui pada 2026-10-30 (G0)**. WP-01 sudah menyediakan fondasi repo, CI preflight, compose development, dan scaffold minimal. Belum ada modul domain, autentikasi, RLS, atau tabel domain.
 
 Kontrak mesin-terbaca (izin, kode error, OpenAPI, Prisma, locale) tersedia di [osc_docs/technical/contracts](osc_docs/technical/contracts/README.md) dan berstatus disetujui bersama 0.6. Aturan kerja untuk agen AI ada di [AGENTS.md](AGENTS.md).
 
@@ -18,7 +18,41 @@ omnisight/
 └── README.md
 ```
 
-Folder `osc_base`, `osc_rest`, `osc_auto`, dan `osc_site` pada tahap ini hanya berisi README penanda. Isi kode akan dibuat setelah dokumen disetujui.
+Folder `osc_base`, `osc_rest`, `osc_auto`, dan `osc_site` berisi scaffold minimal WP-01 yang dapat di-build. Fitur domain menyusul sesuai work package di [rencana implementasi](osc_docs/governance/rencana-implementasi.md).
+
+## Development quick start
+
+Prasyarat: Rust, Go, Node.js, Python 3, dan Docker Compose.
+
+```bash
+# Validator dokumen, kontrak, dan secret scan
+python3 osc_docs/tools/validate_docs.py
+python3 osc_docs/technical/contracts/validate_contracts.py
+python3 osc_docs/tools/scan_secrets.py
+
+# Build dan tes per komponen
+cargo test --locked --manifest-path osc_rest/Cargo.toml
+cargo build --locked --release --manifest-path osc_rest/Cargo.toml
+(cd osc_auto && go vet ./... && go test ./... && go build ./...)
+(cd osc_site && npm ci && npm run lint && npm test && npm run build)
+(cd osc_base && npm ci && DATABASE_URL=postgresql://placeholder:placeholder@localhost:5432/omnisight npm run validate)
+
+# Compose development (placeholder lokal, bukan rahasia)
+docker compose -f deploy/compose/core.compose.yaml \
+  --env-file deploy/compose/.env.example up -d --build
+docker compose -f deploy/compose/core.compose.yaml \
+  --env-file deploy/compose/.env.example ps
+
+# Health internal osc_rest dari dalam jaringan compose
+docker compose -f deploy/compose/core.compose.yaml \
+  --env-file deploy/compose/.env.example exec -T osc-rest \
+  curl -fsS http://127.0.0.1:8080/internal/healthz
+
+# Landing osc_site
+curl -fsS http://127.0.0.1:3000/
+```
+
+Lihat [deploy/compose/README.md](deploy/compose/README.md) untuk detail compose dan batas keamanannya.
 
 ## Dokumen utama
 

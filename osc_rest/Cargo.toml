@@ -1,0 +1,13 @@
+[package]
+name = "osc-rest"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+publish = false
+
+[dependencies]
+axum = "0.8.9"
+tokio = { version = "1.54.1", features = ["macros", "net", "rt-multi-thread"] }
+
+[profile.release]
+strip = true
