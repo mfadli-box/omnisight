@@ -418,6 +418,12 @@ Constraint: `UNIQUE (integration_id, local_type, local_id)`.
 
 Constraint: `UNIQUE (company_id, key)`.
 
+Catatan WP-02:
+
+- Baris global memakai `company_id` NULL, misalnya `locale.default`.
+- Policy RLS saat ini hanya mengizinkan `company_id = current_setting('app.company_id')`, sehingga baris global tidak terlihat oleh `osc_rest_app`. Visibilitas baca global dan larangan tulis lintas tenant diputuskan di ADR-017.
+- Definisi peran platform sementara disimpan sebagai `platform.role.*` sampai ADR-017 diputuskan; sumber definitifnya tetap `permissions.json`.
+
 ### `platform.feature_flags`
 
 | Kolom | Tipe | Catatan |

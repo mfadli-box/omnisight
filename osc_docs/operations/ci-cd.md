@@ -51,7 +51,7 @@ Aturan:
 - Action pihak ketiga wajib memakai runtime Node 24 atau composite. Action berbasis Node 20 tidak dipakai karena sudah deprecated.
 - Cache Go dimatikan selama `osc_auto/go.sum` belum ada. Setelah dependensi ditambahkan, aktifkan cache dengan `cache-dependency-path: osc_auto/go.sum`.
 - Logika validasi tetap berada di skrip Python dan perintah build komponen; workflow hanya merangkai agar mudah dipindahkan bila penyedia CI berubah.
-- Status WP-01: perintah padanan sudah dijalankan lokal dan lulus; eksekusi GitHub Actions pertama menunggu push ke repositori. Sampai itu terjadi, pipeline belum dianggap terbukti di CI dan WP-01 berstatus blocking.
+- Status WP-01: GitHub Actions run #2 (`preflight`, 2026-10-30) lulus untuk keenam job, sehingga pipeline preflight terbukti di CI.
 
 Risiko supply-chain yang diterima pada WP-01:
 

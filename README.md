@@ -2,7 +2,7 @@
 
 OmniSight adalah rencana platform DevSecOps satu pintu untuk mengelola identitas, aset, jaringan, monitoring, container, akses aman, layanan, konten, dan audit dalam satu portal. Platform dirancang untuk dipakai oleh satu perusahaan maupun banyak perusahaan (multi-tenant), dengan pembatasan akses sampai tingkat area.
 
-Status saat ini: **dokumentasi 0.6 disetujui pada 2026-10-30 (G0)**. WP-01 sudah menyediakan fondasi repo, CI preflight, compose development, dan scaffold minimal. Belum ada modul domain, autentikasi, RLS, atau tabel domain.
+Status saat ini: **dokumentasi 0.6 disetujui pada 2026-10-30 (G0)**. WP-01 sudah selesai: fondasi repo, CI preflight yang lulus di GitHub Actions run #2, compose development, dan scaffold minimal. WP-02 sedang dikerjakan: skema fondasi `core`/`audit`/`platform`, migrasi RLS/grant/hash chain, seed idempotent, dan tes isolasi lokal sudah ada; migrasi staging, keputusan keamanan ADR-015/016/017, modul domain, dan autentikasi belum.
 
 Kontrak mesin-terbaca (izin, kode error, OpenAPI, Prisma, locale) tersedia di [osc_docs/technical/contracts](osc_docs/technical/contracts/README.md) dan berstatus disetujui bersama 0.6. Aturan kerja untuk agen AI ada di [AGENTS.md](AGENTS.md).
 

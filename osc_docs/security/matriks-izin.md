@@ -58,7 +58,7 @@ Aturan:
 
 ## 4. Peran platform
 
-Peran platform disimpan di `core.user_platform_roles` dan tidak memberi akses data bisnis secara otomatis.
+Pemberian peran platform disimpan di `core.user_platform_roles` dan tidak memberi akses data bisnis secara otomatis. Definisi nama, izin, dan batas peran berada di `permissions.json`; seed WP-02 menyimpan salinan sementara di `platform.settings` sampai ADR-017 diputuskan.
 
 | Kode | Nama | Scope | Izin utama | Batas |
 |---|---|---|---|---|

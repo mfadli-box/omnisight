@@ -6,7 +6,8 @@ Dokumen ini adalah kontrak kerja untuk agen AI dan kontributor manusia. Baca seb
 
 - Dokumentasi **0.6 disetujui** pada 2026-10-30. Gate **G0 disetujui**.
 - Implementasi boleh dimulai dari **WP-01** di `osc_base`, `osc_rest`, `osc_auto`, dan `osc_site`, mengikuti urutan work package.
-- **WP-01 berstatus blocking** sampai workflow preflight berjalan dan lulus di GitHub; artefak dan verifikasi lokal sudah ada.
+- **WP-01 selesai** (2026-10-30): workflow preflight run #2 lulus untuk keenam job. **WP-02 berjalan, belum selesai** (2026-10-31): skema fondasi, migrasi, RLS, seed, dan tes database lokal sudah ada; migrasi staging, salinan data, dan keputusan keamanan masih tertunda. WP-03 belum dimulai.
+- **ADR-015, ADR-016, dan ADR-017 berstatus Diusulkan** dan wajib diputuskan sebelum WP-03 selesai; jangan mengubah grant audit, RLS `user_identities`, atau definisi peran platform tanpa keputusan tersebut.
 - Artefak di `osc_docs/technical/contracts/` berstatus **disetujui**. Perubahan wajib memperbarui dokumen sumber, generator, dan UAT terkait pada perubahan yang sama.
 - Deploy, migrasi destruktif, dan perubahan infrastruktur bersama tetap memerlukan persetujuan eksplisit.
 - Urutan pengerjaan dan gerbang ada di [rencana implementasi](osc_docs/governance/rencana-implementasi.md).

@@ -294,6 +294,8 @@ $$;
 
 Catatan: fungsi final harus memetakan seluruh kolom audit, memakai payload kanonik (urutan kunci stabil), dan diuji untuk determinisme.
 
+Status WP-02: grant `INSERT` langsung pada `audit.audit_events` masih ada dan `audit.append_event` bergantung pada owner migrasi yang memiliki `BYPASSRLS`. Keduanya belum menjadi satu jalur tulis yang tertutup. Keputusan dan implementasi ada di ADR-015 pada WP-03.
+
 ## 7. Seed
 
 Seed harus idempotent dan tidak memuat rahasia.
@@ -309,6 +311,8 @@ Seed harus idempotent dan tidak memuat rahasia.
 | Feature flags | Flag awal, semua aman dinonaktifkan kecuali inti |
 
 Role perusahaan baru diduplikasi dari template role sistem saat onboarding. Izin submodul sensitif menggantikan izin modul untuk submenu tersebut, sesuai [matriks izin](../../security/matriks-izin.md).
+
+Jumlah grant seed untuk data uji dua perusahaan adalah **162 baris `core.role_permissions` per perusahaan (324 total)**. Angka ini bukan 64 izin dikali 7 role: `post` mencakup `read`, dan submodul sensitif memakai izin submodul. Rincian per role perusahaan: `company_admin` 61, `area_manager` 31, `noc_operator` 26, `field_technician` 10, `viewer` 10, `auditor` 18, `requester` 6.
 
 Contoh seed permission:
 

@@ -20,6 +20,13 @@ Status tiap dokumen mengikuti salah satu label berikut:
 - **Disetujui**: menjadi acuan implementasi.
 - **Usang**: digantikan dokumen lain, tidak dihapus agar jejak keputusan tetap ada.
 
+## Status implementasi
+
+| WP | Status | Catatan |
+|---|---|---|
+| WP-01 | Selesai 2026-10-30 | Workflow preflight run #2 lulus untuk keenam job |
+| WP-02 | Berjalan, belum selesai | Skema, migrasi, RLS, seed, dan tes lokal ada; migrasi staging, salinan data, dan ADR-015/016/017 belum selesai |
+
 ## Hasil tinjauan konsistensi 0.3
 
 - 13 modul `AA` sampai `AM` dan 75 submenu memiliki kode yang sama di peta modul, peta menu, database, API, dan keamanan.
@@ -67,8 +74,8 @@ Status tiap dokumen mengikuti salah satu label berikut:
 - Pipeline CI/CD dan rencana implementasi WP-01 sampai WP-12 menetapkan gerbang build, tes, keamanan, deploy, dan urutan pekerjaan.
 - Semua tautan internal dan pagar kode divalidasi dengan skrip Python.
 - Kontrak mesin-terbaca ditambahkan di `technical/contracts/`: izin, kode error, katalog `en`/`id`, OpenAPI 3.1, dan fondasi Prisma. Disetujui bersama 0.6 pada G0.
-- WP-01 menyediakan scaffold repo, compose development, dan workflow preflight; belum ada modul domain, autentikasi, RLS, atau tabel domain.
-- WP-01 belum selesai: workflow preflight belum pernah berjalan di GitHub, sehingga kriteria "build kosong lulus di CI" belum terbukti. Padanan perintah sudah lulus secara lokal.
+- WP-01 selesai: scaffold repo, compose development, dan workflow preflight tersedia; GitHub Actions run #2 lulus untuk keenam job.
+- WP-02 sedang dikerjakan: skema fondasi `core`/`audit`/`platform`, migrasi RLS/grant/hash chain, seed idempotent, dan tes isolasi lokal sudah ada; migrasi staging, ADR-015/016/017, modul domain, dan autentikasi belum.
 
 ## Peta dokumen
 

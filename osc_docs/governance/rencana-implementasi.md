@@ -36,7 +36,7 @@ Dokumentasi 0.6 disetujui pada **2026-10-30 (G0)**. Rencana ini berlaku dan impl
 
 Pemetaan kasar ke roadmap produk: Tahap 1 (MVP) mencakup WP-01 sampai WP-06, ditambah agent host dan container dasar dari WP-08/WP-09; Tahap 2 mencakup WP-07, sisa WP-09, dan WP-10; Tahap 3 mencakup WP-11 dan WP-12. Urutan WP tetap mengikuti dependensi, bukan tanggal.
 
-Status WP-01 per 2026-10-30: **blocking**. Artefak sudah ada dan verifikasi lokal lulus, tetapi CI GitHub belum pernah berjalan; WP-01 belum selesai sampai push pertama dan run preflight lulus.
+Status WP-01 per 2026-10-30: **selesai**. GitHub Actions run #2 (`preflight`, commit `af2ac18`) lulus untuk keenam job: `docs-and-secrets`, `rust`, `go`, `site`, `base`, dan `compose`.
 
 ## 3. Rincian work package
 
@@ -57,10 +57,10 @@ Kriteria keluar:
 - Tidak ada rahasia di repositori atau log.
 - Validator dokumen menggagalkan tautan rusak dan registry tidak konsisten.
 
-Status 2026-10-30 (**blocking**):
+Status 2026-10-30 (**selesai**):
 
 - Struktur repo, compose dev, Dockerfile, workflow preflight, `.env.example`, dan validator sudah ada.
-- Workflow dan perintah padanannya dijalankan lokal dan lulus, tetapi **GitHub Actions belum pernah berjalan** karena belum ada push. Kriteria "build kosong lulus di CI" belum terbukti, sehingga WP-01 belum selesai.
+- Workflow preflight berjalan di GitHub Actions run #2 dan keenam job lulus. Kriteria "build kosong lulus di CI" terpenuhi.
 - Compose dev sudah diverifikasi lalu dihentikan dengan `down`; volume `omnisight-dev_postgres-data` sengaja dipertahankan. Hapus dengan `down -v` hanya bila data development memang boleh hilang.
 - Sesuai batas WP-01, domain, auth, JWT, RLS, dan tabel domain belum dibuat; semuanya dimulai di WP-02/WP-03.
 
@@ -80,6 +80,17 @@ Kriteria keluar:
 - Seed idempotent.
 - Migrasi expand-contract lulus di staging.
 
+Status 2026-10-31 (**belum selesai**):
+
+- Skema fondasi, empat migrasi, RLS, grant, partisi, hash chain audit, seed, dan tes database lokal sudah ada.
+- `osc_base/tests/run.sh` lulus: migrasi dari database kosong, seed dua kali, isolasi dua perusahaan, FK komposit, partial unique, audit hash chain, dan append-only.
+- Seed menghasilkan **162 baris `role_permissions` per perusahaan (324 untuk dua perusahaan)**, bukan 136/272. Angka ini berasal dari `post` yang mencakup `read` dan grant izin submodul sensitif sesuai `permissions.json`; rincian ada di [Prisma dan migrasi](../technical/database/prisma-dan-migrasi.md).
+- `core.user_platform_roles` menyimpan pemberian peran, bukan definisi. Tiga definisi peran platform sementara disimpan di `platform.settings` karena belum ada tabel katalog; keputusan ada di ADR-017.
+- `audit.append_event` bergantung pada owner migrasi yang memiliki `BYPASSRLS`; grant `INSERT` langsung ke `audit.audit_events` masih memungkinkan aplikasi melewati hash chain. Keputusan keamanan ada di ADR-015.
+- `core.user_identities` sengaja tanpa RLS karena lookup lintas tenant; kebijakan auth khusus ada di ADR-016.
+- Migrasi staging dan salinan data belum dijalankan, sehingga kriteria keluar "migrasi expand-contract lulus di staging" belum terpenuhi.
+- Belum ada commit untuk WP-02; perubahan dokumen WP-01 yang sudah ada tetap dipertahankan.
+
 ### WP-03 Autentikasi dan audit
 
 Deliverable:
@@ -88,6 +99,7 @@ Deliverable:
 - CSRF, rate limit, pesan generik, audit login.
 - Registry kode error dan katalog `en`/`id` untuk auth.
 - Halaman login, MFA, pilih perusahaan, akses ditolak.
+- Keputusan dan implementasi ADR-015 (jalur tulis audit), ADR-016 (akses `user_identities`), dan ADR-017 (peran platform/settings global).
 
 Kriteria keluar:
 
@@ -293,7 +305,7 @@ Sebuah WP selesai bila:
 
 - [x] Dokumentasi 0.6 disetujui pemilik area (G0, 2026-10-30).
 - [ ] Tidak ada keputusan terbuka yang memblokir skema atau auth.
-- [ ] Pipeline preflight sudah berjalan di GitHub (menunggu push pertama; padanan lokal sudah lulus).
+- [x] Pipeline preflight sudah berjalan di GitHub (run #2 lulus, 2026-10-30).
 - [ ] Environment staging tersedia.
 - [ ] Pemilik WP dan reviewer ditunjuk.
 - [ ] Data uji sintetis disiapkan.

@@ -1,6 +1,6 @@
 # Skema Inti: Identitas, Organisasi, dan Akses
 
-Schema: `core`. Semua tabel tenant memiliki `company_id` kecuali yang bersifat global (`users`, `permissions`) atau lintas tenant (`user_identities`).
+Schema: `core`. Semua tabel tenant memiliki `company_id` kecuali yang bersifat global (`users`, `permissions`) atau lintas tenant (`user_identities`). `core.user_identities` sengaja tanpa RLS karena lookup identitas dapat terjadi sebelum tenant diketahui; kebijakan aksesnya diatur terpisah di ADR-016.
 
 ## 1. Organisasi
 
@@ -114,6 +114,12 @@ Constraint:
 - `UNIQUE (provider, company_id, provider_subject)` dengan `company_id` null untuk provider global.
 - Satu pengguna tidak boleh punya dua identity HRIS aktif untuk perusahaan yang sama.
 
+Akses:
+
+- Tabel ini tidak memakai RLS karena dipakai untuk lookup lintas tenant sebelum sesi perusahaan terbentuk.
+- Hanya jalur autentikasi yang boleh membacanya; repository umum dan endpoint bisnis dilarang mengakses langsung.
+- Kebijakan teknis (fungsi resolver, grant, tes negatif) ditetapkan di ADR-016 pada WP-03.
+
 ### `core.company_memberships`
 
 | Kolom | Tipe | Catatan |
@@ -156,7 +162,7 @@ Constraint:
 
 ### `core.user_platform_roles`
 
-Peran platform melekat pada pengguna dan terpisah dari membership perusahaan.
+Peran platform melekat pada pengguna dan terpisah dari membership perusahaan. Tabel ini menyimpan **pemberian peran**, bukan definisi peran. Definisi nama, izin, dan batas berada di `permissions.json` serta katalog locale.
 
 | Kolom | Tipe | Catatan |
 |---|---|---|

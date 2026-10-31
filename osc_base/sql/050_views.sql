@@ -1,0 +1,1 @@
+-- WP-02 has no database views yet. Reserved for read models added in later work packages.

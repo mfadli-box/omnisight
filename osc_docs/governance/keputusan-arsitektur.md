@@ -1,6 +1,6 @@
 # Keputusan Arsitektur (ADR)
 
-Format ringkas: konteks, keputusan, konsekuensi, alternatif. Seluruh keputusan berstatus **Disetujui** bersama dokumentasi 0.6 pada 2026-10-30 (G0).
+Format ringkas: konteks, keputusan, konsekuensi, alternatif. ADR-001 sampai ADR-014 berstatus **Disetujui** bersama dokumentasi 0.6 pada 2026-10-30 (G0). ADR-015 sampai ADR-017 berstatus **Diusulkan** dan harus diputuskan sebelum WP-03 selesai.
 
 ---
 
@@ -334,6 +334,76 @@ Format ringkas: konteks, keputusan, konsekuensi, alternatif. Seluruh keputusan b
 - Positif: pipeline aktif tanpa biaya tambahan dan cocok dengan repositori yang sudah di GitHub.
 - Negatif: workflow terikat pada sintaks GitHub Actions; pindah penyedia berarti menulis ulang lapisan orkestrasi.
 - Negatif: action masih dipin ke tag mayor, bukan commit SHA; SHA pinning ditunda sampai WP-12 dengan mitigasi izin minimal dan tanpa secret.
-- Status verifikasi: padanan perintah sudah dijalankan lokal dan lulus; eksekusi GitHub Actions pertama menunggu push ke repositori.
+- Status verifikasi: GitHub Actions run #2 lulus untuk keenam job pada 2026-10-30.
 
 **Alternatif:** GitLab CI, Woodpecker, Jenkins (perlu infrastruktur dan keputusan platform lebih dulu); tanpa CI (melanggar gerbang dokumentasi).
+
+---
+
+## ADR-015: Audit hanya ditulis melalui `audit.append_event`
+
+**Status:** Diusulkan (keputusan WP-03)
+
+**Konteks:** `osc_rest_app` saat ini memegang `SELECT, INSERT` pada `audit.audit_events` dan juga `EXECUTE` pada `audit.append_event`. Grant INSERT langsung memungkinkan aplikasi melewati hash chain. Fungsi `append_event` adalah `SECURITY DEFINER` dan bergantung pada owner migrasi yang memiliki `BYPASSRLS`/superuser agar dapat menulis melewati `FORCE ROW LEVEL SECURITY`.
+
+**Keputusan yang diusulkan:**
+
+- Cabut `INSERT` pada `audit.audit_events` dari `osc_rest_app`; pertahankan `SELECT`.
+- Satu-satunya jalur tulis adalah `EXECUTE audit.append_event(text, jsonb)`.
+- Fungsi dimiliki role khusus `osc_audit_writer` (NOLOGIN, hak minimum), bukan superuser aplikasi.
+- Fungsi memvalidasi `payload.company_id` terhadap `current_setting('app.company_id')` untuk chain tenant; chain platform memakai aturan terpisah.
+- Tes negatif wajib: INSERT langsung ditolak, payload lintas tenant ditolak, dan verifikasi chain tetap lulus.
+
+**Konsekuensi:**
+
+- Positif: aplikasi tidak dapat membuat baris audit tanpa hash; satu jalur tulis mudah diaudit.
+- Negatif: semua penulisan audit harus melalui fungsi; perubahan skema audit menyentuh fungsi dan grant.
+- Risiko sementara: sampai diputuskan, grant INSERT langsung tetap ada dan hash chain bukan satu-satunya jalur tulis.
+
+**Alternatif:** mempertahankan INSERT langsung (ditolak karena melemahkan hash chain), trigger penolak INSERT langsung (kompleks dan mudah terlewat), aplikasi menghitung hash sendiri (tidak aman).
+
+---
+
+## ADR-016: Kebijakan akses `core.user_identities`
+
+**Status:** Diusulkan (keputusan WP-03)
+
+**Konteks:** `core.user_identities` sengaja tidak memakai RLS karena lookup identitas dapat terjadi sebelum tenant diketahui, misalnya login global atau HRIS lintas perusahaan. Tanpa kebijakan khusus, tabel ini menjadi jalur baca lintas tenant yang hanya dijaga kode aplikasi.
+
+**Keputusan yang diusulkan:**
+
+- Aktifkan RLS pada `core.user_identities` tanpa policy untuk `osc_rest_app` (deny by default).
+- Sediakan fungsi `auth.resolve_identity(provider, provider_subject)` dengan `SECURITY DEFINER`, `search_path` tetap, dan hasil minimal (`user_id`, `company_id`, status).
+- Hanya jalur autentikasi yang boleh memanggil fungsi tersebut; tidak ada SELECT langsung dari repository umum.
+- Validasi input, rate limit, audit kegagalan, dan tes negatif lintas tenant.
+
+**Konsekuensi:**
+
+- Positif: lookup tetap mungkin sebelum tenant context, tetapi tabel tidak terbuka untuk query umum.
+- Negatif: menambah fungsi dan grant khusus; debugging auth sedikit lebih kompleks.
+- Wajib diuji: identitas global, identitas HRIS per perusahaan, dan percobaan enumerasi.
+
+**Alternatif:** membiarkan tanpa RLS dengan kontrol aplikasi saja (risiko lebih tinggi), atau memisahkan identitas global ke tabel/skema terpisah (perubahan skema lebih besar).
+
+---
+
+## ADR-017: Definisi peran platform dan visibilitas `platform.settings` global
+
+**Status:** Diusulkan (keputusan WP-03)
+
+**Konteks:** Definisi tiga peran platform sudah ada di `permissions.json`, sedangkan `core.user_platform_roles` hanya menyimpan pemberian peran. WP-02 menyimpan definisi tersebut sementara di `platform.settings` dengan `company_id` NULL. Policy RLS `platform.settings` saat ini hanya mengizinkan `company_id = current_setting('app.company_id')`, sehingga baris global (`company_id` NULL, termasuk `locale.default`) tidak terlihat oleh `osc_rest_app`.
+
+**Keputusan yang diusulkan:**
+
+- Definisi peran platform tetap bersumber dari `permissions.json` dan katalog locale; database hanya menyimpan pemberian di `core.user_platform_roles`.
+- Hapus duplikasi `platform.role.*` dari `platform.settings` setelah WP-03.
+- Tambahkan policy SELECT terpisah untuk baris global non-rahasia (`company_id IS NULL AND is_secret = false`); penulisan global hanya untuk peran platform, bukan tenant.
+- Jika katalog definisi di database dibutuhkan, buat tabel `core.platform_roles` yang dihasilkan dari kontrak, bukan menyimpannya di settings.
+
+**Konsekuensi:**
+
+- Positif: satu sumber definisi, tidak ada drift antara kontrak dan seed; setting global dapat dibaca tanpa membuka penulisan lintas tenant.
+- Negatif: UI harus memuat nama peran dari katalog locale/kontrak; perubahan definisi memerlukan regenerasi kontrak.
+- Risiko sementara: sampai diputuskan, `platform.role.*` dan `locale.default` di `platform.settings` belum dapat diandalkan di bawah RLS.
+
+**Alternatif:** mempertahankan definisi di `platform.settings` (duplikasi dan masalah RLS), atau menambahkan tabel katalog sekarang (perubahan skema di luar WP-02).

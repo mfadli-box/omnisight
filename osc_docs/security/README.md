@@ -96,6 +96,12 @@ Lihat [topologi dan akses](../technical/backend/topologi-dan-akses.md). Ringkas:
 - Platform admin tidak otomatis melihat data bisnis; impersonasi harus eksplisit dan diaudit.
 - Uji dengan minimal dua perusahaan dan dua area.
 
+### 5.6 Pengecualian dan keputusan terbuka WP-02
+
+- `core.user_identities` tanpa RLS karena lookup lintas tenant. Akses hanya lewat jalur auth; kebijakan teknis di ADR-016.
+- `audit.audit_events` masih memiliki grant `INSERT` langsung dan `append_event` bergantung pada owner migrasi dengan `BYPASSRLS`. Hash chain belum menjadi satu-satunya jalur tulis; keputusan di ADR-015.
+- `platform.settings` menyimpan baris global `company_id` NULL yang tidak terlihat oleh policy tenant saat ini, dan definisi peran platform masih berupa salinan sementara. Keputusan di ADR-017.
+
 ## 6. Kontrol input dan output
 
 | Risiko | Kontrol |
@@ -249,6 +255,7 @@ Kebijakan ini bukan kontrol keamanan. Keamanan tetap berasal dari autentikasi, o
 - Redaksi field sensitif.
 - Verifikasi chain berkala.
 - Retensi terkontrol.
+- Satu jalur tulis `audit.append_event` dan pencabutan `INSERT` langsung masih menunggu keputusan ADR-015.
 
 ### AM Platform
 
