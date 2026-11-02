@@ -92,7 +92,7 @@ Status 2026-11-02 (**belum selesai**):
 - `audit.append_event` bergantung pada owner migrasi yang memiliki `BYPASSRLS`; grant `INSERT` langsung ke `audit.audit_events` masih memungkinkan aplikasi melewati hash chain. Keputusan keamanan ada di ADR-015.
 - `core.user_identities` sengaja tanpa RLS karena lookup lintas tenant; kebijakan auth khusus ada di ADR-016.
 - Migrasi staging dan salinan data belum dijalankan, sehingga kriteria keluar "migrasi expand-contract lulus di staging" belum terpenuhi.
-- Perubahan P0 `20261102000100_tenant_integrity` sudah di-commit (`0e70d7a`). Helper partisi dan tesnya belum di-commit.
+- Perubahan P0 `20261102000100_tenant_integrity` sudah di-commit dan di-push (`0e70d7a`); helper partisi, tes, dan dokumentasinya sudah di-commit dan di-push (`bfb35a0`).
 
 ### WP-03 Autentikasi dan audit
 
