@@ -22,7 +22,7 @@ Database adalah sumber kebenaran identitas, akses, inventaris, dan audit. Unit t
 | Constraint | Foreign key komposit, unique parsial, check `locale` |
 | RLS | Tenant hanya melihat datanya, tanpa konteks tidak melihat data |
 | Audit | Payload kanonik deterministik, hash chain, append-only |
-| Partisi | Routing bulanan, retensi, query lintas partisi |
+| Partisi | Routing bulanan, retensi, query lintas partisi, helper pembuat partisi idempotent beserta RLS/grant-nya |
 | Seed | Idempotent, permission dan role sistem lengkap |
 | View laporan | Read-only dan tidak membocorkan tenant lain |
 | Transaksi | Rollback, isolation, retry pada konflik |

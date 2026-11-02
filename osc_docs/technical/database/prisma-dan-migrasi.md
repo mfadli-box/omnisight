@@ -32,6 +32,8 @@ osc_base/
 │   │   │   └── migration.sql
 │   │   ├── 20261102000100_tenant_integrity/
 │   │   │   └── migration.sql
+│   │   ├── 20261102000200_login_attempts_partition_helper/
+│   │   │   └── migration.sql
 │   │   └── ...
 │   └── seed.sql
 ├── sql/
@@ -40,6 +42,7 @@ osc_base/
 │   ├── 020_rls.sql
 │   ├── 025_tenant_integrity.sql
 │   ├── 030_partitions.sql
+│   ├── 035_login_attempts_partition_helper.sql
 │   ├── 040_functions.sql
 │   └── 050_views.sql
 ├── tests/
@@ -273,6 +276,20 @@ CREATE TABLE monitor.metric_samples_2026_11
   PARTITION OF monitor.metric_samples
   FOR VALUES FROM ('2026-11-01') TO ('2026-12-01');
 ```
+
+Partisi `core.login_attempts` tidak dibuat manual. Job maintenance memanggil
+helper yang idempotent agar RLS tidak pernah terlewat:
+
+```sql
+SELECT core.ensure_login_attempts_partition(date '2026-11-15');
+-- core.login_attempts_2026_11 (aman dipanggil berulang)
+```
+
+Helper (`20261102000200_login_attempts_partition_helper`) memakai advisory lock
+per bulan, membuat partisi bila belum ada, menerapkan `ENABLE`/`FORCE ROW LEVEL
+SECURITY`, policy `tenant_isolation`, dan grant DML ke `osc_rest_app`. `EXECUTE`
+dicabut dari `PUBLIC`; aplikasi tidak boleh memilikinya. Nama yang sudah dipakai
+relasi lain ditolak dengan `42P07`.
 
 ### 6.6 Fungsi audit
 

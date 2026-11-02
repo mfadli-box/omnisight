@@ -82,15 +82,17 @@ Kriteria keluar:
 
 Status 2026-11-02 (**belum selesai**):
 
-- Skema fondasi, lima migrasi, RLS, grant, partisi, hash chain audit, seed, dan tes database lokal sudah ada.
+- Skema fondasi, enam migrasi, RLS, grant, partisi, hash chain audit, seed, dan tes database lokal sudah ada.
 - Migrasi `20261102000100_tenant_integrity` menutup celah P0: FK komposit untuk item access review dan webhook delivery, FK plus trigger tenant untuk integration link, RLS `hris_login_rules`/`hris_login_logs`, dan RLS pada setiap partisi `login_attempts`.
-- `osc_base/tests/run.sh` lulus: migrasi dari database kosong, seed dua kali, isolasi dua perusahaan, FK komposit, partial unique, audit hash chain, append-only, RLS HRIS, dan akses langsung ke partisi dengan dua perusahaan.
+- Migrasi `20261102000200_login_attempts_partition_helper` menutup celah partisi masa depan: `core.ensure_login_attempts_partition(date)` membuat partisi secara idempotent (advisory lock per bulan) sekaligus menerapkan RLS `FORCE`, policy `tenant_isolation`, dan grant DML ke `osc_rest_app`. `EXECUTE` dicabut dari `PUBLIC`; aplikasi tidak bisa membuat partisi sendiri.
+- `osc_base/tests/run.sh` lulus: migrasi dari database kosong, seed dua kali, isolasi dua perusahaan, FK komposit, partial unique, audit hash chain, append-only, RLS HRIS, akses langsung ke partisi, dan idempotensi helper partisi.
+- Helper diuji untuk pembuatan baru, pemanggilan berulang pada bulan yang sama, bulan yang sudah punya partisi, `NULL` (`22023`), RLS tetap berlaku pada partisi baru, dan penolakan `EXECUTE`/DDL bagi `osc_rest_app`.
 - Seed menghasilkan **162 baris `role_permissions` per perusahaan (324 untuk dua perusahaan)**, bukan 136/272. Angka ini berasal dari `post` yang mencakup `read` dan grant izin submodul sensitif sesuai `permissions.json`; rincian ada di [Prisma dan migrasi](../technical/database/prisma-dan-migrasi.md).
 - `core.user_platform_roles` menyimpan pemberian peran, bukan definisi. Tiga definisi peran platform sementara disimpan di `platform.settings` karena belum ada tabel katalog; keputusan ada di ADR-017.
 - `audit.append_event` bergantung pada owner migrasi yang memiliki `BYPASSRLS`; grant `INSERT` langsung ke `audit.audit_events` masih memungkinkan aplikasi melewati hash chain. Keputusan keamanan ada di ADR-015.
 - `core.user_identities` sengaja tanpa RLS karena lookup lintas tenant; kebijakan auth khusus ada di ADR-016.
 - Migrasi staging dan salinan data belum dijalankan, sehingga kriteria keluar "migrasi expand-contract lulus di staging" belum terpenuhi.
-- Perubahan P0 ini belum di-commit.
+- Perubahan P0 `20261102000100_tenant_integrity` sudah di-commit (`0e70d7a`). Helper partisi dan tesnya belum di-commit.
 
 ### WP-03 Autentikasi dan audit
 

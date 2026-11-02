@@ -230,7 +230,7 @@ Prinsip:
 |---|---|---|
 | `monitor.metric_samples` | Partisi bulanan berdasarkan `ts` | 30 hari raw |
 | `monitor.metric_rollups_1h` | Agregasi per jam | 1 tahun |
-| `core.login_attempts` | Partisi bulanan | 180 hari |
+| `core.login_attempts` | Partisi bulanan; dibuat lewat `core.ensure_login_attempts_partition(date)` yang menerapkan RLS dan grant | 180 hari |
 | `ops.job_runs` | Partisi bulanan | 90 hari |
 | `audit.audit_events` | Append-only, evaluasi partisi jika volume tinggi | 2 tahun (kebijakan) |
 | `content.notifications` | Index waktu, hapus/arsip terjadwal | 90 hari |

@@ -92,7 +92,7 @@ Lihat [topologi dan akses](../technical/backend/topologi-dan-akses.md). Ringkas:
 
 - Tabel tenant memiliki `company_id`; tabel turunan tanpa kolom itu (`membership_roles`, `role_permissions`, `hris_login_rules`, `hris_login_logs`) memakai kebijakan yang mengikuti parent-nya.
 - Foreign key komposit mencegah relasi lintas perusahaan, termasuk item access review, webhook delivery, dan integration link.
-- RLS `FORCE` untuk user aplikasi, termasuk setiap partisi `core.login_attempts`. Partisi baru wajib menerima kebijakan yang sama.
+- RLS `FORCE` untuk user aplikasi, termasuk setiap partisi `core.login_attempts`. Partisi baru dibuat hanya lewat `core.ensure_login_attempts_partition(date)` yang menerapkan RLS, policy, dan grant secara idempotent; jangan membuat partisi dengan SQL manual.
 - Platform admin tidak otomatis melihat data bisnis; impersonasi harus eksplisit dan diaudit.
 - Uji dengan minimal dua perusahaan dan dua area.
 

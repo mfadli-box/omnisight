@@ -19,7 +19,8 @@ DATABASE_URL=postgresql://placeholder:placeholder@localhost:5432/omnisight npm r
 
 `tests/run.sh` menjalankan PostgreSQL ephemeral, menerapkan seluruh migrasi dari
 database kosong, menjalankan seed dua kali, lalu menguji RLS, constraint, tenant
-integrity, audit hash chain, akses langsung ke partisi, dan jumlah seed.
+integrity, audit hash chain, akses langsung ke partisi, idempotensi helper
+partisi `login_attempts`, dan jumlah seed.
 
 Jangan memakai `prisma db push`. Migrasi memakai alur expand-contract dan SQL
 manual untuk RLS, grant, trigger, serta constraint.
@@ -34,4 +35,4 @@ manual untuk RLS, grant, trigger, serta constraint.
 | `sql/` | SQL kanonik yang disalin ke migrasi |
 | `tests/` | Tes database berbasis psql dan PostgreSQL ephemeral |
 
-Status: WP-02 berjalan, belum selesai. Migrasi lokal dan tes lulus, termasuk migrasi P0 tenant integrity (`20261102000100_tenant_integrity`); migrasi staging, salinan data, serta keputusan ADR-015/016/017 masih tertunda.
+Status: WP-02 berjalan, belum selesai. Migrasi lokal dan tes lulus, termasuk migrasi P0 tenant integrity (`20261102000100_tenant_integrity`) dan helper partisi `login_attempts` (`20261102000200_login_attempts_partition_helper`); migrasi staging, salinan data, serta keputusan ADR-015/016/017 masih tertunda.

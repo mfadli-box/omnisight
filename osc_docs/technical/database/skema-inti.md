@@ -317,8 +317,17 @@ Kebijakan:
 - Login gagal dicatat dan masuk metrik keamanan.
 - Jangan mencatat password, token HRIS, atau isi respons HRIS mentah.
 - RLS FORCE berlaku pada tabel induk dan setiap partisi bulanan. Partisi baru
-  wajib menerima kebijakan `tenant_isolation` yang sama dari job pemeliharaan;
-  kebijakan tidak diwarisi otomatis oleh partisi.
+  wajib menerima kebijakan `tenant_isolation` yang sama; kebijakan tidak
+  diwarisi otomatis oleh partisi.
+- Partisi dibuat hanya melalui `core.ensure_login_attempts_partition(date)`
+  (migrasi `20261102000200_login_attempts_partition_helper`). Fungsi ini
+  idempotent: memakai advisory lock per bulan, membuat partisi bila belum ada,
+  lalu menerapkan `ENABLE`/`FORCE ROW LEVEL SECURITY`, policy `tenant_isolation`,
+  dan grant `SELECT, INSERT, UPDATE, DELETE` ke `osc_rest_app`. Bila nama
+  partisi sudah dipakai relasi lain, fungsi gagal dengan `42P07`.
+- `EXECUTE` pada helper dicabut dari `PUBLIC`; hanya job pemeliharaan dengan
+  peran khusus/owner migrasi yang menjalankannya. Aplikasi tidak boleh memiliki
+  `EXECUTE` maupun hak `CREATE` pada skema `core`.
 - Baris pra-autentikasi dengan `company_id NULL` tidak memenuhi kebijakan tenant;
   penanganannya masih keputusan terbuka (lihat `security/README.md` 5.6).
 
