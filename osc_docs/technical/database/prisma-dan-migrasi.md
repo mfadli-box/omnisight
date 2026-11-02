@@ -24,16 +24,25 @@ osc_base/
 │   ├── migrations/
 │   │   ├── 20261030000100_init_core/
 │   │   │   └── migration.sql
-│   │   ├── 20261030000200_init_asset/
+│   │   ├── 20261030000200_core_constraints/
+│   │   │   └── migration.sql
+│   │   ├── 20261030000300_rls_grants/
+│   │   │   └── migration.sql
+│   │   ├── 20261030000400_audit_hash_chain/
+│   │   │   └── migration.sql
+│   │   ├── 20261102000100_tenant_integrity/
 │   │   │   └── migration.sql
 │   │   └── ...
-│   └── seed.ts
+│   └── seed.sql
 ├── sql/
 │   ├── 010_roles.sql
+│   ├── 015_constraints.sql
 │   ├── 020_rls.sql
+│   ├── 025_tenant_integrity.sql
 │   ├── 030_partitions.sql
 │   ├── 040_functions.sql
 │   └── 050_views.sql
+├── tests/
 ├── .env.example
 └── README.md
 ```
@@ -149,18 +158,27 @@ Catatan model:
 ## 4. Alur membuat migrasi
 
 ```bash
-# 1. Ubah schema.prisma
-# 2. Buat migrasi tanpa langsung apply
+# 1. Ubah schema.prisma untuk perubahan yang dapat dimodelkan Prisma
+# 2. Buat folder migrasi tanpa langsung apply
 npx prisma migrate dev --create-only --name add_asset_assignment
 
 # 3. Review SQL hasil generate
-# 4. Tambahkan SQL manual: RLS, grant, index parsial, trigger, FK komposit
-# 5. Apply ke database lokal
-npx prisma migrate dev
+# 4. Tambahkan SQL manual: RLS, grant, index parsial, trigger, FK komposit,
+#    partisi. Salin isi yang sama ke sql/NNN_*.sql sebagai sumber kanonik.
+# 5. Apply ke database lokal dengan migrate deploy
+DATABASE_URL=... npx prisma migrate deploy --schema prisma/schema.prisma
 
-# 6. Di staging/produksi
+# 6. Di staging/produksi memakai perintah yang sama
 npx prisma migrate deploy
 ```
+
+**Jangan memakai `prisma migrate dev` untuk apply atau `prisma db push`.**
+Repositori ini menyimpan objek SQL-only yang tidak dinyatakan di
+`schema.prisma` (FK komposit, index parsial, RLS, trigger, partisi).
+`prisma migrate dev` dan `prisma migrate diff --exit-code` akan melaporkan
+drift dan dapat menawarkan reset database; jangan dijalankan pada database yang
+berisi data. Buat migrasi dengan `--create-only`, tulis SQL manual, lalu
+terapkan dengan `migrate deploy`.
 
 Aturan review migrasi:
 

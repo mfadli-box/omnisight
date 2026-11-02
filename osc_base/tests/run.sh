@@ -62,7 +62,7 @@ psql_file prisma/seed.sql >/dev/null
 printf 'Loading test helpers\n'
 psql_file tests/00_helpers.sql >/dev/null
 
-for test_file in tests/10_rls.sql tests/20_audit.sql tests/30_seed.sql; do
+for test_file in tests/10_rls.sql tests/20_audit.sql tests/30_seed.sql tests/40_tenant_integrity.sql; do
   printf 'Running %s\n' "$test_file"
   psql_file "$test_file" >/dev/null
 done

@@ -316,6 +316,11 @@ Kebijakan:
 - Rate limit per IP, per identifier, dan per perusahaan.
 - Login gagal dicatat dan masuk metrik keamanan.
 - Jangan mencatat password, token HRIS, atau isi respons HRIS mentah.
+- RLS FORCE berlaku pada tabel induk dan setiap partisi bulanan. Partisi baru
+  wajib menerima kebijakan `tenant_isolation` yang sama dari job pemeliharaan;
+  kebijakan tidak diwarisi otomatis oleh partisi.
+- Baris pra-autentikasi dengan `company_id NULL` tidak memenuhi kebijakan tenant;
+  penanganannya masih keputusan terbuka (lihat `security/README.md` 5.6).
 
 ## 6. HRIS
 
@@ -357,6 +362,9 @@ Aturan dinamis untuk menentukan request, respons sukses, mapping pengguna, mappi
 | `fallback_policy` | jsonb | `deny` atau `local_if_mfa` |
 | `version` | integer | Optimistic locking |
 | `created_at`, `updated_at` | timestamptz | |
+
+RLS FORCE aktif. Tabel ini tidak memiliki `company_id`; kebijakan tenant
+mengikuti `core.hris_connections.company_id` melalui `connection_id`.
 
 Contoh `request_spec` (placeholder, bukan data nyata):
 
@@ -450,6 +458,9 @@ Aturan HRIS:
 | `response_hash` | bytea null | Untuk korelasi, bukan isi respons |
 | `request_id` | uuid | |
 | `created_at` | timestamptz | |
+
+RLS FORCE aktif. Baris log mengikuti perusahaan pemilik
+`core.hris_connections` melalui `connection_id`.
 
 ## 7. Alur login HRIS
 

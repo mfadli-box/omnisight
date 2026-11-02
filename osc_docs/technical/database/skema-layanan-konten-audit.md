@@ -328,6 +328,10 @@ Aturan:
 
 Keputusan `revoke` menghasilkan aksi pencabutan yang diaudit.
 
+FK komposit `(company_id, review_id)`, `(company_id, membership_id)`, dan
+`(company_id, role_id)` memastikan review, membership, dan role berasal dari
+perusahaan yang sama.
+
 ### `audit.data_retention_policies`
 
 | Kolom | Tipe | Catatan |
@@ -375,6 +379,11 @@ Keputusan `revoke` menghasilkan aksi pencabutan yang diaudit.
 
 Constraint: `UNIQUE (integration_id, local_type, local_id)`.
 
+`integration_id` memiliki FK ke `platform.integration_endpoints(id)`. Trigger
+`platform.enforce_integration_link_tenant()` hanya mengizinkan endpoint global
+(`company_id IS NULL`) atau endpoint perusahaan yang sama; referensi lintas
+perusahaan ditolak dengan SQLSTATE `23503`.
+
 ### `platform.webhooks`
 
 | Kolom | Tipe | Catatan |
@@ -403,6 +412,9 @@ Constraint: `UNIQUE (integration_id, local_type, local_id)`.
 | `response_code` | integer null | |
 | `next_retry_at` | timestamptz null | |
 | `created_at`, `finished_at` | timestamptz | |
+
+FK komposit `(company_id, webhook_id)` mencegah delivery menunjuk webhook
+perusahaan lain.
 
 ### `platform.settings`
 

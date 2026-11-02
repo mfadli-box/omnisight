@@ -90,17 +90,19 @@ Lihat [topologi dan akses](../technical/backend/topologi-dan-akses.md). Ringkas:
 
 ### 5.5 Multi-tenant
 
-- Semua tabel tenant memiliki `company_id`.
-- Foreign key komposit mencegah relasi lintas perusahaan.
-- RLS `FORCE` untuk user aplikasi.
+- Tabel tenant memiliki `company_id`; tabel turunan tanpa kolom itu (`membership_roles`, `role_permissions`, `hris_login_rules`, `hris_login_logs`) memakai kebijakan yang mengikuti parent-nya.
+- Foreign key komposit mencegah relasi lintas perusahaan, termasuk item access review, webhook delivery, dan integration link.
+- RLS `FORCE` untuk user aplikasi, termasuk setiap partisi `core.login_attempts`. Partisi baru wajib menerima kebijakan yang sama.
 - Platform admin tidak otomatis melihat data bisnis; impersonasi harus eksplisit dan diaudit.
 - Uji dengan minimal dua perusahaan dan dua area.
 
 ### 5.6 Pengecualian dan keputusan terbuka WP-02
 
 - `core.user_identities` tanpa RLS karena lookup lintas tenant. Akses hanya lewat jalur auth; kebijakan teknis di ADR-016.
+- `core.users`, `core.sessions`, dan `core.refresh_tokens` belum memiliki RLS. `core.users` menyimpan `password_hash` dan `mfa_secret_ref` serta masih dapat diakses `osc_rest_app` melalui grant tabel. Kebijakan auth terpadu masih menunggu perluasan ADR-016; jangan menambah endpoint auth sebelum keputusan itu.
+- Baris `core.login_attempts` dengan `company_id NULL` (pra-autentikasi) tidak terlihat oleh policy tenant. Jalur pencatatan pra-login memerlukan peran atau kebijakan terpisah; bagian dari keputusan auth.
 - `audit.audit_events` masih memiliki grant `INSERT` langsung dan `append_event` bergantung pada owner migrasi dengan `BYPASSRLS`. Hash chain belum menjadi satu-satunya jalur tulis; keputusan di ADR-015.
-- `platform.settings` menyimpan baris global `company_id` NULL yang tidak terlihat oleh policy tenant saat ini, dan definisi peran platform masih berupa salinan sementara. Keputusan di ADR-017.
+- `platform.settings` menyimpan baris global `company_id` NULL yang tidak terlihat oleh policy tenant saat ini, dan definisi peran platform masih berupa salinan sementara. Keputusan di ADR-017. Hal yang sama berlaku untuk endpoint integrasi global: trigger `platform.enforce_integration_link_tenant()` adalah `SECURITY DEFINER` dan bergantung pada owner migrasi dengan `BYPASSRLS` untuk membacanya.
 
 ## 6. Kontrol input dan output
 

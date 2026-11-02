@@ -4,7 +4,7 @@ Fondasi **PostgreSQL + Prisma** untuk OmniSight.
 
 - Prisma hanya dipakai untuk skema dan migrasi.
 - ORM runtime tidak dipakai; backend Rust mengakses database memakai SQLx.
-- WP-02 menyediakan skema fondasi `core`, `audit`, dan `platform`, migrasi SQL manual untuk constraint, RLS, grant, partisi, dan hash chain audit, serta seed idempotent.
+- WP-02 menyediakan skema fondasi `core`, `audit`, dan `platform`, migrasi SQL manual untuk constraint, RLS, grant, partisi, tenant integrity, dan hash chain audit, serta seed idempotent.
 - Seed dua perusahaan sintetis menghasilkan 162 baris `core.role_permissions` per perusahaan (324 total), karena `post` mencakup `read` dan submodul sensitif memakai izin submodul sesuai `permissions.json`.
 - Belum ada model domain aset, jaringan, monitoring, operasi, layanan, atau konten; model tersebut menyusul pada WP berikutnya.
 - Semua tabel, skema, indeks, RLS, dan seed dijelaskan di [dokumentasi database](../osc_docs/technical/database/README.md).
@@ -18,8 +18,8 @@ DATABASE_URL=postgresql://placeholder:placeholder@localhost:5432/omnisight npm r
 ```
 
 `tests/run.sh` menjalankan PostgreSQL ephemeral, menerapkan seluruh migrasi dari
-database kosong, menjalankan seed dua kali, lalu menguji RLS, constraint, audit
-hash chain, dan jumlah seed.
+database kosong, menjalankan seed dua kali, lalu menguji RLS, constraint, tenant
+integrity, audit hash chain, akses langsung ke partisi, dan jumlah seed.
 
 Jangan memakai `prisma db push`. Migrasi memakai alur expand-contract dan SQL
 manual untuk RLS, grant, trigger, serta constraint.
@@ -34,4 +34,4 @@ manual untuk RLS, grant, trigger, serta constraint.
 | `sql/` | SQL kanonik yang disalin ke migrasi |
 | `tests/` | Tes database berbasis psql dan PostgreSQL ephemeral |
 
-Status: WP-02 berjalan, belum selesai. Migrasi lokal dan tes lulus; migrasi staging, salinan data, serta keputusan ADR-015/016/017 masih tertunda.
+Status: WP-02 berjalan, belum selesai. Migrasi lokal dan tes lulus, termasuk migrasi P0 tenant integrity (`20261102000100_tenant_integrity`); migrasi staging, salinan data, serta keputusan ADR-015/016/017 masih tertunda.
