@@ -1,0 +1,141 @@
+# =============================================================================
+# omnisight — Docker Compose DEV (infrastructure only)
+# Doc       : osc_docs/infrastructure.md
+# Author    : ai-main (PM & Docker DevOps Architect)
+# Scope     : SESI 1.1 — fondasi infrastruktur dasar untuk pengembangan lokal.
+#             Hanya service infrastruktur: PostgreSQL 18 + RustFS (S3-compatible).
+#             Service aplikasi (osc_rest / osc_site / agents) TIDAK ada di file
+#             ini — stack lengkap ada di docker-compose.yml (master).
+#
+# Usage:
+#   cp .env.example .env          # lalu isi nilai development (bukan produksi)
+#   docker compose -f docker-compose.dev.yml --env-file .env up -d
+#   docker compose -f docker-compose.dev.yml ps
+#   docker compose -f docker-compose.dev.yml logs -f postgres rustfs
+#
+# Catatan:
+#   - Project name terpisah (omnisight-dev) agar tidak bentrok dengan stack
+#     master (omnisight) — container/volume/network benar-benar terpisah.
+#   - Port host di-bind ke 127.0.0.1 (tidak terekspos ke luar workstation dev).
+# =============================================================================
+
+name: omnisight-dev
+
+networks:
+  osc_internal:
+    internal: true # tanpa rute keluar — service app menyusul akan tetap
+    driver: bridge # terisolasi dari internet; port host dipublish via proxy
+  osc_dev_edge:
+    driver: bridge # network "pintu" dev: inilah yang memuat port-publikasi
+
+volumes:
+  pg_dev_data:
+    driver: local
+  rustfs_dev_data:
+    driver: local
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL 18 (osc_base)
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:18-alpine
+    container_name: omnisight_dev_postgres
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    security_opt:
+      - "no-new-privileges:true"
+    environment:
+      - TZ=${TZ:-Asia/Jakarta}
+      - POSTGRES_DB=${PG_DATA:-osc}
+      - POSTGRES_USER=${PG_USER:-dbe}
+      - POSTGRES_PASSWORD=${PG_PASS:?set PG_PASS di .env (lihat .env.example)}
+      - POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256 --auth-local=scram-sha-256
+      # Performance/dev sanity defaults
+      - POSTGRES_INITDB_WALDIR=/var/lib/postgresql/wal
+    ports:
+      # Bind loopback saja — aman untuk workstation dev
+      - "127.0.0.1:${PG_PORT:-5432}:5432"
+    volumes:
+      - pg_dev_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-dbe} -d ${PG_DATA:-osc}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+    networks:
+      - osc_internal
+      - osc_dev_edge
+
+  # ---------------------------------------------------------------------------
+  # RustFS 1.0.4 — S3-compatible object storage (pengganti MinIO/RustFS target)
+  # ---------------------------------------------------------------------------
+  rustfs:
+    image: rustfs/rustfs:1.0.4
+    container_name: omnisight_dev_rustfs
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    security_opt:
+      - "no-new-privileges:true"
+    environment:
+      - TZ=${TZ:-Asia/Jakarta}
+      - RUSTFS_ADDRESS=:9000
+      - RUSTFS_CONSOLE_ENABLE=true
+      - RUSTFS_CONSOLE_ADDRESS=:9001
+      - RUSTFS_VOLUMES=/data
+      - RUSTFS_ACCESS_KEY=${RUSTFS_ACCESS_KEY:?set RUSTFS_ACCESS_KEY di .env}
+      - RUSTFS_SECRET_KEY=${RUSTFS_SECRET_KEY:?set RUSTFS_SECRET_KEY di .env}
+    ports:
+      - "127.0.0.1:9000:9000" # S3 API
+      - "127.0.0.1:${RUSTFS_CONSOLE_PORT:-9001}:9001" # Web console (dev saja)
+    volumes:
+      - rustfs_dev_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+    networks:
+      - osc_internal
+      - osc_dev_edge
+
+  # ---------------------------------------------------------------------------
+  # One-shot bucket init (idempotent) — membuat bucket default dari .env
+  # ---------------------------------------------------------------------------
+  rustfs_init:
+    image: minio/mc:latest
+    container_name: omnisight_dev_rustfs_init
+    depends_on:
+      rustfs:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://rustfs:9000 \"$$RUSTFS_ACCESS_KEY\" \"$$RUSTFS_SECRET_KEY\" &&
+      mc mb --ignore-existing local/${RUSTFS_BUCKET:-osc} &&
+      echo 'bucket ready: ${RUSTFS_BUCKET:-osc}'"
+    environment:
+      - RUSTFS_ACCESS_KEY=${RUSTFS_ACCESS_KEY:?set RUSTFS_ACCESS_KEY di .env}
+      - RUSTFS_SECRET_KEY=${RUSTFS_SECRET_KEY:?set RUSTFS_SECRET_KEY di .env}
+    restart: "no"
+    networks:
+      - osc_internal

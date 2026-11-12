@@ -1,0 +1,19 @@
+{
+  "name": "osc-base",
+  "version": "0.1.0",
+  "private": true,
+  "description": "omnisight data layer — Prisma + PostgreSQL (workspace osc_base)",
+  "scripts": {
+    "prisma:format": "prisma format",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
+    "prisma:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.0.0"
+  },
+  "devDependencies": {
+    "prisma": "^6.0.0"
+  }
+}

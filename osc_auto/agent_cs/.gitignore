@@ -1,0 +1,10 @@
+# artefak build
+bin/
+dist/
+*.exe
+*.test
+*.out
+
+# file lingkungan asli (hanya *.example yang di-commit)
+*.env
+!*.env.example

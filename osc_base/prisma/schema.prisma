@@ -1,0 +1,71 @@
+// =============================================================================
+// omnisight — Core Schema (bootstrap)
+// Author    : ai-base (Database Engineer)
+// Blueprint : osc_docs/architecture.md
+// Doc       : osc_docs/base/schema-core.md
+//
+// Konvensi:
+//   - Model PascalCase, field camelCase -> snake_case di PostgreSQL via
+//     @map("column_name") dan @@map("table_name")
+//   - Tipe native PostgreSQL eksplisit (@db.Uuid, @db.Timestamptz(3), ...)
+//   - Referential actions eksplisit (onDelete/onUpdate) di setiap relasi
+//   - Audit fields (createdAt/updatedAt) + soft-delete (deletedAt)
+//   - UUID PK memakai gen_random_uuid() (native sejak PostgreSQL 13,
+//     tanpa perlu ekstensi pgcrypto)
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+//Role pengguna (enum PG: user_role)
+enum Role {
+  USER
+  ADMIN
+
+  @@map("user_role")
+}
+
+//Pengguna aplikasi (tabel: users)
+model User {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email        String    @unique @db.VarChar(255)
+  passwordHash String    @map("password_hash") @db.VarChar(255)
+  displayName  String?   @map("display_name") @db.VarChar(100)
+  role         Role      @default(USER)
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  auditLogs AuditLog[]
+
+  @@index([role])
+  @@index([isActive])
+  @@map("users")
+}
+
+//Jejak audit aksi pengguna/sistem (tabel: audit_logs)
+model AuditLog {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorId    String?  @map("actor_id") @db.Uuid
+  action     String   @db.VarChar(100)
+  entityType String?  @map("entity_type") @db.VarChar(100)
+  entityId   String?  @map("entity_id") @db.Uuid
+  ipAddress  String?  @map("ip_address") @db.Inet
+  detail     Json?    @map("detail") @db.JsonB
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  //Aksi sistem yang tidak terikat pengguna memakai actor_id = NULL
+  //(onDelete: SetNull agar riwayat audit tidak ikut terhapus saat user dihapus)
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([actorId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

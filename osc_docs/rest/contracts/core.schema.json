@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://omnisight.local/schemas/rest/core.schema.json",
+  "title": "osc_rest — Core Foundation Contract",
+  "description": "Kontrak bersama fondasi osc_rest (health + envelope error + correlation tracing). Konsumen: ai-site (BFF proxy), ai-auto (agent), ai-test (rest_qad/rest_soc). Referensi lintas-file: \"$ref\": \"core.schema.json#/$defs/<nama>\". Konvensi field: snake_case.",
+  "$defs": {
+    "CheckStatus": {
+      "type": "string",
+      "enum": ["up", "down"],
+      "description": "Status satu dependensi readiness (GET /api/v1/health)."
+    },
+    "HealthChecks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["database", "storage"],
+      "properties": {
+        "database": { "$ref": "#/$defs/CheckStatus" },
+        "storage": { "$ref": "#/$defs/CheckStatus", "description": "RustFS (S3-compatible) via aws-sdk-s3." }
+      }
+    },
+    "HealthReport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "checks"],
+      "properties": {
+        "status": { "enum": ["ok", "degraded"], "description": "\"ok\" bila semua probe naik; \"degraded\" bila ada yang turun (respons tetap 503)." },
+        "checks": { "$ref": "#/$defs/HealthChecks" }
+      }
+    },
+    "XCorrelationIdHeader": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._/-]{1,64}$",
+      "description": "Header X-Correlation-ID: di-echo dari klien bila valid, atau digenerate (UUIDv7) oleh osc_rest. Wajib ada di SETIAP respons (termasuk error); dikirim juga ke log terstruktur."
+    },
+    "ErrorCode": {
+      "type": "string",
+      "enum": [
+        "VALIDATION_ERROR",
+        "NOT_FOUND",
+        "UNAUTHORIZED",
+        "FORBIDDEN",
+        "PAYLOAD_TOO_LARGE",
+        "RATE_LIMITED",
+        "INTERNAL_ERROR"
+      ],
+      "description": "Kode error mesin yang stabil. Detail internal tidak pernah bocor: pesan selalu generik untuk INTERNAL_ERROR."
+    },
+    "ErrorEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "error", "correlation_id"],
+      "properties": {
+        "status": { "const": "error" },
+        "correlation_id": { "$ref": "#/$defs/XCorrelationIdHeader", "description": "Sisipan otomatis middleware correlation pada SETIAP error JSON — sama dengan header X-Correlation-ID respons." },
+        "error": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["code", "message"],
+          "properties": {
+            "code": { "$ref": "#/$defs/ErrorCode" },
+            "message": { "type": "string", "maxLength": 255 }
+          }
+        }
+      }
+    },
+    "HealthEndpoint": {
+      "type": "object",
+      "description": "Deskripsi endpoint GET /api/v1/health (meta-endpoint untuk generator klien/uji).",
+      "additionalProperties": false,
+      "required": ["method", "path", "auth", "responses"],
+      "properties": {
+        "method": { "const": "GET" },
+        "path": { "const": "/api/v1/health" },
+        "auth": { "const": "public", "description": "Readiness probe Docker healthcheck & monitoring." },
+        "requestSchema": { "const": null },
+        "successSchema": { "$ref": "#/$defs/HealthReport" },
+        "successHttpStatus": { "const": 200 },
+        "degradedHttpStatus": { "const": 503 },
+        "responses": {
+          "type": "object",
+          "required": ["200", "503"],
+          "properties": {
+            "200": { "$ref": "#/$defs/HealthReport" },
+            "503": { "$ref": "#/$defs/HealthReport" }
+          }
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "health_ok": {
+        "status": "ok",
+        "checks": { "database": "up", "storage": "up" }
+      },
+      "health_degraded": {
+        "status": "degraded",
+        "checks": { "database": "up", "storage": "down" }
+      },
+      "error_envelope": {
+        "status": "error",
+        "correlation_id": "01969e5a-7c3f-7d3a-9d2b-4f0a1c8e5b21",
+        "error": { "code": "VALIDATION_ERROR", "message": "email tidak valid" }
+      }
+    }
+  ]
+}

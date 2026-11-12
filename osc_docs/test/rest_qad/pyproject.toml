@@ -1,0 +1,30 @@
+# =============================================================================
+# rest_qad — QA & Debugger suite (pytest) untuk omnisight.
+# Struktur Clean Architecture: src/{domain,application,infrastructure} + test/.
+# Jalankan dari folder ini:   python3 -m pytest -v
+# Test live butuh stack:      docker compose up -d osc_base rustfs osc_rest
+# =============================================================================
+[project]
+name = "rest-qad"
+version = "0.1.0"
+description = "QA & Debugger test suite omnisight — kontrak & fungsionalitas osc_rest"
+requires-python = ">=3.10"
+dependencies = [
+    "httpx>=0.27",
+    "pydantic>=2.9",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["test"]
+pythonpath = ["src"]
+addopts = "-ra --strict-markers"
+markers = [
+    "unit: test murni tanpa jaringan/OS (selalu berjalan di CI)",
+    "integration: kontrak live terhadap osc_rest (skip bila target mati)",
+    "regression: reproduksi bug minimal (fail sebelum fix, pass sesudah)",
+    "excel: verifikasi alur import/export .xlsx (fase excel)",
+    "contract: verifikasi bentuk respons sesuai osc_docs/rest",
+]

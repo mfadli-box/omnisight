@@ -1,0 +1,57 @@
+# =============================================================================
+# agent_cs — systemd unit (omnisight)
+#
+# Pemasangan:
+#   sudo install -m 0755 bin/agent_cs /usr/local/bin/agent_cs
+#   sudo install -m 0644 deploy/linux/agent_cs.service /etc/systemd/system/
+#   sudo mkdir -p /etc/agent_cs && sudo install -m 0600 \
+#        configs/agent_cs.env.example /etc/agent_cs/agent_cs.env
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now agent_cs
+# =============================================================================
+
+[Unit]
+Description=omnisight agent_cs - health probe agent untuk osc_rest
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# User dinamis non-root (UID unik per-service, dibuat systemd).
+DynamicUser=yes
+# File lingkungan opsional; prefiks "-" berarti tidak gagal bila tidak ada.
+EnvironmentFile=-/etc/agent_cs/agent_cs.env
+ExecStart=/usr/local/bin/agent_cs
+Restart=on-failure
+RestartSec=5s
+
+# --- Hardening (least privilege) ---------------------------------------------
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictAddressFamilies=AF_INET AF_INET6
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+# --- Logging -------------------------------------------------------------------
+# Agent menulis log JSON terstruktur ke stdout; journald yang mengumpulkan
+# (jurnalctl -u agent_cs -o json-pretty).
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=agent_cs
+
+[Install]
+WantedBy=multi-user.target

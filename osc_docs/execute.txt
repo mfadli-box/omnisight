@@ -1,0 +1,283 @@
+================================================================================
+PANDUAN TAHAPAN EKSEKUSI (ROADMAP & MICRO-PROMPTS)
+PROYEK RE-ENGINEERING 12-IN-1 ENTERPRISE IT, NETWORK, CONTAINER & SECOPS
+================================================================================
+Target Workspace:
+- osc_base/       -> Database Schema (PostgreSQL + Prisma) [Skill: ai-base]
+- osc_rest/       -> Backend API (Rust + RustFS + Excel) [Skill: ai-rest]
+- osc_site/       -> Frontend UI (Next.js + shadcn/ui + BFF Proxy) [Skill: ai-site]
+- osc_auto/       -> Cross-Platform Agents (Golang Linux/Windows) [Skill: ai-auto]
+- osc_docs/       -> Dokumentasi Teknis & Suite Test (ai-test)
+- Root / docker/  -> Orkestrasi & Docker Compose [Skill: ai-main]
+
+Aturan Eksekusi OpenCode (Versi Free / Hemat Token):
+1. Jalankan 1 Sesi = 1 Prompt Mikro di bawah ini.
+2. Setelah satu sesi selesai dan dokumentasinya tersimpan di osc_docs/, jalankan
+   perintah `/new` di OpenCode untuk mereset context window sebelum lanjut ke
+   sesi berikutnya.
+3. Jangan lompati urutan karena setiap sesi membaca dokumen teknis dari sesi
+   sebelumnya sebagai memori eksternal.
+
+================================================================================
+TAHAP 0: AUDIT STATIS 12 REPOSITORI GITHUB & MASTER BLUEPRINT (4 SESI)
+================================================================================
+
+--- [SESI 0.1] Audit Grup A (Directus, Snipe-IT, GLPI) --- 
+Gunakan skill `ai-main` untuk melakukan audit statis tahap 1:
+1. Pastikan folder `.rea_docs/` masuk ke `.gitignore`.
+2. Lakukan shallow clone:
+   - `git clone --depth 1 https://github.com/directus/directus .rea_docs/directus`
+   - `git clone --depth 1 https://github.com/grokability/snipe-it .rea_docs/snipe-it`
+   - `git clone --depth 1 https://github.com/glpi-project/glpi .rea_docs/glpi`
+3. Dilarang menjalankan install/build script apa pun. Audit statis metadata koleksi dinamis, filter AST, policy RBAC (Directus), siklus aset/lisensi (Snipe-IT), serta inventory & tiket ITIL (GLPI).
+4. Simpan catatan hasil audit Grup A ke `osc_docs/audit-group-a.md`.
+5. Setelah selesai dan lolos pemeriksaan, buka `osc_docs/checklist.md`, centang `[x]` pada baris **Hari 1 (`SESI 0.1`)**, isi tanggal hari ini, dan catat ringkasan hasil audit di tabel log harian.
+
+--- [SESI 0.2] Audit Grup B (NetBox, LibreNMS, Uptime Kuma, Nginx UI) ---
+Gunakan skill `ai-main` untuk melakukan audit statis tahap 2:
+1. Lakukan shallow clone:
+   - `git clone --depth 1 https://github.com/netbox-community/netbox .rea_docs/netbox`
+   - `git clone --depth 1 https://github.com/librenms/librenms .rea_docs/librenms`
+   - `git clone --depth 1 https://github.com/louislam/uptime-kuma .rea_docs/uptime-kuma`
+   - `git clone --depth 1 https://github.com/0xJacky/nginx-ui .rea_docs/nginx-ui`
+2. Audit statis model DCIM/IPAM (NetBox), SNMP polling & port metrics (LibreNMS), synthetic monitor & status page (Uptime Kuma), serta manajemen virtual host & SSL Nginx (Nginx UI).
+3. Simpan catatan hasil audit Grup B ke `osc_docs/audit-group-b.md`.
+4. Setelah selesai dan lolos pemeriksaan, buka `osc_docs/checklist.md`, centang `[x]` pada baris **Hari 2 (`SESI 0.2`)**, isi tanggal hari ini, dan catat ringkasan hasil audit di tabel log harian.
+
+--- [SESI 0.3] Audit Grup C & D (Dockge, Arcane, Beszel, Wazuh, JumpServer) ---
+Gunakan skill `ai-main` untuk melakukan audit statis tahap 3:
+1. Lakukan shallow clone:
+   - `git clone --depth 1 https://github.com/louislam/dockge .rea_docs/dockge`
+   - `git clone --depth 1 https://github.com/getarcaneapp/arcane .rea_docs/arcane`
+   - `git clone --depth 1 https://github.com/henrygd/beszel .rea_docs/beszel`
+   - `git clone --depth 1 https://github.com/wazuh/wazuh .rea_docs/wazuh`
+   - `git clone --depth 1 https://github.com/jumpserver/jumpserver .rea_docs/jumpserver`
+2. Audit statis manajemen `compose.yaml` & Docker Engine (Dockge, Arcane), kolektor metrik host/container (Beszel), aturan FIM/CVE/SIEM (Wazuh), serta protokol PAM SSH/Web terminal & session recording (JumpServer).
+3. Simpan catatan hasil audit Grup C & D ke `osc_docs/audit-group-c.md`.
+4. Setelah selesai dan lolos pemeriksaan, buka `osc_docs/checklist.md`, centang `[x]` pada baris **Hari 3 (`SESI 0.3`)**, isi tanggal hari ini, dan catat ringkasan hasil audit di tabel log harian.
+
+--- [SESI 0.4] Penyusunan Master Blueprint & Pembersihan Staging ---
+Gunakan skill `ai-main` untuk membaca `osc_docs/audit-group-a.md`, `osc_docs/audit-group-b.md`, dan `osc_docs/audit-group-c.md`:
+
+1. Susun cetak biru arsitektur terpadu di `osc_docs/reengineering.md` lengkap dengan diagram Mermaid yang menyatukan entitas induk `Asset`/`ManagedNode` dengan seluruh modul, pembagian Wave 1, Wave 2, dan Wave 3, serta spesifikasi lengkap berikut:
+
+   - **Konfigurasi Multi-Company & HRIS ASMX Link**:
+     - Setiap record `Company` memiliki `hris_login_url` (nullable) dan `hris_cache_ttl_hours` (default `72`).
+     - Jika `hris_login_url` terisi (pola: `http://hris.check{\(U}&uPaswd={\)P}`), Rust (`osc_rest`) melakukan HTTP `GET` server-to-server (dengan allowlist domain/IP intranet HRIS anti-SSRF, batas respons 64 KB, dan sensor `uPaswd` pada log `tracing`).
+     - Jika `hris_login_url` kosong atau user memilih opsi Company kosong (`""`), sistem menggunakan **Local Login** (`username` + `password` Argon2id).
+
+   - **Parsing XML HRIS, Circuit Breaker & Cached Password Auto-Sync**:
+     - Parse elemen `<string xmlns="...">` menggunakan parser XML aman (non-DTD) tanpa `.unwrap()`.
+     - Jika berawalan `1|`: parse profil user, lakukan auto-provision/sync user lokal, hash password saat ini dengan `Argon2id` lalu simpan/perbarui ke `password_hash` beserta `last_hris_sync_at` (dilarang menyimpan password plaintext).
+     - Jika berawalan `0|...|NONE`: tolak login `401 Unauthorized` tanpa fallback.
+     - **Circuit Breaker & Offline Cache Fallback**: Terapkan Circuit Breaker pada client HRIS (jika gagal/timeout 5x dalam 30 detik, buka circuit selama 60 detik agar request tidak menumpuk). Saat upstream gangguan atau circuit terbuka, lakukan fallback verifikasi `Argon2id` terhadap `password_hash` lokal **hanya jika** selisih `last_hris_sync_at` masih dalam batas `hris_cache_ttl_hours` (catat di `ActivityLog` sebagai `LOGIN_HRIS_OFFLINE_CACHE`), atau kembalikan `502 Bad Gateway` (`HRIS_UPSTREAM_INVALID_RESPONSE`) jika cache tidak tersedia/kedaluwarsa.
+
+   - **Optional TOTP MFA, Mandatory PAM MFA & Safe MFA Reset**:
+     - Tabel `User` menyimpan `mfa_enabled` (default `false`), `mfa_secret_encrypted` (AES-256-GCM), `mfa_last_verified_step` (anti-replay), dan `mfa_backup_codes_hash` (Argon2id).
+     - Jika `mfa_enabled == true`, `POST /api/v1/auth/login` mengembalikan `mfa_required: true` + `mfa_challenge_token` (JWT 5 menit dengan `scope: "mfa_pending"`). Sediakan endpoint `/api/v1/auth/mfa/setup`, `/enable`, `/verify` (rate-limit maks 5x gagal, toleransi ±1 step 30 detik), dan `/disable`.
+     - **Mandatory MFA untuk PAM Bastion**: Endpoint `POST /api/v1/pam/sessions/authorize` wajib menolak akses (`403 MFA_REQUIRED_FOR_PAM`) jika `user.mfa_enabled == false`, serta mewajibkan step-up OTP jika verifikasi MFA terakhir lebih dari 15 menit.
+     - **Akses Reset MFA (Human Error Recovery)**:
+       1. *Self-Service*: User dapat memakai Backup Code sekali pakai di layar login untuk masuk dan otomatis me-reset `mfa_enabled = false`, atau meminta token reset MFA terverifikasi ke email terdaftar (`POST /api/v1/auth/mfa/reset-request` & `/reset-confirm` dengan pencabutan seluruh sesi aktif).
+       2. *Admin-Assisted*: Endpoint `POST /api/v1/users/{id}/mfa/reset` bagi admin berizin untuk me-reset MFA user yang kehilangan perangkat + audit log `MFA_RESET`.
+
+   - **Multi-Company Switcher, Menu Privilege & Strict Tenant Isolation**:
+     - Tabel `UserCompanyAccess` (`user_id`, `company_id`, `role_id`, `is_default`, `is_active`) dan endpoint `POST /api/v1/auth/switch-company` untuk berpindah Company dan memperbarui `active_company_id` pada JWT (`HttpOnly` cookie di `osc_site` proxy), dilengkapi komponen **Company Switcher** di UI `osc_site`.
+     - Tabel `MenuModule` & `CompanyMenuPrivilege` (`company_id`, `role_id`, `menu_id`, `can_view`, `can_create`, `can_update`, `can_delete`) serta endpoint `GET /api/v1/me/navigation` untuk merender sidebar dinamis di `osc_site`.
+     - Seluruh tabel transaksi mengikat `company_id` dan difilter otomatis oleh middleware `RequestContext` di `osc_rest`.
+
+   - **Day-2 Operational Foundations (Bootstrap, Enrollment, Notification & Retention)**:
+     - **Idempotent Seeder (`osc_base`)**: Seeder wajib membuat akun awal `Global Super Admin` (dari `.env`) dan mengisi master registry `MenuModule` secara otomatis setelah migrasi.
+     - **Agent Enrollment Flow**: Admin membuat one-time enrollment token terikat `company_id` di UI; agent Golang melakukan registrasi pertama kali ke `POST /api/v1/agents/enroll` untuk memperoleh `agent_id` dan `hmac_secret` secara otomatis.
+     - **Centralized Notification Dispatcher**: Tabel `NotificationChannel` per Company (SMTP Email, Telegram, Webhook) yang dieksekusi secara asinkron oleh `osc_auto/flow_worker_agent` (untuk email reset MFA, alert metrik, downtime, dan SIEM).
+     - **Data Retention Policy**: Kebijakan retensi/pembersihan terjadwal (30–90 hari) untuk tabel bervolume tinggi (`SystemMetricSnapshot`, `UptimeHeartbeat`) serta pengarsipan rekaman sesi PAM ke RustFS.
+
+2. Hapus folder sementara `.rea_docs/` agar ruang disk bersih.
+3. Setelah selesai dan lolos pemeriksaan, buka `osc_docs/checklist.md`, centang `[x]` pada baris **Hari 4 (`SESI 0.4`)**, isi tanggal hari ini, dan catat ringkasan hasil audit di tabel log harian.
+
+================================================================================
+TAHAP 1: FONDASI DATABASE & SEEDER (4 SESI)
+================================================================================
+
+--- [SESI 1.1] Setup Fondasi Docker & Compose ---
+Gunakan skill `ai-main` untuk membaca `osc_docs/reengineering.md` lalu menyiapkan infrastruktur dasar di root workspace:
+1. Buat `.env.example` lengkap dengan variabel:
+   - PostgreSQL (`POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `DATABASE_URL`)
+   - RustFS (`RUSTFS_ACCESS_KEY`, `RUSTFS_SECRET_KEY`, `RUSTFS_ENDPOINT`, `RUSTFS_BUCKET_FILES`, `RUSTFS_BUCKET_PAM`, `RUSTFS_BUCKET_BACKUPS`)
+   - Keamanan & Kriptografi (`JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `APP_MASTER_ENCRYPTION_KEY`, `AGENT_ENROLLMENT_SECRET`, `HRIS_ALLOWED_HOSTS`)
+   - Bootstrap Seeder (`BOOTSTRAP_ADMIN_USERNAME`, `BOOTSTRAP_ADMIN_PASSWORD`, `BOOTSTRAP_ADMIN_EMAIL`)
+2. Buat `docker-compose.yml` awal berisi layanan `postgres` (PostgreSQL 16/17), `rustfs` (S3-compatible object storage), dan container one-shot `rustfs-init` untuk membuat bucket default secara otomatis, lengkap dengan named volumes, internal bridge network terisolasi (`internal: true`), healthcheck, dan resource limits.
+3. Buat dokumentasi topologi infrastruktur awal di `osc_docs/infrastructure.md`.
+4. Setelah selesai dan lolos pemeriksaan (`docker compose config`), buka `osc_docs/checklist.md`, centang `[x]` pada baris **Hari 5 (`SESI 1.1`)**, isi tanggal hari ini, dan catat ringkasan hasil verifikasi di tabel log harian.
+
+--- [SESI 1.2] Skema Prisma Bagian 1: Multi-Company, HRIS Cache, MFA, RBAC & Menu Privilege ---
+Gunakan skill `ai-base` untuk membaca `osc_docs/reengineering.md` dan `osc_docs/infrastructure.md`:
+1. Inisialisasi proyek Prisma + PostgreSQL di `osc_base/` (`prisma/schema.prisma`) dan buat model inti Bagian 1:
+   - `Company` (termasuk `hris_login_url` nullable, `hris_cache_ttl_hours` default `72`, `is_active`).
+   - `User` (termasuk `username`, `email`, `password_hash`, `last_hris_sync_at`, `mfa_enabled` default `false`, `mfa_secret_encrypted`, `mfa_last_verified_step`, `mfa_backup_codes_hash`, `is_super_admin`).
+   - `Role`, `Policy`, `Permission` (CRUD + field-level allowed columns + JSON row filter rules), `Session`, `UserCompanyAccess` (`user_id`, `company_id`, `role_id`, `is_default`, `is_active`).
+   - `MenuModule` (`code`, `label`, `route_path`, `icon`, `parent_id`, `sort_order`) dan `CompanyMenuPrivilege` (`company_id`, `role_id`, `menu_id`, `can_view`, `can_create`, `can_update`, `can_delete`).
+   - `CollectionMeta`, `FieldMeta`, `RelationMeta`, `ActivityLog`, `WebhookFlow`, `NotificationChannel` (SMTP/Telegram/Webhook per company), dan `AgentEnrollmentToken` (one-time token terikat `company_id`).
+2. Dokumentasikan ERD dan spesifikasi tabel Bagian 1 di `osc_docs/base/schema-p1.md`.
+3. Jalankan `npx prisma format` dan `npx prisma validate`, lalu buka `osc_docs/checklist.md`, centang `[x]` pada baris **Hari 6 (`SESI 1.2`)**, isi tanggal hari ini, dan catat ringkasan hasil verifikasi di tabel log harian.
+
+--- [SESI 1.3] Skema Prisma Bagian 2: ITAM (Snipe-IT/GLPI) & DCIM/IPAM (NetBox) ---
+Gunakan skill `ai-base` untuk membaca `osc_docs/reengineering.md` dan memperluas `osc_base/prisma/schema.prisma`:
+1. Tambahkan model ITAM & Service Desk yang seluruhnya wajib mengikat foreign key `company_id` terindeks:
+   - `Department`, `Location`, `Category`, `Manufacturer`, `Supplier`, `StatusLabel`, `AssetModel`, `Asset` (entitas induk server/network device/workstation), `AssetCheckoutLog`, `SoftwareLicense`, `LicenseSeat`, `HardwareInventorySnapshot`, `Ticket`, dan `TicketFollowup`.
+2. Tambahkan model DCIM & IPAM yang juga mengikat `company_id`:
+   - `Site`, `Rack`, `RackUnitAllocation`, `DeviceInterface`, `CableConnection`, `Vlan`, `IpPrefix`, `IpAddress`, `SnmpDeviceProfile`, dan `InterfaceMetricSnapshot`.
+3. Dokumentasikan ERD dan relasi lintas modul di `osc_docs/base/schema-p2.md`.
+4. Jalankan `npx prisma format` dan `npx prisma validate`, lalu buka `osc_docs/checklist.md`, centang `[x]` pada baris **Hari 7 (`SESI 1.3`)**, isi tanggal hari ini, dan catat ringkasan hasil verifikasi di tabel log harian.
+
+--- [SESI 1.4] Skema Prisma Bagian 3: Telemetry, Docker/Nginx, SecOps/PAM, Migrasi SQL & Seeder ---
+Gunakan skill `ai-base` untuk melengkapi `osc_base/prisma/schema.prisma`:
+1. Tambahkan model operasional & keamanan (semua mengikat `company_id`):
+   - `UptimeMonitor`, `UptimeHeartbeat`, `StatusPage`, `NginxNode`, `NginxVirtualHost`, `DockerHost`, `ComposeStack`, `SystemMetricSnapshot`, `ContainerMetricSnapshot`, `AlertRule`, `AlertHistory` (sertakan indeks komposit `(company_id, host_id, recorded_at)` untuk mendukung data retention cleanup 30-90 hari).
+   - `FimBaselineEvent`, `SecurityAlertEvent`, `VulnerabilityFinding`, `ComplianceCheckResult`, `PamVaultAccount`, `PamAccessPolicy`, `PamSessionLog`, dan `FileAsset`.
+2. Buat migrasi SQL awal (`npx prisma migrate dev --name init_enterprise_platform`) dan buat **Idempotent Seeder (`osc_base/prisma/seed.ts`)** untuk membuat akun awal `Global Super Admin` (dari `.env`) serta mengisi master registry `MenuModule`.
+3. Dokumentasikan spesifikasi penuh beserta tabel pemetaan tipe data Prisma-ke-SQLx di `osc_docs/base/schema-p3.md`.
+4. Jalankan `npx prisma db seed` untuk verifikasi seeder, lalu buka `osc_docs/checklist.md`, centang `[x]` pada baris **Hari 8 (`SESI 1.4`)**, isi tanggal hari ini, dan catat ringkasan hasil verifikasi di tabel log harian.
+
+
+================================================================================
+TAHAP 2: WAVE 1 — CORE RBAC, HRIS/MFA AUTH, DYNAMIC ITEMS, ITAM & DCIM/IPAM
+================================================================================
+
+--- [SESI 2.1] Wave 1 Backend Rust: Auth HRIS/MFA, Company Switcher, Menu Privilege, ITAM & Excel ---
+Gunakan skill `ai-rest` untuk membaca `osc_docs/reengineering.md` dan `osc_docs/base/schema-p1.md` serta `schema-p2.md`:
+1. Inisialisasi proyek Rust Clean Architecture (`axum` + `sqlx` + `aws-sdk-s3` RustFS + `calamine` + `rust_xlsxwriter` + `quick-xml` + `totp-rs` + `aes-gcm`) di `osc_rest/` dengan propagasi `X-Correlation-ID`.
+2. Implementasikan **Dual-Mode Auth & HRIS ASMX XML Engine**:
+   - Endpoint publik `GET /api/v1/auth/companies` (mengembalikan daftar company aktif beserta flag apakah memakai HRIS, tanpa membocorkan URL/secret).
+   - `POST /api/v1/auth/login`: Jika `company_id` memiliki `hris_login_url`, lakukan HTTP `GET` ke URL HRIS (`uLogin` & `uPaswd` ter-encode, anti-SSRF allowlist, batas body 64 KB, sensor `uPaswd` di log) dengan **Circuit Breaker** (open 60s jika gagal 5x/30s). Parse XML `<string>`: jika `1|`, sync profil user dan update `password_hash` (`Argon2id`) + `last_hris_sync_at`; jika `0|...|NONE`, tolak `401`; jika gangguan upstream/non-XML, fallback verifikasi `Argon2id` lokal selama masih dalam `hris_cache_ttl_hours` (catat `LOGIN_HRIS_OFFLINE_CACHE`), atau `502`. Jika `hris_login_url` kosong atau `company_id == ""`, validasi Local Login `Argon2id`.
+3. Implementasikan **Optional TOTP MFA & Safe Recovery**:
+   - Jika `user.mfa_enabled == true`, kembalikan `mfa_required: true` + `mfa_challenge_token` (JWT 5 menit `scope: "mfa_pending"`).
+   - Sediakan `/api/v1/auth/mfa/setup`, `/enable`, `/verify` (anti-replay `mfa_last_verified_step`, rate-limit 5x gagal, dukungan backup code sekali pakai), `/disable`, `/reset-request`, `/reset-confirm`, serta admin reset `POST /api/v1/users/{id}/mfa/reset`.
+4. Implementasikan **Company Switcher, Menu Privilege & Tenant Guard**:
+   - `POST /api/v1/auth/switch-company` (verifikasi `UserCompanyAccess`, terbitkan ulang JWT dengan `active_company_id`).
+   - `GET /api/v1/me/navigation` (mengembalikan daftar company user + pohon `MenuModule` sesuai `CompanyMenuPrivilege`).
+   - Middleware `RequestContext` yang mengunci `active_company_id` pada semua query SQLx.
+5. Implementasikan endpoint **Dynamic Items** (`/api/v1/collections`, `/fields`, `/items/{collection}` dengan filter AST terparameterisasi), **ITAM** (`/api/v1/assets`, `/checkout`, `/checkin`, `/licenses`, `/tickets`), **DCIM/IPAM** (`/api/v1/dcim/racks`, `/api/v1/ipam/prefixes`, `/addresses`), **RustFS Files** (`/api/v1/files`), dan **Excel Import/Export** (`/api/v1/assets/import` & `/export` via `spawn_blocking` + sanitasi formula injection).
+6. Simpan spesifikasi API & kontrak JSON/OpenAPI di `osc_docs/rest/api-w1.md` dan `osc_docs/rest/contracts/w1.openapi.yaml`.
+7. Jalankan `cargo check` dan `cargo clippy -- -D warnings`, lalu centang `[x]` pada baris **Hari 9 (`SESI 2.1`)** di `osc_docs/checklist.md`.
+
+--- [SESI 2.2] Wave 1 Frontend Next.js: Login HRIS/MFA, Company Switcher, Dynamic Studio & ITAM UI ---
+Gunakan skill `ai-site` untuk membaca `osc_docs/rest/api-w1.md` dan `osc_docs/rest/contracts/w1.openapi.yaml`:
+1. Inisialisasi struktur Clean Architecture (`domain`, `application`, `infrastructure`, `presentation`) di `osc_site/` menggunakan Next.js App Router + `shadcn/ui`.
+2. Buat **Secure BFF API Proxy** `/app/api/proxy/[...path]/route.ts` dengan `HttpOnly` cookies, SSRF path whitelist ke `osc_rest`, propagasi `X-Correlation-ID`, dan passthrough streaming untuk Excel dan file RustFS.
+3. Implementasikan **Halaman Login Dual-Mode & MFA**:
+   - Dropdown pilih Company (dengan opsi default `"Local / Global Login"` bernilai `""`), label dinamis (`HRIS ID` vs `Username`), serta transisi otomatis ke input `InputOTP` 6-digit + tombol *"Gunakan Backup Code / Reset MFA"* jika `mfa_required: true`.
+4. Implementasikan **App Shell Dinamis**:
+   - Komponen **Company Switcher** di header sidebar (`Popover` + `Command`) yang memanggil `/api/proxy/v1/auth/switch-company` dan me-refresh state halaman.
+   - Sidebar navigasi dinamis dari `GET /api/proxy/v1/me/navigation` + Route Guard jika URL diakses tanpa privilege.
+   - Halaman Profil Keamanan User untuk aktivasi/nonaktifkan TOTP MFA (QR Code + Backup Codes).
+5. Implementasikan modul UI Wave 1 (`shadcn/ui`): Manajemen Aset (Check-Out/Check-In Modal), Software Licenses, Helpdesk Tickets, DCIM/IPAM Explorer, Dynamic Collection Explorer, serta **Excel Import Modal** (progress bar + tabel error per baris) dan **Excel Export** streaming.
+6. Dokumentasikan di `osc_docs/site/app-w1.md`, verifikasi dengan `npx tsc --noEmit` dan `npm run lint`, lalu centang `[x]` pada baris **Hari 10 (`SESI 2.2`)** di `osc_docs/checklist.md`.
+
+--- [SESI 2.3] Wave 1 QA Functional & SOC Security Test Suite ---
+Gunakan skill `ai-test` untuk membaca `osc_docs/rest/api-w1.md` dan `osc_docs/site/app-w1.md`:
+1. Bangun kerangka Python `pytest` Clean Architecture (`src/{domain,application,infrastructure}` dan `test/`) di `osc_docs/test/rest_qad/` dan `osc_docs/test/rest_soc/`.
+2. Di `osc_docs/test/rest_qad/test/wave1/`: Buat test untuk Local Login, mock HRIS XML `1|` (verifikasi auto-sync `password_hash`), simulasi HRIS timeout/non-XML (verifikasi offline cache fallback), TOTP MFA setup/verify/backup-code reset, `switch-company`, `me/navigation`, ITAM checkout/checkin, dan Excel import/export.
+3. Di `osc_docs/test/rest_soc/test/wave1/`: Buat penetration test untuk bypass `mfa_challenge_token` ke endpoint bisnis, TOTP replay attack, IDOR `switch-company` ke company ilegal, kebocoran data lintas `company_id`, SQL injection pada dynamic `filter` AST, dan Excel formula injection (`=cmd|...`).
+4. Buat laporan teknis di `osc_docs/test/rest_qad/qar-w2.md` dan `osc_docs/test/rest_soc/soc-w1.md`, lalu centang `[x]` pada baris **Hari 11 (`SESI 2.3`)** di `osc_docs/checklist.md`.
+
+
+================================================================================
+TAHAP 3: WAVE 2 — OBSERVABILITY, UPTIME, DOCKER & NGINX CONTROL PLANE
+================================================================================
+
+--- [SESI 3.1] Wave 2 Backend Rust: Agent Enrollment, Telemetry Ingest, Uptime & Docker/Nginx Control ---
+Gunakan skill `ai-rest` untuk membaca `osc_docs/reengineering.md` dan `osc_docs/base/schema-p3.md`:
+1. Tambahkan modul Wave 2 di `osc_rest/` dengan isolasi ketat `active_company_id`:
+   - **Agent Enrollment & Auth**: `POST /api/v1/agents/enrollment-tokens` (admin) dan `POST /api/v1/agents/enroll` (menukar one-time token dengan `agent_id`, `hmac_secret`, dan `company_id`).
+   - **High-Throughput Telemetry Ingest**: `POST /api/v1/agents/inventory/ingest` (hardware/software discovery) dan `POST /api/v1/agents/metrics/ingest` (batch host CPU/RAM/Disk/S.M.A.R.T., Docker container stats, dan SNMP interface metrics) + evaluasi `AlertRule`.
+   - **Synthetic Uptime & Status Pages**: CRUD `/api/v1/monitors`, `POST /api/v1/agents/uptime/ingest`, dan publik `GET /api/v1/status-pages/{slug}`.
+   - **Docker Stack & Nginx Reverse Proxy Control Plane**: CRUD `/api/v1/docker/stacks` (validasi `compose.yaml`, anti-path traversal, backup snapshot ke RustFS, dispatch perintah `up`/`down`/`pull`/`restart`) dan CRUD `/api/v1/nginx/vhosts` (validasi blok config, backup ke RustFS, dispatch `test & reload`), ditambah streaming live logs via **SSE**.
+2. Dokumentasikan di `osc_docs/rest/api-w2.md` dan `osc_docs/rest/contracts/w2.openapi.yaml`.
+3. Jalankan `cargo check` dan `cargo clippy -- -D warnings`, lalu centang `[x]` pada baris **Hari 12 (`SESI 3.1`)** di `osc_docs/checklist.md`.
+
+--- [SESI 3.2] Wave 2 Golang Cross-Platform Agents (`host_telemetry`, `network_poller`, `infra_control`) ---
+Gunakan skill `ai-auto` untuk membaca `osc_docs/rest/api-w2.md` dan `osc_docs/rest/contracts/w2.openapi.yaml`:
+1. Buat tiga agent Golang Clean Architecture terisolasi di `osc_auto/` yang mendukung flag `--enroll <TOKEN>`, mode CLI (`--run-console`), Linux `systemd`, dan Windows `Windows Service`:
+   - `osc_auto/host_telemetry_agent`: Mengumpulkan inventaris hardware/software OS serta metrik host & Docker container stats lalu mengirim via TLS + HMAC ke `osc_rest`. Dokumentasikan di `osc_docs/auto/host_telemetry_agent/README.md`.
+   - `osc_auto/network_poller_agent`: Melakukan polling SNMP/ICMP dan pengecekan sintetik HTTP/S, TCP, DNS, serta masa berlaku SSL cert lalu mengirim hasilnya ke `osc_rest`. Dokumentasikan di `osc_docs/auto/network_poller_agent/README.md`.
+   - `osc_auto/infra_control_agent`: Mengelola file `compose.yaml` dalam `STACKS_DIR` (validasi path ketat) serta virtual host Nginx (`nginx -t` sebelum `reload` dengan rollback otomatis jika gagal). Dokumentasikan di `osc_docs/auto/infra_control_agent/README.md`.
+2. Jalankan `go vet ./...`, `go test -race ./...`, serta uji cross-compile `GOOS=linux` dan `GOOS=windows` untuk ketiganya, lalu centang `[x]` pada baris **Hari 13 (`SESI 3.2`)** di `osc_docs/checklist.md`.
+
+--- [SESI 3.3] Wave 2 Frontend Next.js: NOC Dashboard, Uptime, Docker Compose & Nginx Studio ---
+Gunakan skill `ai-site` untuk membaca `osc_docs/rest/api-w2.md` dan `osc_docs/rest/contracts/w2.openapi.yaml`:
+1. Perbarui whitelist `/app/api/proxy/[...path]/route.ts` untuk rute Wave 2 (termasuk SSE streaming logs).
+2. Bangun halaman UI Wave 2 (`shadcn/ui`) yang menghormati privilege menu Company aktif:
+   - **NOC Command Center Dashboard**: Grafik metrik host (CPU/RAM/Disk/S.M.A.R.T.), status Uptime Monitors, dan generator **Agent Enrollment Token**.
+   - **Docker Stack & Container Studio**: Editor YAML untuk `compose.yaml`, tombol `Deploy / Pull / Restart / Stop`, dan viewer live logs.
+   - **Nginx Reverse Proxy Studio**: Manajemen Virtual Host, status SSL certificate expiry, dan tombol `Test & Reload`.
+3. Dokumentasikan di `osc_docs/site/app-w2.md`, jalankan `npx tsc --noEmit` dan `npm run lint`, lalu centang `[x]` pada baris **Hari 14 (`SESI 3.3`)** di `osc_docs/checklist.md`.
+
+--- [SESI 3.4] Wave 2 QA & SOC Security Test Suite ---
+Gunakan skill `ai-test` untuk membaca `osc_docs/rest/api-w2.md`:
+1. Di `osc_docs/test/rest_qad/test/wave2/`: Buat test untuk agent enrollment, batch telemetry/uptime ingestion, CRUD `compose.yaml` stack, dan Nginx virtual host config.
+2. Di `osc_docs/test/rest_soc/test/wave2/`: Buat security test untuk replay/expired enrollment token, pemalsuan signature HMAC agent, **Path Traversal** pada nama stack `compose.yaml` (`../../etc/cron.d`), dan **Command Injection** pada konfigurasi Nginx upstream/server_name.
+3. Buat laporan di `osc_docs/test/rest_qad/qar-w2.md` dan `osc_docs/test/rest_soc/soc-w2.md`, lalu centang `[x]` pada baris **Hari 15 (`SESI 3.4`)** di `osc_docs/checklist.md`.
+
+
+================================================================================
+TAHAP 4: WAVE 3 — SECOPS (SIEM/FIM/CVE), PAM BASTION & NOTIFICATION WORKER
+================================================================================
+
+--- [SESI 4.1] Wave 3 Backend Rust: SIEM/FIM/CVE Ingest & PAM Bastion Vault (Mandatory MFA) ---
+Gunakan skill `ai-rest` untuk membaca `osc_docs/reengineering.md` dan `osc_docs/base/schema-p3.md`:
+1. Implementasikan modul SecOps & PAM di `osc_rest/` dengan isolasi `active_company_id`:
+   - **Security Telemetry Ingest**: `POST /api/v1/agents/security/ingest` untuk menerima event File Integrity Monitoring (FIM), log anomali keamanan, dan pencocokan paket terinstal terhadap CVE.
+   - **PAM Vault & Session Authorization**: CRUD `/api/v1/pam/accounts` (enkripsi secret/private key menggunakan `AES-256-GCM` dengan `APP_MASTER_ENCRYPTION_KEY`) dan `POST /api/v1/pam/sessions/authorize`.
+   - **Mandatory MFA & Step-Up Enforcement**: Endpoint `POST /api/v1/pam/sessions/authorize` wajib menolak akses (`403 MFA_REQUIRED_FOR_PAM`) jika `user.mfa_enabled == false`, dan wajib meminta verifikasi OTP baru jika verifikasi terakhir > 15 menit, sebelum menerbitkan ephemeral session ticket untuk `pam_bastion_gateway`.
+   - **Immutable Session Recording**: `POST /api/v1/pam/sessions/{id}/recording` untuk mengunggah rekaman terminal sesi ke bucket privat RustFS (`RUSTFS_BUCKET_PAM`).
+   - **Notification Channel & Retention API**: CRUD `/api/v1/notifications/channels` (SMTP/Telegram/Webhook per company) dan endpoint internal pembersihan data retensi untuk `flow_worker_agent`.
+2. Dokumentasikan di `osc_docs/rest/api-w3.md` dan `osc_docs/rest/contracts/w3.openapi.yaml`.
+3. Jalankan `cargo check` dan `cargo clippy -- -D warnings`, lalu centang `[x]` pada baris **Hari 16 (`SESI 4.1`)** di `osc_docs/checklist.md`.
+
+--- [SESI 4.2] Wave 3 Golang Agents (`pam_bastion_gateway` & `flow_worker_agent`) + FIM Upgrade ---
+Gunakan skill `ai-auto` untuk membaca `osc_docs/rest/api-w3.md` dan `osc_docs/rest/contracts/w3.openapi.yaml`:
+1. Tambahkan modul **File Integrity Monitoring (FIM)** ringan ke `osc_auto/host_telemetry_agent` untuk memantau perubahan hash/permission direktori kritis (`/etc`, binary penting, config).
+2. Buat `osc_auto/pam_bastion_gateway` (Golang Clean Architecture):
+   - WebSocket-to-SSH bastion proxy yang memvalidasi ephemeral session ticket ke `osc_rest`, mengambil kredensial target secara aman di memori tanpa pernah mengirimkannya ke browser, menerapkan **Command ACL Blacklist** (memblokir perintah terlarang secara real-time), dan mengunggah rekaman sesi ke `osc_rest` -> RustFS. Dokumentasikan di `osc_docs/auto/pam_bastion_gateway/README.md`.
+3. Buat `osc_auto/flow_worker_agent` (Golang Clean Architecture):
+   - Worker asinkron lintas platform untuk memproses outbound webhooks, mengirim notifikasi email SMTP (termasuk token reset MFA), Telegram/Slack alerts (downtime, disk penuh, SIEM critical), dan menjalankan **Data Retention Cleanup** terjadwal (30-90 hari). Dokumentasikan di `osc_docs/auto/flow_worker_agent/README.md`.
+4. Jalankan `go vet ./...`, `go test -race ./...`, serta cross-compile Linux & Windows, lalu centang `[x]` pada baris **Hari 17 (`SESI 4.2`)** di `osc_docs/checklist.md`.
+
+--- [SESI 4.3] Wave 3 Frontend Next.js: SecOps SIEM Dashboard, Web SSH Terminal & Notification UI ---
+Gunakan skill `ai-site` untuk membaca `osc_docs/rest/api-w3.md` dan `osc_docs/rest/contracts/w3.openapi.yaml`:
+1. Perbarui `/app/api/proxy/[...path]/route.ts` untuk mendukung rute SecOps, PAM, dan Notification Channels.
+2. Bangun halaman UI Wave 3 (`shadcn/ui`):
+   - **SecOps & Vulnerability Center**: Dashboard Security Alerts (severity & MITRE tag), FIM Change Logs, dan daftar CVE per asset.
+   - **PAM Bastion & Web SSH Terminal**: Daftar server target PAM, modal **Step-Up OTP Verification** (atau prompt aktivasi MFA jika user belum mengaktifkan MFA), komponen terminal interaktif `xterm.js` yang terhubung ke `pam_bastion_gateway`, serta **Session Replay Viewer**.
+   - **Notification Channel Settings**: Pengaturan SMTP Email, Telegram, dan Webhook per Company.
+3. Dokumentasikan di `osc_docs/site/app-w3.md`, jalankan `npx tsc --noEmit` dan `npm run lint`, lalu centang `[x]` pada baris **Hari 18 (`SESI 4.3`)** di `osc_docs/checklist.md`.
+
+--- [SESI 4.4] Wave 3 SOC Penetration Test Suite (PAM & SecOps Hardening) ---
+Gunakan skill `ai-test` untuk membaca `osc_docs/rest/api-w3.md`:
+1. Di `osc_docs/test/rest_soc/test/wave3/`: Buat penetration test khusus untuk:
+   - Percobaan otorisasi sesi PAM oleh user dengan `mfa_enabled == false` (wajib ditolak `403 MFA_REQUIRED_FOR_PAM`) atau MFA step-up kedaluwarsa (> 15 menit).
+   - Replay ephemeral PAM session ticket yang sudah terpakai.
+   - Uji **Command ACL Evasion** pada `pam_bastion_gateway` dan verifikasi bahwa API response tidak pernah membocorkan plaintext kredensial vault.
+   - Uji spoofing event SIEM/FIM tanpa HMAC valid.
+2. Buat laporan audit di `osc_docs/test/rest_soc/qar-w3.md`, lalu centang `[x]` pada baris **Hari 19 (`SESI 4.4`)** di `osc_docs/checklist.md`.
+
+
+================================================================================
+TAHAP 5: FINALISASI FULL-STACK DOCKER & CLEANUP
+================================================================================
+
+--- [SESI 5.1] Full-Stack Production Dockerfiles, Compose Wiring & Cleanup ---
+Gunakan skill `ai-main` untuk merakit seluruh ekosistem ke dalam arsitektur Docker produksi:
+1. Buat multi-stage `Dockerfile` (non-root) untuk:
+   - `osc_rest/Dockerfile` (`cargo-chef` builder -> `distroless/cc-debian12` non-root).
+   - `osc_site/Dockerfile` (Node Alpine `output: 'standalone'` non-root).
+   - `osc_base/Dockerfile` (Prisma CLI runner untuk migrasi & idempotent seed).
+   - `osc_auto/*/Dockerfile` (Static `CGO_ENABLED=0` -> `distroless/static-debian12` non-root untuk agent/gateway berbasis container).
+2. Perbarui `docker-compose.yml` di root workspace agar menjalankan: `postgres`, `rustfs`, `rustfs-init`, `prisma-migrate` (`npx prisma migrate deploy && npx prisma db seed`), `osc_rest`, `osc_site`, `pam_bastion_gateway`, dan `flow_worker_agent` dengan isolasi internal network, `read_only: true` filesystem, healthcheck, dan resource limits.
+3. Pastikan folder sementara `.rea_docs/` atau `.tmp_reeng/` sudah dihapus bersih dari workspace.
+4. Dokumentasikan panduan deployment produksi lengkap di `osc_docs/production.md`, validasi dengan `docker compose config`, lalu centang `[x]` pada baris **Hari 20 (`SESI 5.1`)** di `osc_docs/checklist.md`.
+
+================================================================================
+HARI 21: BUFFER & END-TO-END SMOKE TEST LOKAL
+================================================================================
+Jalankan `docker compose up -d --build`, login menggunakan akun Bootstrap Super Admin dari `.env`, buat Company pertama (uji HRIS link & Local login), aktifkan TOTP MFA, enroll agent Golang pertama, dan verifikasi seluruh alur berjalan mulus!

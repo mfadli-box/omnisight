@@ -1,0 +1,38 @@
+# =============================================================================
+# rest_soc — SOC security test suite (pytest) untuk omnisight.
+# Struktur Clean Architecture: src/{domain,application,infrastructure} + test/.
+# Jalankan dari folder ini:   python3 -m pytest -v
+#
+# ATURAN MAIN (Rules of Engagement): seluruh test non-destruktif,
+# deterministik, dan terbatas jumlahnya (lihat src/infrastructure/config.py);
+# target default 127.0.0.1:8000 via environment — JANGAN diarahkan ke
+# lingkungan yang bukan milik Anda.
+# =============================================================================
+[project]
+name = "rest-soc"
+version = "0.1.0"
+description = "SOC security test suite omnisight — validasi defensif osc_rest (OWASP API Top 10)"
+requires-python = ">=3.10"
+dependencies = [
+    "httpx>=0.27",
+    "pydantic>=2.9",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["test"]
+pythonpath = ["src"]
+addopts = "-ra --strict-markers"
+markers = [
+    "unit: test murni tanpa jaringan/OS (selalu berjalan di CI)",
+    "soc: seluruh test keamanan SOC",
+    "headers: audit security header & informasi bocor",
+    "info_leak: kebocoran informasi internal pada error response",
+    "injection: SQLi/path traversal/formula injection",
+    "idor: broken object level authorization (API1:2023)",
+    "auth_bypass: broken authentication & escalation (API2:2023)",
+    "file_upload_abuse: penyalahgunaan upload Excel/RustFS",
+    "rate_limit: verifikasi rate limiting tower-governor",
+]
