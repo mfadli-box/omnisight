@@ -5,6 +5,7 @@ use std::sync::Arc;
 use crate::infrastructure::config::AppConfig;
 use crate::infrastructure::crypto::CryptoProvider;
 use crate::infrastructure::hris::HrisClient;
+use crate::infrastructure::logstream::LogBroker;
 use crate::infrastructure::mfa_reset::MfaResetStore;
 use crate::infrastructure::persistence::PgHealth;
 use crate::infrastructure::ratelimit::RateLimiter;
@@ -19,6 +20,8 @@ pub struct AppState {
     pub crypto: Arc<CryptoProvider>,
     pub hris: Arc<HrisClient>,
     pub store: Arc<Store>,
+    /// Broker log live (docker/nginx) — sumber stream SSE Wave 2.
+    pub logs: Arc<LogBroker>,
     /// Rate-limit MFA (5 kegagalan → lockout) — key `mfa:{user_id}`.
     pub mfa_limiter: Arc<RateLimiter>,
     /// Rate-limit login (10 kegagalan → lockout) — key `login:{username}`.

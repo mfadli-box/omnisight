@@ -17,6 +17,7 @@ use std::time::Duration;
 use crate::infrastructure::config::AppConfig;
 use crate::infrastructure::crypto::CryptoProvider;
 use crate::infrastructure::hris::HrisClient;
+use crate::infrastructure::logstream::LogBroker;
 use crate::infrastructure::mfa_reset::MfaResetStore;
 use crate::infrastructure::persistence::PgHealth;
 use crate::infrastructure::ratelimit::RateLimiter;
@@ -93,6 +94,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Login: 10 kegagalan / 15 menit → lockout 15 menit per username.
         login_limiter: Arc::new(RateLimiter::new(10, Duration::from_secs(900), Duration::from_secs(900))),
         mfa_resets: Arc::new(MfaResetStore::default()),
+        // Broker log live (SSE Wave 2) — in-process broadcast.
+        logs: Arc::new(LogBroker::new()),
     };
 
     let addr: SocketAddr = format!("{}:{}", state.config.host, state.config.port).parse()?;

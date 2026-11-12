@@ -1,14 +1,20 @@
 //! Definisi router — satu-satunya tempat pemetaan route.
 //!
 //! Topologi:
-//! - Publik: health, `auth/companies`, `auth/login`, `mfa/reset-request`.
-//! - Terproteksi (RequestContext middleware): MFA, switch-company,
-//!   navigation, studio/items, ITAM, DCIM/IPAM, files, excel.
+//! - Publik: health, `auth/companies`, `auth/login`, `mfa/reset-request`,
+//!   `status-pages/{slug}` (status page publik), `agents/enroll`.
+//! - Agent (HMAC per-request — bukan JWT): `agents/{inventory,metrics,uptime}/ingest`,
+//!   `agents/logs`.
+//! - Terproteksi (RequestContext middleware): MFA, switch-company, navigation,
+//!   studio/items, ITAM, DCIM/IPAM, files, excel, monitors, status-pages,
+//!   docker stacks, nginx vhosts, SSE logs.
 //! - Middleware global: correlation_id (X-Correlation-ID) + security headers.
 
+use axum::extract::DefaultBodyLimit;
 use axum::routing::{get, post};
 use axum::{Router, middleware as axum_middleware};
 
+use crate::presentation::http::agent_auth::MAX_AGENT_BODY;
 use crate::presentation::http::handlers;
 use crate::presentation::http::middleware::correlation_id::correlation_id;
 use crate::presentation::http::middleware::request_context::request_context;
@@ -70,17 +76,97 @@ pub fn build_router(state: AppState) -> Router {
             get(handlers::files::list).post(handlers::files::upload),
         )
         .route("/api/v1/files/{id}", get(handlers::files::get))
+        // --- Wave 2: Uptime monitors & status pages ---
+        .route(
+            "/api/v1/monitors",
+            get(handlers::uptime::list_monitors).post(handlers::uptime::create_monitor),
+        )
+        .route(
+            "/api/v1/monitors/{id}",
+            get(handlers::uptime::get_monitor)
+                .put(handlers::uptime::update_monitor)
+                .delete(handlers::uptime::delete_monitor),
+        )
+        .route(
+            "/api/v1/status-pages",
+            get(handlers::uptime::list_status_pages).post(handlers::uptime::create_status_page),
+        )
+        .route(
+            "/api/v1/status-pages/{id}",
+            get(handlers::uptime::get_status_page)
+                .put(handlers::uptime::update_status_page)
+                .delete(handlers::uptime::delete_status_page),
+        )
+        // --- Wave 2: Docker stack control plane ---
+        .route(
+            "/api/v1/docker/hosts",
+            get(handlers::infra::list_docker_hosts),
+        )
+        .route(
+            "/api/v1/docker/stacks",
+            get(handlers::infra::list_stacks).post(handlers::infra::create_stack),
+        )
+        .route(
+            "/api/v1/docker/stacks/{id}",
+            get(handlers::infra::get_stack)
+                .put(handlers::infra::update_stack)
+                .delete(handlers::infra::delete_stack),
+        )
+        .route("/api/v1/docker/stacks/{id}/dispatch", post(handlers::infra::dispatch_stack))
+        // --- Wave 2: Nginx reverse proxy control plane ---
+        .route("/api/v1/nginx/nodes", get(handlers::infra::list_nginx_nodes))
+        .route(
+            "/api/v1/nginx/vhosts",
+            get(handlers::infra::list_vhosts).post(handlers::infra::create_vhost),
+        )
+        .route(
+            "/api/v1/nginx/vhosts/{id}",
+            get(handlers::infra::get_vhost)
+                .put(handlers::infra::update_vhost)
+                .delete(handlers::infra::delete_vhost),
+        )
+        .route("/api/v1/nginx/vhosts/{id}/dispatch", post(handlers::infra::dispatch_vhost))
+        // --- Wave 2: Live logs (SSE) ---
+        .route("/api/v1/infra/logs/stream", get(handlers::infra::stream_logs))
+        // --- Wave 2: Agent enrollment (admin) ---
+        .route(
+            "/api/v1/agents/enrollment-tokens",
+            post(handlers::agents::create_enrollment_token),
+        )
         .route_layer(axum_middleware::from_fn_with_state(state.clone(), request_context))
         .layer(axum::extract::DefaultBodyLimit::max(handlers::files::MAX_UPLOAD_BYTES));
+
+    // --- Router agent (HMAC per-request, bukan JWT) ---
+    let agent = Router::new()
+        .route(
+            "/api/v1/agents/inventory/ingest",
+            post(handlers::agents::inventory_ingest),
+        )
+        .route(
+            "/api/v1/agents/metrics/ingest",
+            post(handlers::agents::metrics_ingest),
+        )
+        .route(
+            "/api/v1/agents/uptime/ingest",
+            post(handlers::agents::uptime_ingest),
+        )
+        .route("/api/v1/agents/logs", post(handlers::agents::logs_ingest))
+        .layer(DefaultBodyLimit::max(MAX_AGENT_BODY));
 
     // --- Router publik ---
     let public = Router::new()
         .route("/api/v1/health", get(handlers::health::health))
         .route("/api/v1/auth/companies", get(handlers::auth::companies))
         .route("/api/v1/auth/login", post(handlers::auth::login))
-        .route("/api/v1/auth/mfa/reset-request", post(handlers::mfa::reset_request));
+        .route("/api/v1/auth/mfa/reset-request", post(handlers::mfa::reset_request))
+        .route("/api/v1/agents/enroll", post(handlers::agents::enroll))
+        // Status page publik (tanpa auth; hanya `is_published`).
+        .route("/api/v1/status-pages/{slug}", get(handlers::uptime::public_status_page));
 
-    let app = public.merge(protected).with_state(state);
+    let app = public
+        .merge(protected)
+        .merge(agent)
+        .with_state(state);
 
     app.layer(axum_middleware::from_fn(correlation_id))
         .layer(axum_middleware::from_fn(security_headers))

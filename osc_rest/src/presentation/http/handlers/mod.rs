@@ -1,9 +1,12 @@
+pub mod agents;
 pub mod auth;
 pub mod excel;
 pub mod files;
 pub mod health;
+pub mod infra;
 pub mod itam;
 pub mod me;
 pub mod mfa;
 pub mod net;
 pub mod studio;
+pub mod uptime;

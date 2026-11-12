@@ -1,0 +1,1178 @@
+openapi: 3.1.0
+info:
+  title: omnisight osc_rest — Wave 2 (Agent Enrollment, Telemetry Ingest, Uptime, Docker/Nginx Control Plane, SSE Logs)
+  version: 1.0.0-w2
+  description: |
+    Kontrak OpenAPI 3.1 untuk Wave 2 `osc_rest` (Hari 13 / SESI 3.1).
+    Autentikasi agent: HMAC-SHA256 per-request
+    (X-Agent-Id + X-Agent-Timestamp ±30s + X-Agent-Signature atas
+    "{ts}\n{METHOD}\n{path}\n{sha256_hex(body)}").
+    Seluruh endpoint meng-echo X-Correlation-ID (di-generate UUIDv7 bila tidak ada).
+    Envelope error: {status:"error", error:{code,message}, correlation_id}.
+    Konvensi penamaan field: snake_case. Dokumentasi lengkap: osc_docs/rest/api-w2.md.
+servers:
+  - url: /api/v1
+tags:
+  - name: agents
+  - name: telemetry
+  - name: uptime
+  - name: status-pages
+  - name: docker
+  - name: nginx
+  - name: sse-logs
+
+paths:
+  # ====================================================================
+  # Agent Enrollment
+  # ====================================================================
+  /agents/enrollment-tokens:
+    post:
+      tags: [agents]
+      summary: Terbitkan one-time enrollment token (admin; token ditampilkan sekali)
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [node_type]
+              properties:
+                node_type:
+                  type: string
+                  enum: [HOST, NETWORK, VIRTUAL, CONTAINER, RACK_MOUNTED, SERVICE]
+                ttl_hours:
+                  type: integer
+                  minimum: 1
+                  maximum: 72
+                  default: 24
+      responses:
+        '201':
+          description: Token dibuat
+          headers:
+            X-Correlation-ID: { $ref: '#/components/headers/CorrelationId' }
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: success }
+                  data: { $ref: '#/components/schemas/EnrollmentTokenIssued' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+
+  /agents/enroll:
+    post:
+      tags: [agents]
+      summary: Tukar one-time token dengan agent_id + hmac_secret + company_id (publik)
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enrollment_token, hostname, asset_model_id, status_label_id]
+              properties:
+                enrollment_token: { type: string, maxLength: 255 }
+                hostname: { type: string, minLength: 1, maxLength: 150 }
+                mgmt_ip: { type: string, format: ipv4 }
+                asset_model_id: { type: string, format: uuid }
+                status_label_id: { type: string, format: uuid }
+                asset_tag:
+                  type: string
+                  maxLength: 100
+                  description: Unik per company; default AG-<uuidv7>
+                agent_version: { type: string, maxLength: 50 }
+      responses:
+        '201':
+          description: Agent terdaftar (hmac_secret ditampilkan sekali)
+          headers:
+            X-Correlation-ID: { $ref: '#/components/headers/CorrelationId' }
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: success }
+                  data: { $ref: '#/components/schemas/AgentEnrolled' }
+        '401': { $ref: '#/components/responses/Error' }
+
+  # ====================================================================
+  # Telemetry / Inventory Ingest (Agent HMAC)
+  # ====================================================================
+  /agents/inventory/ingest:
+    post:
+      tags: [telemetry]
+      summary: Ingest inventaris hardware/software (+ S.M.A.R.T. via /agents/metrics/ingest)
+      security: [{ AgentHmac: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/AgentTimestamp'
+        - $ref: '#/components/parameters/AgentSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InventoryPayload' }
+      responses:
+        '202': { $ref: '#/components/responses/AcceptedSnapshot' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+
+  /agents/metrics/ingest:
+    post:
+      tags: [telemetry]
+      summary: |
+        Batch metrik host CPU/RAM/Disk, Docker container stats, SNMP interface
+        metrics, laporan S.M.A.R.T. + evaluasi AlertRule (histeresis app-level).
+      security: [{ AgentHmac: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/AgentTimestamp'
+        - $ref: '#/components/parameters/AgentSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MetricsPayload' }
+      responses:
+        '202':
+          description: Batch tersimpan + jumlah event alert
+          headers:
+            X-Correlation-ID: { $ref: '#/components/headers/CorrelationId' }
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: accepted }
+                  data:
+                    type: object
+                    properties:
+                      system_rows: { type: integer }
+                      container_rows: { type: integer }
+                      interface_rows: { type: integer }
+                      smart_reports: { type: integer }
+                      alert_events: { type: integer }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+
+  /agents/uptime/ingest:
+    post:
+      tags: [uptime]
+      summary: Push heartbeat uptime (transisi important + evaluasi rule uptime.down)
+      security: [{ AgentHmac: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/AgentTimestamp'
+        - $ref: '#/components/parameters/AgentSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UptimeHeartbeatPayload' }
+      responses:
+        '202':
+          description: Heartbeat tersimpan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: accepted }
+                  data:
+                    type: object
+                    properties:
+                      heartbeat_id: { type: string, format: uuid }
+                      alert_events: { type: integer }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+
+  /agents/logs:
+    post:
+      tags: [sse-logs]
+      summary: Push baris log live docker/nginx (diteruskan ke subscriber SSE)
+      security: [{ AgentHmac: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/AgentTimestamp'
+        - $ref: '#/components/parameters/AgentSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LogsPayload' }
+      responses:
+        '202':
+          description: Baris diterbitkan ke broker
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: accepted }
+                  data:
+                    type: object
+                    properties:
+                      published: { type: integer }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+
+  # ====================================================================
+  # Monitors (JWT)
+  # ====================================================================
+  /monitors:
+    get:
+      tags: [uptime]
+      summary: Daftar monitor tenant aktif
+      security: [{ BearerJwt: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - name: limit
+          in: query
+          schema: { type: integer, default: 100 }
+        - name: offset
+          in: query
+          schema: { type: integer, default: 0 }
+      responses:
+        '200': { $ref: '#/components/responses/MonitorList' }
+    post:
+      tags: [uptime]
+      summary: Buat monitor (tipe PUSH mengembalikan push_token sekali)
+      security: [{ BearerJwt: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MonitorCreate' }
+      responses:
+        '201': { $ref: '#/components/responses/MonitorCreated' }
+        '400': { $ref: '#/components/responses/Error' }
+
+  /monitors/{id}:
+    parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [uptime]
+      summary: Detail monitor
+      security: [{ BearerJwt: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/MonitorItem' }
+        '404': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [uptime]
+      summary: Update monitor (tanpa rotasi push token)
+      security: [{ BearerJwt: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MonitorUpdate' }
+      responses:
+        '200': { $ref: '#/components/responses/MonitorItem' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [uptime]
+      summary: Soft delete monitor
+      security: [{ BearerJwt: [] }]
+      responses:
+        '204': { description: Terhapus (soft delete) }
+        '404': { $ref: '#/components/responses/Error' }
+
+  # ====================================================================
+  # Status Pages
+  # ====================================================================
+  /status-pages:
+    get:
+      tags: [status-pages]
+      summary: Daftar status page tenant aktif
+      security: [{ BearerJwt: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200': { $ref: '#/components/responses/StatusPageList' }
+    post:
+      tags: [status-pages]
+      summary: Buat status page + attach monitor
+      security: [{ BearerJwt: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StatusPageCreate' }
+      responses:
+        '201': { $ref: '#/components/responses/StatusPageCreated' }
+        '400': { $ref: '#/components/responses/Error' }
+
+  /status-pages/{id}:
+    parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [status-pages]
+      summary: Detail status page (tenant)
+      security: [{ BearerJwt: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/StatusPageItem' }
+        '404': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [status-pages]
+      summary: Update status page (monitor_ids di-set = replace m2m)
+      security: [{ BearerJwt: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StatusPageUpdate' }
+      responses:
+        '200': { $ref: '#/components/responses/StatusPageItem' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [status-pages]
+      summary: Soft delete status page
+      security: [{ BearerJwt: [] }]
+      responses:
+        '204': { description: Terhapus }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /status-pages/{slug}:
+    get:
+      tags: [status-pages]
+      summary: Status page publik (tanpa auth; hanya is_published; proyeksi aman)
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[a-z0-9-]{1,100}$' }
+      responses:
+        '200':
+          description: Halaman status + monitor rollup
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: success }
+                  data: { $ref: '#/components/schemas/StatusPagePublic' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  # ====================================================================
+  # Docker Stack Control Plane
+  # ====================================================================
+  /docker/hosts:
+    get:
+      tags: [docker]
+      summary: Daftar docker host (referensi)
+      security: [{ BearerJwt: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200': { $ref: '#/components/responses/DockerHostList' }
+
+  /docker/stacks:
+    get:
+      tags: [docker]
+      summary: Daftar compose stack
+      security: [{ BearerJwt: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - name: docker_host_id
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { $ref: '#/components/responses/StackList' }
+    post:
+      tags: [docker]
+      summary: Buat stack (validasi compose + working_dir anti traversal; env terenkripsi)
+      security: [{ BearerJwt: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StackCreate' }
+      responses:
+        '201': { $ref: '#/components/responses/StackCreated' }
+        '400': { $ref: '#/components/responses/Error' }
+
+  /docker/stacks/{id}:
+    parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [docker]
+      summary: Detail stack (compose_content disertakan; env ciphertext tidak diekspos)
+      security: [{ BearerJwt: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/StackItem' }
+        '404': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [docker]
+      summary: Update stack (backup snapshot lama ke RustFS dulu)
+      security: [{ BearerJwt: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StackUpdate' }
+      responses:
+        '200': { $ref: '#/components/responses/StackItem' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [docker]
+      summary: Soft delete stack
+      security: [{ BearerJwt: [] }]
+      responses:
+        '204': { description: Terhapus }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /docker/stacks/{id}/dispatch:
+    post:
+      tags: [docker]
+      summary: Dispatch perintah up/down/pull/restart (202; dieksekusi agent infra_control)
+      security: [{ BearerJwt: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [command]
+              properties:
+                command:
+                  type: string
+                  enum: [up, down, pull, restart]
+      responses:
+        '202':
+          description: Antrean dibuat
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: queued }
+                  data:
+                    type: object
+                    properties:
+                      dispatch_ref: { type: string, format: uuid }
+                      command: { type: string }
+                      stack_id: { type: string, format: uuid }
+        '400': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  # ====================================================================
+  # Nginx Control Plane
+  # ====================================================================
+  /nginx/nodes:
+    get:
+      tags: [nginx]
+      summary: Daftar nginx node (referensi)
+      security: [{ BearerJwt: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200': { $ref: '#/components/responses/NginxNodeList' }
+
+  /nginx/vhosts:
+    get:
+      tags: [nginx]
+      summary: Daftar vhost
+      security: [{ BearerJwt: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - name: nginx_node_id
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { $ref: '#/components/responses/VhostList' }
+    post:
+      tags: [nginx]
+      summary: 'Buat vhost (validasi blok config: brace seimbang, directive server wajib, include anti traversal)'
+      security: [{ BearerJwt: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VhostCreate' }
+      responses:
+        '201': { $ref: '#/components/responses/VhostCreated' }
+        '400': { $ref: '#/components/responses/Error' }
+
+  /nginx/vhosts/{id}:
+    parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [nginx]
+      summary: Detail vhost (config_content disertakan)
+      security: [{ BearerJwt: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/VhostItem' }
+        '404': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [nginx]
+      summary: Update vhost (backup config lama ke RustFS; status kembali DRAFT)
+      security: [{ BearerJwt: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VhostUpdate' }
+      responses:
+        '200': { $ref: '#/components/responses/VhostItem' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [nginx]
+      summary: Soft delete vhost
+      security: [{ BearerJwt: [] }]
+      responses:
+        '204': { description: Terhapus }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /nginx/vhosts/{id}/dispatch:
+    post:
+      tags: [nginx]
+      summary: Dispatch test & reload (nginx -t lalu reload oleh agent; 202)
+      security: [{ BearerJwt: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '202':
+          description: Antrean dibuat; status vhost TESTING
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: queued }
+                  data:
+                    type: object
+                    properties:
+                      dispatch_ref: { type: string, format: uuid }
+                      command: { type: string, const: test_reload }
+                      vhost_id: { type: string, format: uuid }
+        '400': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  # ====================================================================
+  # SSE Live Logs
+  # ====================================================================
+  /infra/logs/stream:
+    get:
+      tags: [sse-logs]
+      summary: |
+        Live logs via Server-Sent Events (text/event-stream).
+        Filter server-side per active_company_id + scope/reference opsional.
+        Keep-alive komentar tiap 15 detik; subscriber lambat menerima event "lagged".
+      security: [{ BearerJwt: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - name: scope
+          in: query
+          schema: { type: string, enum: [docker_stack, nginx_vhost] }
+        - name: reference
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Stream SSE
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                example: |
+                  event: log
+                  data: {"ts":"2026-11-12T08:00:01Z","scope":"docker_stack","reference":"…","company_id":"…","level":"INFO","source":"compose","message":"Container api  Healthy"}
+
+components:
+  securitySchemes:
+    BearerJwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token sesi (scope access) — active_company_id dari baris sesi DB.
+    AgentHmac:
+      type: apiKey
+      in: header
+      description: |
+        Kombinasi X-Agent-Id + X-Agent-Timestamp + X-Agent-Signature
+        (HMAC-SHA256 atas "{ts}\n{METHOD}\n{path}\n{sha256_hex(body)}", ±30 s).
+
+  parameters:
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: false
+      schema: { type: string, format: uuid }
+    AgentId:
+      name: X-Agent-Id
+      in: header
+      required: true
+      schema: { type: string, format: uuid }
+    AgentTimestamp:
+      name: X-Agent-Timestamp
+      in: header
+      required: true
+      schema: { type: integer, description: Unix epoch detik (±30 s) }
+    AgentSignature:
+      name: X-Agent-Signature
+      in: header
+      required: true
+      schema: { type: string, description: hex HMAC-SHA256 }
+
+  headers:
+    CorrelationId:
+      description: Correlation id request (echo / generate UUIDv7)
+      schema: { type: string, format: uuid }
+
+  responses:
+    Error:
+      description: Envelope error standar
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status: { type: string, const: error }
+              error:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    enum: [VALIDATION_ERROR, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT, PAYLOAD_TOO_LARGE, RATE_LIMITED, INTERNAL_ERROR]
+                  message: { type: string }
+    AcceptedSnapshot:
+      description: Snapshot inventaris tersimpan
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status: { type: string, const: accepted }
+              data:
+                type: object
+                properties:
+                  snapshot_id: { type: string, format: uuid }
+    MonitorList:
+      description: Daftar monitor
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status: { type: string, const: success }
+              data:
+                type: object
+                properties:
+                  count: { type: integer }
+                  monitors:
+                    type: array
+                    items: { $ref: '#/components/schemas/Monitor' }
+    MonitorItem:
+      description: Detail monitor
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status: { type: string, const: success }
+              data: { $ref: '#/components/schemas/Monitor' }
+    MonitorCreated:
+      description: Monitor dibuat (push_token bila PUSH)
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status: { type: string, const: success }
+              data:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  push_token: { type: string }
+    StatusPageList:
+      description: Daftar status page
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status: { type: string, const: success }
+              data:
+                type: object
+                properties:
+                  count: { type: integer }
+                  pages:
+                    type: array
+                    items: { $ref: '#/components/schemas/StatusPage' }
+    StatusPageItem:
+      description: Detail status page
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status: { type: string, const: success }
+              data: { $ref: '#/components/schemas/StatusPage' }
+    StatusPageCreated:
+      description: Status page dibuat
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status: { type: string, const: success }
+              data:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  slug: { type: string }
+    DockerHostList:
+      description: Daftar docker host
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status: { type: string, const: success }
+              data:
+                type: object
+                properties:
+                  count: { type: integer }
+                  hosts:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        name: { type: string }
+                        status: { type: string, enum: [ONLINE, OFFLINE, UNKNOWN] }
+                        docker_version: { type: string, nullable: true }
+                        container_count: { type: integer, nullable: true }
+                        last_seen_at: { type: string, format: date-time, nullable: true }
+    StackList:
+      description: Daftar stack
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status: { type: string, const: success }
+              data:
+                type: object
+                properties:
+                  count: { type: integer }
+                  stacks:
+                    type: array
+                    items: { $ref: '#/components/schemas/Stack' }
+    StackItem:
+      description: Detail stack
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status: { type: string, const: success }
+              data: { $ref: '#/components/schemas/Stack' }
+    StackCreated:
+      description: Stack dibuat
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status: { type: string, const: success }
+              data:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+    NginxNodeList:
+      description: Daftar nginx node
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status: { type: string, const: success }
+              data:
+                type: object
+                properties:
+                  count: { type: integer }
+                  nodes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        name: { type: string }
+                        status: { type: string, enum: [ONLINE, OFFLINE, UNKNOWN] }
+                        nginx_version: { type: string, nullable: true }
+                        last_seen_at: { type: string, format: date-time, nullable: true }
+    VhostList:
+      description: Daftar vhost
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status: { type: string, const: success }
+              data:
+                type: object
+                properties:
+                  count: { type: integer }
+                  vhosts:
+                    type: array
+                    items: { $ref: '#/components/schemas/Vhost' }
+    VhostItem:
+      description: Detail vhost
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status: { type: string, const: success }
+              data: { $ref: '#/components/schemas/Vhost' }
+    VhostCreated:
+      description: Vhost dibuat
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status: { type: string, const: success }
+              data:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+
+  schemas:
+    EnrollmentTokenIssued:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        token:
+          type: string
+          description: Plaintext token (hex 64) — ditampilkan sekali; DB hanya SHA-256.
+        node_type: { type: string }
+        expires_at: { type: string, format: date-time }
+    AgentEnrolled:
+      type: object
+      properties:
+        agent_id:
+          type: string
+          format: uuid
+          description: Id ManagedNode dinamis (assets.is_dynamic, source='agent').
+        company_id: { type: string, format: uuid }
+        hmac_secret:
+          type: string
+          description: Hex 64 — ditampilkan sekali; disimpan Envelope AES-256-GCM.
+        node_type: { type: string }
+        asset_tag: { type: string }
+    InventoryPayload:
+      type: object
+      properties:
+        cpu_model: { type: string }
+        cpu_cores: { type: integer }
+        memory_total_bytes: { type: integer, format: int64 }
+        storage_total_bytes: { type: integer, format: int64 }
+        os_name: { type: string }
+        os_version: { type: string }
+        hostname: { type: string, maxLength: 150 }
+        payload:
+          type: object
+          description: Payload mentah JSONB (disk, paket, service).
+          additionalProperties: true
+    MetricsPayload:
+      type: object
+      properties:
+        host:
+          type: object
+          nullable: true
+          description: Sampel host — host_id = identitas agent (bukan dari body).
+          properties:
+            recorded_at: { type: string, format: date-time }
+            cpu_usage_pct: { type: number, nullable: true }
+            load1: { type: number, nullable: true }
+            load5: { type: number, nullable: true }
+            load15: { type: number, nullable: true }
+            mem_used_bytes: { type: integer, format: int64, nullable: true }
+            mem_total_bytes: { type: integer, format: int64, nullable: true }
+            disk_used_bytes: { type: integer, format: int64, nullable: true }
+            disk_total_bytes: { type: integer, format: int64, nullable: true }
+            net_in_bps: { type: integer, format: int64, nullable: true }
+            net_out_bps: { type: integer, format: int64, nullable: true }
+            uptime_seconds: { type: integer, format: int64, nullable: true }
+        containers:
+          type: array
+          maxItems: 200
+          items:
+            type: object
+            required: [host_id, container_ref]
+            properties:
+              host_id: { type: string, format: uuid }
+              container_ref: { type: string, maxLength: 100 }
+              container_name: { type: string, nullable: true }
+              recorded_at: { type: string, format: date-time, nullable: true }
+              cpu_usage_pct: { type: number, nullable: true }
+              mem_used_bytes: { type: integer, format: int64, nullable: true }
+              mem_limit_bytes: { type: integer, format: int64, nullable: true }
+              net_in_bps: { type: integer, format: int64, nullable: true }
+              net_out_bps: { type: integer, format: int64, nullable: true }
+              block_read_bps: { type: integer, format: int64, nullable: true }
+              block_write_bps: { type: integer, format: int64, nullable: true }
+              pids: { type: integer, nullable: true }
+              is_running: { type: boolean, default: true }
+        smart:
+          type: array
+          maxItems: 64
+          description: Dipersist sebagai hardware_inventory_snapshots payload kind=smart.
+          items:
+            type: object
+            required: [device]
+            properties:
+              device: { type: string, maxLength: 200 }
+              health: { type: string, nullable: true }
+              temperature_c: { type: number, nullable: true }
+              reallocated_sectors: { type: integer, format: int64, nullable: true }
+              power_on_hours: { type: integer, format: int64, nullable: true }
+        snmp_interfaces:
+          type: array
+          maxItems: 500
+          items:
+            type: object
+            required: [interface_id, in_octets, out_octets]
+            properties:
+              interface_id: { type: string, format: uuid }
+              collected_at: { type: string, format: date-time, nullable: true }
+              in_octets: { type: integer, format: int64 }
+              out_octets: { type: integer, format: int64 }
+              in_unicast_packets: { type: integer, format: int64, nullable: true }
+              out_unicast_packets: { type: integer, format: int64, nullable: true }
+              in_errors: { type: integer, format: int64, nullable: true }
+              out_errors: { type: integer, format: int64, nullable: true }
+              in_discards: { type: integer, format: int64, nullable: true }
+              out_discards: { type: integer, format: int64, nullable: true }
+              in_rate_bps: { type: integer, format: int64, nullable: true }
+              out_rate_bps: { type: integer, format: int64, nullable: true }
+    UptimeHeartbeatPayload:
+      type: object
+      required: [monitor_id, status]
+      properties:
+        monitor_id: { type: string, format: uuid }
+        status: { type: string, enum: [UP, DOWN, PENDING, MAINTENANCE] }
+        ping_ms: { type: integer, nullable: true }
+        msg: { type: string, maxLength: 500, nullable: true }
+        recorded_at: { type: string, format: date-time, nullable: true }
+    LogsPayload:
+      type: object
+      required: [scope, reference, lines]
+      properties:
+        scope: { type: string, enum: [docker_stack, nginx_vhost] }
+        reference: { type: string, format: uuid }
+        source: { type: string, default: agent }
+        level: { type: string, enum: [DEBUG, INFO, WARN, ERROR], default: INFO }
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items: { type: string, maxLength: 2000 }
+    MonitorCreate:
+      type: object
+      required: [name, monitor_type, target]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 150 }
+        monitor_type: { type: string, enum: [HTTP, HTTPS, TCP, ICMP, DNS, KEYWORD, PUSH] }
+        target: { type: string, minLength: 1, maxLength: 500 }
+        config: { type: object, additionalProperties: true, nullable: true }
+        interval_seconds: { type: integer, default: 60 }
+        retries: { type: integer, default: 1 }
+        asset_id: { type: string, format: uuid, nullable: true }
+    MonitorUpdate:
+      type: object
+      properties:
+        name: { type: string, maxLength: 150, nullable: true }
+        target: { type: string, maxLength: 500, nullable: true }
+        config: { type: object, additionalProperties: true, nullable: true }
+        interval_seconds: { type: integer, nullable: true }
+        retries: { type: integer, nullable: true }
+        is_active: { type: boolean, nullable: true }
+    Monitor:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        type: { type: string }
+        target: { type: string }
+        config: { type: object, additionalProperties: true, nullable: true }
+        interval_seconds: { type: integer }
+        retries: { type: integer }
+        is_active: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    StatusPageCreate:
+      type: object
+      required: [slug, title]
+      properties:
+        slug: { type: string, pattern: '^[a-z0-9-]{1,100}$' }
+        title: { type: string, minLength: 1, maxLength: 150 }
+        description: { type: string, maxLength: 500, nullable: true }
+        is_published: { type: boolean, default: false }
+        monitor_ids:
+          type: array
+          items: { type: string, format: uuid }
+          description: Sort order = index array.
+    StatusPageUpdate:
+      type: object
+      properties:
+        title: { type: string, maxLength: 150, nullable: true }
+        description: { type: string, maxLength: 500, nullable: true }
+        is_published: { type: boolean, nullable: true }
+        monitor_ids:
+          type: array
+          nullable: true
+          items: { type: string, format: uuid }
+    StatusPage:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        title: { type: string }
+        description: { type: string, nullable: true }
+        is_published: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    StatusPagePublic:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        title: { type: string }
+        description: { type: string, nullable: true }
+        is_published: { type: boolean }
+        monitors:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string, format: uuid }
+              name: { type: string }
+              type: { type: string }
+              status: { type: string, nullable: true }
+              ping_ms: { type: integer, nullable: true }
+              message: { type: string, nullable: true }
+              uptime_pct_24h: { type: number, nullable: true }
+    StackCreate:
+      type: object
+      required: [docker_host_id, name, working_dir, compose_content]
+      properties:
+        docker_host_id: { type: string, format: uuid }
+        name: { type: string, pattern: '^[a-zA-Z0-9_-]{1,150}$' }
+        working_dir:
+          type: string
+          maxLength: 500
+          description: Path absolut host; tanpa '..', '~', backslash.
+        compose_content:
+          type: string
+          maxLength: 262144
+          description: Isi compose.yaml penuh (validasi struktural app-level).
+        env:
+          type: string
+          description: Env override plaintext — dienkripsi Envelope AES-256-GCM di server.
+    StackUpdate:
+      type: object
+      properties:
+        name: { type: string, nullable: true }
+        working_dir: { type: string, nullable: true }
+        compose_content: { type: string, nullable: true }
+        env:
+          type: string
+          nullable: true
+          description: String kosong = hapus env; isi = re-encrypt.
+        is_active: { type: boolean, nullable: true }
+    Stack:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        docker_host_id: { type: string, format: uuid }
+        host_name: { type: string }
+        name: { type: string }
+        working_dir: { type: string }
+        compose_content: { type: string, nullable: true }
+        drift_status: { type: string, enum: [IN_SYNC, DRIFTED, UNKNOWN] }
+        backup_object_key: { type: string, nullable: true }
+        last_deployed_at: { type: string, format: date-time, nullable: true }
+        last_synced_at: { type: string, format: date-time, nullable: true }
+        last_error: { type: string, nullable: true }
+        is_active: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    VhostCreate:
+      type: object
+      required: [nginx_node_id, server_name, config_content]
+      properties:
+        nginx_node_id: { type: string, format: uuid }
+        server_name: { type: string, minLength: 1, maxLength: 255 }
+        listen_port: { type: integer, default: 80 }
+        config_content: { type: string, maxLength: 131072 }
+        ssl_cert_path: { type: string, maxLength: 500, nullable: true }
+        ssl_key_path: { type: string, maxLength: 500, nullable: true }
+    VhostUpdate:
+      type: object
+      properties:
+        server_name: { type: string, nullable: true }
+        listen_port: { type: integer, nullable: true }
+        config_content: { type: string, nullable: true }
+        ssl_cert_path: { type: string, nullable: true }
+        ssl_key_path: { type: string, nullable: true }
+    Vhost:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        nginx_node_id: { type: string, format: uuid }
+        node_name: { type: string }
+        server_name: { type: string }
+        listen_port: { type: integer }
+        status: { type: string, enum: [DRAFT, TESTING, APPLIED, FAILED, ROLLED_BACK] }
+        config_content: { type: string, nullable: true }
+        ssl_cert_path: { type: string, nullable: true }
+        ssl_key_path: { type: string, nullable: true }
+        backup_object_key: { type: string, nullable: true }
+        last_error: { type: string, nullable: true }
+        validated_at: { type: string, format: date-time, nullable: true }
+        applied_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }

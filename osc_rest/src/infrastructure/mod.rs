@@ -4,6 +4,8 @@
 pub mod config;
 pub mod crypto;
 pub mod hris;
+pub mod hmac;
+pub mod logstream;
 pub mod logging;
 pub mod persistence;
 pub mod ratelimit;
