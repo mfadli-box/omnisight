@@ -22,17 +22,25 @@ pub enum AppError {
     #[error("resource not found")]
     NotFound,
 
-    #[error("missing or invalid credentials")]
-    Unauthorized,
+    #[error("{0}")]
+    /// Pesan detail aman dikonsumsi (tidak memuat data internal).
+    Unauthorized(String),
 
-    #[error("insufficient permissions")]
-    Forbidden,
+    #[error("{0}")]
+    Forbidden(String),
+
+    #[error("{0}")]
+    Conflict(String),
 
     #[error("payload exceeds allowed size")]
     PayloadTooLarge,
 
     #[error("too many requests")]
     RateLimited,
+
+    #[error("{0}")]
+    /// Error upstream terkontrol (mis. HRIS invalid) — pesan aman.
+    Upstream(String),
 
     #[error("{0}")]
     /// Sudah dimask oleh `AppError::internal()` — tidak berisi detail internal.
@@ -58,6 +66,11 @@ impl From<DomainError> for AppError {
         match err {
             DomainError::NotFound => AppError::NotFound,
             DomainError::Validation(message) => AppError::Validation(message),
+            DomainError::Unauthorized(message) => AppError::Unauthorized(message),
+            DomainError::Forbidden(message) => AppError::Forbidden(message),
+            DomainError::Conflict(message) => AppError::Conflict(message),
+            DomainError::RateLimited => AppError::RateLimited,
+            DomainError::Upstream(message) => AppError::Upstream(message),
             DomainError::Unavailable(detail) => AppError::internal(detail),
         }
     }
@@ -72,16 +85,9 @@ impl IntoResponse for AppError {
                 "NOT_FOUND",
                 "resource tidak ditemukan".to_owned(),
             ),
-            AppError::Unauthorized => (
-                StatusCode::UNAUTHORIZED,
-                "UNAUTHORIZED",
-                "kredensial tidak valid".to_owned(),
-            ),
-            AppError::Forbidden => (
-                StatusCode::FORBIDDEN,
-                "FORBIDDEN",
-                "izin tidak memadai".to_owned(),
-            ),
+            AppError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, "UNAUTHORIZED", msg),
+            AppError::Forbidden(msg) => (StatusCode::FORBIDDEN, "FORBIDDEN", msg),
+            AppError::Conflict(msg) => (StatusCode::CONFLICT, "CONFLICT", msg),
             AppError::PayloadTooLarge => (
                 StatusCode::PAYLOAD_TOO_LARGE,
                 "PAYLOAD_TOO_LARGE",
@@ -91,6 +97,11 @@ impl IntoResponse for AppError {
                 StatusCode::TOO_MANY_REQUESTS,
                 "RATE_LIMITED",
                 "terlalu banyak permintaan".to_owned(),
+            ),
+            AppError::Upstream(msg) => (
+                StatusCode::BAD_GATEWAY,
+                "HRIS_UPSTREAM_INVALID_RESPONSE",
+                msg,
             ),
             AppError::Internal(msg) => (StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", msg),
         };
@@ -130,12 +141,29 @@ mod tests {
         .await;
         assert_envelope(AppError::NotFound, StatusCode::NOT_FOUND, "NOT_FOUND").await;
         assert_envelope(
-            AppError::Unauthorized,
+            AppError::Unauthorized("kredensial tidak valid".into()),
             StatusCode::UNAUTHORIZED,
             "UNAUTHORIZED",
         )
         .await;
-        assert_envelope(AppError::Forbidden, StatusCode::FORBIDDEN, "FORBIDDEN").await;
+        assert_envelope(
+            AppError::Forbidden("izin tidak memadai".into()),
+            StatusCode::FORBIDDEN,
+            "FORBIDDEN",
+        )
+        .await;
+        assert_envelope(
+            AppError::Conflict("data sudah ada".into()),
+            StatusCode::CONFLICT,
+            "CONFLICT",
+        )
+        .await;
+        assert_envelope(
+            AppError::Upstream("hris upstream gagal".into()),
+            StatusCode::BAD_GATEWAY,
+            "HRIS_UPSTREAM_INVALID_RESPONSE",
+        )
+        .await;
         assert_envelope(
             AppError::PayloadTooLarge,
             StatusCode::PAYLOAD_TOO_LARGE,
@@ -165,6 +193,10 @@ mod tests {
         assert!(matches!(
             AppError::from(DomainError::Validation("bad".into())),
             AppError::Validation(_)
+        ));
+        assert!(matches!(
+            AppError::from(DomainError::Upstream("0|NONE".into())),
+            AppError::Upstream(_)
         ));
         // Unavailable -> Internal generik (detail tidak ikut ke klien).
         let mapped = AppError::from(DomainError::Unavailable("koneksi gagal".into()));

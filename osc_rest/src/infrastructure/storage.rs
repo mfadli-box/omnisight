@@ -3,8 +3,12 @@
 //! Seluruh operasi object storage WAJIB melalui tipe ini — jangan pernah
 //! membocorkan `Client` SDK mentah ke layer application/presentation.
 
+use std::time::Duration;
+
 use aws_sdk_s3::Client;
 use aws_sdk_s3::config::{BehaviorVersion, Credentials, Region};
+use aws_sdk_s3::presigning::PresigningConfig;
+use aws_sdk_s3::primitives::ByteStream;
 
 use crate::domain::error::DomainError;
 use crate::domain::ports::StorageProbe;
@@ -39,9 +43,66 @@ impl RustfsClient {
     }
 
     /// Nama bucket target (dipakai key pattern di fase excel).
-    #[allow(dead_code)] // dipakai mulai fase excel (key naming)
     pub fn bucket(&self) -> &str {
         &self.bucket
+    }
+
+    /// `PutObject` — unggah bytes (upload file W1, arsip excel async).
+    pub async fn put_object(
+        &self,
+        key: &str,
+        bytes: Vec<u8>,
+        content_type: &str,
+    ) -> Result<(), DomainError> {
+        self.client
+            .put_object()
+            .bucket(self.bucket.clone())
+            .key(key)
+            .content_type(content_type)
+            .body(ByteStream::from(bytes))
+            .send()
+            .await
+            .map(|_| ())
+            .map_err(|e| DomainError::Unavailable(format!("rustfs put gagal: {e}")))
+    }
+
+    /// `GetObject` — unduh penuh dengan batas keras (proxy download W1).
+    #[allow(dead_code)] // konsumen: proxy download konten file (follow-up)
+    pub async fn get_object(&self, key: &str, max_bytes: usize) -> Result<Vec<u8>, DomainError> {
+        let object = self
+            .client
+            .get_object()
+            .bucket(self.bucket.clone())
+            .key(key)
+            .send()
+            .await
+            .map_err(|e| DomainError::Unavailable(format!("rustfs get gagal: {e}")))?;
+
+        let data = object
+            .body
+            .collect()
+            .await
+            .map_err(|e| DomainError::Unavailable(format!("rustfs stream gagal: {e}")))?
+            .into_bytes();
+        if data.len() > max_bytes {
+            return Err(DomainError::Unavailable("objek melebihi batas unduh".into()));
+        }
+        Ok(data.to_vec())
+    }
+
+    /// Presigned GET URL berumur pendek (default 5 menit) —
+    /// objek privat tidak pernah diekspos publik permanen.
+    pub async fn presign_get(&self, key: &str, ttl: Duration) -> Result<String, DomainError> {
+        let presigning = PresigningConfig::expires_in(ttl)
+            .map_err(|e| DomainError::Unavailable(format!("presign config gagal: {e}")))?;
+        self.client
+            .get_object()
+            .bucket(self.bucket.clone())
+            .key(key)
+            .presigned(presigning)
+            .await
+            .map(|req| req.uri().to_string())
+            .map_err(|e| DomainError::Unavailable(format!("presign gagal: {e}")))
     }
 
     /// `HeadBucket` — verifikasi bucket spesifik ada & dapat diakses.

@@ -1,4 +1,7 @@
-//! Orkestrasi use case — HANYA bergantung pada trait di `domain/`.
-//! Dilarang meng-import axum/sqlx/aws_sdk/calamine di layer ini.
+//! Usecase & orkestrasi bisnis — hanya bergantung pada port `domain/`
+//! (generik static dispatch), TIDAK pada tipe infrastruktur konkret.
 
+pub mod auth;
+pub mod excel;
 pub mod health;
+pub mod mfa;

@@ -5,4 +5,6 @@
 //! framework-agnostic (thiserror/serde bila diperlukan).
 
 pub mod error;
+pub mod filter;
+pub mod model;
 pub mod ports;

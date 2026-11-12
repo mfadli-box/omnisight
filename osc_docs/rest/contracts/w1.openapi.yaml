@@ -1,0 +1,901 @@
+openapi: 3.1.0
+info:
+  title: omnisight osc_rest — Wave 1 (Auth/HRIS/MFA/Switcher/Studio/ITAM/DCIM/IPAM/Files/Excel)
+  version: 1.0.0-w1
+  description: |
+    Kontrak OpenAPI 3.1 untuk Wave 1 `osc_rest` (Hari 9 / SESI 2.1).
+    Seluruh endpoint meng-echo `X-Correlation-ID` (di-generate UUIDv7 bila tidak ada).
+    Envelope error: {status:"error", error:{code,message}, correlation_id}.
+    Konvensi penamaan field: snake_case. Dokumentasi lengkap: osc_docs/rest/api-w1.md.
+servers:
+  - url: /api/v1
+tags:
+  - name: auth
+  - name: mfa
+  - name: me
+  - name: studio
+  - name: itam
+  - name: dcim-ipam
+  - name: files
+  - name: excel
+
+paths:
+  /auth/companies:
+    get:
+      tags: [auth]
+      summary: Daftar company aktif (publik, tanpa membocorkan hris_login_url)
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: OK
+          headers:
+            X-Correlation-ID: { $ref: '#/components/headers/CorrelationId' }
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: success }
+                  data:
+                    type: object
+                    properties:
+                      count: { type: integer }
+                      companies:
+                        type: array
+                        items: { $ref: '#/components/schemas/CompanyPublic' }
+              example:
+                status: success
+                data:
+                  count: 1
+                  companies:
+                    - id: 0193b6a1-7c1a-7cc0-9e2a-1f3e0a5b4c11
+                      name: PT Contoh
+                      code: CONTOH
+                      hris_enabled: true
+
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Login dual-mode (HRIS ASMX XML + Circuit Breaker / Local Argon2id)
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: Login sukses atau challenge MFA
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/LoginSuccess'
+                  - $ref: '#/components/schemas/MfaRequired'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '502': { $ref: '#/components/responses/HrisUpstream' }
+
+  /auth/switch-company:
+    post:
+      tags: [auth]
+      summary: Ganti company aktif (validasi UserCompanyAccess, JWT baru)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [company_id]
+              properties:
+                company_id: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Token & konteks baru
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessionIssued' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /auth/mfa/setup:
+    post:
+      tags: [mfa]
+      summary: Generate secret TOTP + URI otpauth + 10 backup code (plaintext sekali)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Enrolment MFA
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: success }
+                  data:
+                    type: object
+                    properties:
+                      secret_base32: { type: string }
+                      otpauth_url: { type: string, format: uri }
+                      backup_codes:
+                        type: array
+                        items: { type: string }
+                        maxItems: 10
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /auth/mfa/enable:
+    post:
+      tags: [mfa]
+      summary: Konfirmasi OTP pertama → mfa_enabled = true
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [otp]
+              properties:
+                otp: { type: string, minLength: 6, maxLength: 8 }
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /auth/mfa/verify:
+    post:
+      tags: [mfa]
+      summary: Verifikasi challenge OTP / backup code (anti-replay step, rate-limit 5x)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                otp: { type: string }
+                backup_code: { type: string }
+      responses:
+        '200':
+          description: Access token + konteks (backup code = MFA auto-reset)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessionIssued' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /auth/mfa/disable:
+    post:
+      tags: [mfa]
+      summary: Nonaktifkan MFA (password + OTP, doubleCheckPassword)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password, otp]
+              properties:
+                password: { type: string }
+                otp: { type: string }
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /auth/mfa/reset-request:
+    post:
+      tags: [mfa]
+      summary: Minta token reset MFA via email terdaftar (publik, anti-enumeration)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, email]
+              properties:
+                username: { type: string }
+                email: { type: string, format: email }
+      responses:
+        '200': { description: Accepted (respons identik untuk akun asing) }
+
+  /auth/mfa/reset-confirm:
+    post:
+      tags: [mfa]
+      summary: Konfirmasi token reset → reset MFA + revoke seluruh sesi
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, token]
+              properties:
+                username: { type: string }
+                token: { type: string }
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /users/{id}/mfa/reset:
+    post:
+      tags: [mfa]
+      summary: Admin reset MFA user (admin wajib super admin + mfa_enabled sendiri)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 1, maxLength: 500 }
+      responses:
+        '200': { description: OK (audit MFA_RESET) }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /me/navigation:
+    get:
+      tags: [me]
+      summary: Daftar company user + pohon MenuModule (can_view=false tidak dikirim)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: success }
+                  data:
+                    type: object
+                    properties:
+                      active_company_id: { type: [string, 'null'], format: uuid }
+                      companies:
+                        type: array
+                        items: { $ref: '#/components/schemas/CompanyAccess' }
+                      menus:
+                        type: array
+                        items: { $ref: '#/components/schemas/MenuNode' }
+
+  /collections:
+    get:
+      tags: [studio]
+      summary: Daftar koleksi dinamis (metadata)
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [studio]
+      summary: Koleksi baru + DDL runtime (identifier tervalidasi)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [collection]
+              properties:
+                collection: { type: string, pattern: '^[a-z][a-z0-9_]{0,49}$' }
+                icon: { type: string }
+                note: { type: string }
+                fields:
+                  type: array
+                  items:
+                    type: object
+                    required: [field]
+                    properties:
+                      field: { type: string, pattern: '^[a-z][a-z0-9_]{0,62}$' }
+                      is_required: { type: boolean, default: false }
+                      special: { type: string }
+      responses:
+        '201': { description: Dibuat }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /collections/{collection}/fields:
+    get:
+      tags: [studio]
+      summary: Daftar field koleksi
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Collection'
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [studio]
+      summary: Tambah/ubah field metadata
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Collection'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [field]
+              properties:
+                field: { type: string, pattern: '^[a-z][a-z0-9_]{0,62}$' }
+                is_required: { type: boolean, default: false }
+                special: { type: string }
+      responses:
+        '201': { description: Dibuat }
+
+  /items/{collection}:
+    get:
+      tags: [studio]
+      summary: Daftar item koleksi dinamis (tenant-guarded, filter AST terparameterisasi)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Collection'
+        - name: filter
+          in: query
+          required: false
+          description: |
+            JSON Filter AST. Operator: eq|ne|gt|gte|lt|lte|like|in|null|not_null.
+            Contoh: {"and":[{"field":"status","op":"eq","value":"ACTIVE"}]}
+            atau shorthand: {"status":{"in":["ACTIVE","STAGED"]}}.
+            Kedalaman maks 8, maks 64 node; field wajib terdaftar di metadata.
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 500, default: 50 }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+      responses:
+        '200': { description: OK }
+        '400': { $ref: '#/components/responses/ValidationError' }
+    post:
+      tags: [studio]
+      summary: Item baru (data JSONB — field wajib terdaftar)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Collection'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data: { type: object, additionalProperties: true }
+      responses:
+        '201': { description: Dibuat }
+
+  /assets:
+    get:
+      tags: [itam]
+      summary: Daftar aset (filter AST, tenant-guarded)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/FilterQuery'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [itam]
+      summary: Aset baru (model & status label wajib satu tenant)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AssetCreate' }
+      responses:
+        '201': { description: Dibuat }
+        '400': { $ref: '#/components/responses/ValidationError' }
+
+  /assets/{id}:
+    get:
+      tags: [itam]
+      summary: Detail aset
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/AssetId'
+      responses:
+        '200': { description: OK }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /assets/{id}/checkout:
+    post:
+      tags: [itam]
+      summary: Checkout aset (FOR UPDATE + re-check; deployable & bebas)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/AssetId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                target_user_id: { type: string, format: uuid }
+                target_location_id: { type: string, format: uuid }
+                expected_checkin_at: { type: string, format: date-time }
+      responses:
+        '200': { description: OK }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /assets/{id}/checkin:
+    post:
+      tags: [itam]
+      summary: Checkin aset (wajib sedang assigned)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/AssetId'
+      responses:
+        '200': { description: OK }
+        '400': { $ref: '#/components/responses/ValidationError' }
+
+  /assets/import:
+    post:
+      tags: [excel]
+      summary: Import aset dari .xlsx (magic byte, spawn_blocking, laporan row-level)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '200':
+          description: Ringkasan import
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: success }
+                  data:
+                    type: object
+                    properties:
+                      inserted: { type: integer }
+                      error_count: { type: integer }
+                      errors:
+                        type: array
+                        maxItems: 100
+                        items: { $ref: '#/components/schemas/RowError' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+
+  /assets/export:
+    get:
+      tags: [excel]
+      summary: Export aset tenant ke .xlsx (sanitasi formula injection)
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Workbook xlsx
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+
+  /licenses:
+    get:
+      tags: [itam]
+      summary: Daftar lisensi (license_key tidak diekspos — has_key saja)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/FilterQuery'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200': { description: OK }
+
+  /tickets:
+    get:
+      tags: [itam]
+      summary: Daftar tiket ITIL
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/FilterQuery'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [itam]
+      summary: Tiket baru (kode TK-NNNNNN per company)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string, maxLength: 300 }
+                description: { type: string }
+                ticket_type: { type: string, enum: [INCIDENT, REQUEST], default: INCIDENT }
+                priority: { type: string, enum: [VERY_LOW, LOW, MEDIUM, HIGH, VERY_HIGH], default: MEDIUM }
+                assignee_user_id: { type: string, format: uuid }
+                asset_id: { type: string, format: uuid }
+                category_id: { type: string, format: uuid }
+                due_at: { type: string, format: date-time }
+      responses:
+        '201': { description: Dibuat }
+
+  /dcim/racks:
+    get:
+      tags: [dcim-ipam]
+      summary: Daftar rack + okupansi unit
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/FilterQuery'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200': { description: OK }
+
+  /ipam/prefixes:
+    get:
+      tags: [dcim-ipam]
+      summary: Daftar prefix IP
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/FilterQuery'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [dcim-ipam]
+      summary: Prefix baru (validasi CIDR + overlap check app-level)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [prefix]
+              properties:
+                prefix: { type: string, examples: ['10.10.0.0/24'] }
+                status: { type: string, enum: [ACTIVE, RESERVED, CONTAINER, DEPRECATED], default: ACTIVE }
+                is_pool: { type: boolean, default: false }
+                site_id: { type: string, format: uuid }
+                vlan_id: { type: string, format: uuid }
+      responses:
+        '201': { description: Dibuat }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /ipam/addresses:
+    get:
+      tags: [dcim-ipam]
+      summary: Daftar alamat IP
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/FilterQuery'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [dcim-ipam]
+      summary: Alamat IP baru (tenant-match interface divalidasi)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [address]
+              properties:
+                address: { type: string, examples: ['10.10.0.10'] }
+                status: { type: string, enum: [ACTIVE, RESERVED, DEPRECATED, DHCP, SLAAC], default: ACTIVE }
+                prefix_id: { type: string, format: uuid }
+                interface_id: { type: string, format: uuid }
+                is_gateway: { type: boolean, default: false }
+                dns_name: { type: string }
+      responses:
+        '201': { description: Dibuat }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /files:
+    get:
+      tags: [files]
+      summary: Daftar metadata file tenant
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [files]
+      summary: Upload file (multipart ≤ 25 MB, MIME allowlist, key UUIDv7, SHA-256)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '201': { description: Terunggah }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+
+  /files/{id}:
+    get:
+      tags: [files]
+      summary: Metadata + presigned URL (TTL 300 detik)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: OK }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT HS256. scope=access (sesi penuh, revocable DB-backed) atau
+        scope=mfa_pending (challenge 5 menit, hanya /auth/mfa/*).
+
+  parameters:
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: false
+      schema: { type: string, maxLength: 64 }
+      description: Propagasi trace — di-echo/di-generate server (UUIDv7).
+    Collection:
+      name: collection
+      in: path
+      required: true
+      schema: { type: string, pattern: '^[a-z][a-z0-9_]{0,49}$' }
+    AssetId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    FilterQuery:
+      name: filter
+      in: query
+      required: false
+      schema: { type: string }
+      description: JSON Filter AST (lihat /items/{collection}).
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 500, default: 50 }
+    Offset:
+      name: offset
+      in: query
+      schema: { type: integer, minimum: 0, default: 0 }
+
+  headers:
+    CorrelationId:
+      schema: { type: string }
+      description: ID korelasi request.
+
+  schemas:
+    CompanyPublic:
+      type: object
+      required: [id, name, code, hris_enabled]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        code: { type: string }
+        hris_enabled: { type: boolean, description: Flag mode HRIS — URL/secret tidak diekspos }
+
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        company_id:
+          type: string
+          description: UUID company; string kosong / tidak ada → default access (Local Login bila tanpa HRIS)
+        username: { type: string, minLength: 1, maxLength: 100 }
+        password: { type: string, minLength: 1, maxLength: 200 }
+
+    LoginSuccess:
+      type: object
+      properties:
+        status: { type: string, const: success }
+        data:
+          type: object
+          properties:
+            mfa_required: { type: boolean, const: false }
+            access_token: { type: string }
+            token_type: { type: string, const: bearer }
+            session_id: { type: string, format: uuid }
+            offline_cache: { type: boolean, description: true bila login via fallback cache offline HRIS }
+            user: { $ref: '#/components/schemas/UserSummary' }
+            active_company_id: { type: [string, 'null'], format: uuid }
+            active_role_id: { type: [string, 'null'], format: uuid }
+
+    MfaRequired:
+      type: object
+      properties:
+        status: { type: string, const: success }
+        data:
+          type: object
+          properties:
+            mfa_required: { type: boolean, const: true }
+            mfa_challenge_token:
+              type: string
+              description: JWT 5 menit, scope=mfa_pending (hanya /auth/mfa/*)
+
+    SessionIssued:
+      type: object
+      properties:
+        status: { type: string, const: success }
+        data:
+          type: object
+          properties:
+            access_token: { type: string }
+            token_type: { type: string, const: bearer }
+            session_id: { type: string, format: uuid }
+            active_company_id: { type: [string, 'null'], format: uuid }
+            active_role_id: { type: [string, 'null'], format: uuid }
+            mfa_reset_via_backup: { type: boolean }
+
+    UserSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        username: { type: string }
+        email: { type: string, format: email }
+        display_name: { type: [string, 'null'] }
+        mfa_enabled: { type: boolean }
+        is_super_admin: { type: boolean }
+        last_hris_sync_at: { type: [string, 'null'], format: date-time }
+
+    CompanyAccess:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        code: { type: string }
+        hris_enabled: { type: boolean }
+        role_id: { type: string, format: uuid }
+        role_name: { type: string }
+        is_default: { type: boolean }
+        is_active_company: { type: boolean }
+
+    MenuNode:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        label: { type: string }
+        route_path: { type: [string, 'null'] }
+        icon: { type: [string, 'null'] }
+        parent_id: { type: [string, 'null'], format: uuid }
+        sort_order: { type: integer }
+        can_create: { type: boolean }
+        can_update: { type: boolean }
+        can_delete: { type: boolean }
+        children:
+          type: array
+          items: { $ref: '#/components/schemas/MenuNode' }
+
+    AssetCreate:
+      type: object
+      required: [name, asset_tag, asset_model_id, status_label_id]
+      properties:
+        name: { type: string, maxLength: 150 }
+        asset_tag: { type: string, maxLength: 100 }
+        node_type: { type: string, enum: [HOST, NETWORK, VIRTUAL, CONTAINER, RACK_MOUNTED, SERVICE], default: HOST }
+        status: { type: string, enum: [ACTIVE, PLANNED, STAGED, OFFLINE, FAILED, DECOMMISSIONED], default: ACTIVE }
+        hostname: { type: string }
+        mgmt_ip: { type: string }
+        serial_number: { type: string }
+        asset_model_id: { type: string, format: uuid }
+        status_label_id: { type: string, format: uuid }
+        site_id: { type: string, format: uuid }
+        department_id: { type: string, format: uuid }
+        location_id: { type: string, format: uuid }
+        supplier_id: { type: string, format: uuid }
+        assigned_to_user_id: { type: string, format: uuid }
+        purchase_date: { type: string, format: date }
+        purchase_cost: { type: number }
+        notes: { type: string }
+
+    RowError:
+      type: object
+      properties:
+        row_number: { type: integer }
+        column: { type: [string, 'null'] }
+        code: { type: string, examples: [REQUIRED, TOO_LONG, ENUM_INVALID, IP_INVALID, NUMBER_INVALID, DUPLICATE] }
+        message: { type: string }
+
+  responses:
+    ValidationError:
+      description: Input tidak valid
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          example:
+            status: error
+            error: { code: VALIDATION_ERROR, message: filter harus JSON valid }
+            correlation_id: 0193b6a1-7c1a-7cc0-9e2a-1f3e0a5b4c99
+    Unauthorized:
+      description: Kredensial tidak valid / sesi dicabut / challenge MFA salah
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    Forbidden:
+      description: Tidak memiliki akses (tenant/role/admin step-up)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    NotFound:
+      description: Resource tidak ditemukan (termasuk milik tenant lain — anti IDOR)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    Conflict:
+      description: Pelanggaran unique / state (aset ter-assign, prefix overlap)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    RateLimited:
+      description: Terlalu banyak percobaan (login 10x, MFA 5x / 15 menit)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    PayloadTooLarge:
+      description: File/payload melebihi batas
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    HrisUpstream:
+      description: |
+        Dependensi HRIS gangguan (timeout/non-XML/body > 64 KB/circuit open)
+        dan cache offline tidak tersedia/kedaluwarsa — bukan 401.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          example:
+            status: error
+            error: { code: HRIS_UPSTREAM_INVALID_RESPONSE, message: hris request gagal }
+            correlation_id: 0193b6a1-7c1a-7cc0-9e2a-1f3e0a5b4c77
+
+    ErrorEnvelope:
+      type: object
+      properties:
+        status: { type: string, const: error }
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+        correlation_id: { type: string }

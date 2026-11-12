@@ -29,8 +29,7 @@ impl PgHealth {
         Ok(Self { pool })
     }
 
-    /// Akses pool untuk repository fase berikutnya (bulk UNNEST, transaksi).
-    #[allow(dead_code)] // dipakai mulai fase excel/repository
+    /// Akses pool untuk repository (bulk UNNEST, transaksi, dsb.).
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

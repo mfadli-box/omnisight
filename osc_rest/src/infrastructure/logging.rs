@@ -93,6 +93,10 @@ fn redact_with(input: &str, secrets: &[String]) -> String {
         "token",
         "api_key",
         "access_key",
+        // Sensor khusus HRIS ASMX (bab 5.1): field uPaswd tidak pernah
+        // boleh muncul di log — case-insensitive sehingga `uPaswd=` tertutup.
+        "upaswd",
+        "ulogin",
     ] {
         mask_key_value(&mut out, key);
     }
@@ -247,5 +251,13 @@ mod tests {
     fn redact_dengan_daftar_kosong_tetap_menutup_pola() {
         let out = redact_with("password=short", &[]);
         assert_eq!(out, "password=[REDACTED]");
+    }
+
+    #[test]
+    fn upaswd_hris_tertutup_case_insensitive() {
+        let out = redact_with("GET hris.check?uLogin=budi&uPaswd=Secret123", &[]);
+        assert!(out.contains("uLogin=[REDACTED]"), "hasil: {out}");
+        assert!(out.contains("uPaswd=[REDACTED]"), "hasil: {out}");
+        assert!(!out.contains("Secret123"), "password bocor: {out}");
     }
 }

@@ -6,13 +6,13 @@ description = "omnisight core REST API (Clean Architecture: domain/application/i
 
 [dependencies]
 # --- Presentation (HTTP) ---
-axum = "0.8"
+axum = { version = "0.8", features = ["multipart"] }
 
 # --- Runtime async ---
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }
 
 # --- Infrastructure: PostgreSQL (query runtime, bukan macro compile-time) ---
-sqlx = { version = "0.9", features = ["runtime-tokio", "postgres"] }
+sqlx = { version = "0.9", features = ["runtime-tokio", "postgres", "uuid", "chrono", "json"] }
 
 # --- Infrastructure: RustFS (S3-compatible object storage) ---
 aws-sdk-s3 = "1"
@@ -26,14 +26,31 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
 # --- Identifier: correlation ID (UUIDv7) + kunci object storage fase excel ---
-uuid = { version = "1", features = ["v4", "v7"] }
+uuid = { version = "1", features = ["v4", "v7", "serde"] }
 
 # --- Error ergonomis + mapping aman ke HTTP ---
 thiserror = "2"
 
-# --- Excel import/export (dipakai pada fase excel berikutnya) ---
+# --- Excel import/export ---
 calamine = "0.38"
 rust_xlsxwriter = "0.102"
+
+# --- Kriptografi & auth (W1): Argon2id, JWT, Envelope AES-256-GCM, TOTP ---
+argon2 = "0.5"
+jsonwebtoken = "9"
+aes-gcm = "0.10"
+totp-rs = { version = "5", features = ["otpauth"] }
+data-encoding = "2"
+
+# --- HRIS ASMX client (server-to-server) + parser XML aman ---
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+quick-xml = "0.37"
+
+# --- Utilitas umum ---
+base64 = "0.22"
+chrono = { version = "0.4", features = ["serde"] }
+rand = "0.8"
+sha2 = "0.10"
 
 [dev-dependencies]
 # ServiceExt::oneshot untuk pengujian middleware (versi selaras axum 0.8)
