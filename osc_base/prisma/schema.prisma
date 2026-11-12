@@ -1,9 +1,10 @@
 // =============================================================================
 // omnisight — Core Schema Part 1 (Multi-Company, HRIS Cache, MFA, RBAC,
 //              Menu Privilege, Studio Metadata, Notification, Agent Enrollment)
+//              + Part 2 (ITAM & Service Desk: Snipe-IT/GLPI; DCIM & IPAM: NetBox/LibreNMS)
 // Author    : ai-base (Database Engineer)
-// Blueprint : osc_docs/reengineering.md (bab 5.1–5.8)
-// Doc       : osc_docs/base/schema-p1.md
+// Blueprint : osc_docs/reengineering.md (bab 3, 5.1–5.8)
+// Doc       : osc_docs/base/schema-p1.md + osc_docs/base/schema-p2.md
 //
 // Konvensi (mengikuti schema-core.md bootstrap):
 //   - Model PascalCase, field camelCase -> snake_case di PostgreSQL via
@@ -22,8 +23,9 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  // The connection URL is configured in prisma.config.ts for migrations,
-  // and PrismaClient is initialized with either adapter or accelerateUrl.
+  // DATABASE_URL dibaca dari osc_base/.env untuk Prisma CLI (migrasi/format/
+  // validate); container runtime (osc_rest) memakai DATABASE_URL internal.
+  url      = env("DATABASE_URL")
 }
 
 // -----------------------------------------------------------------------------
@@ -86,6 +88,34 @@ model Company {
   agentEnrollmentTokens AgentEnrollmentToken[]
   activityLogs          ActivityLog[]
 
+  // --- Part 2: ITAM & Service Desk ---
+  departments                Department[]
+  locations                  Location[]
+  categories                 Category[]
+  manufacturers              Manufacturer[]
+  suppliers                  Supplier[]
+  statusLabels               StatusLabel[]
+  assetModels                AssetModel[]
+  assets                     Asset[]
+  assetCheckoutLogs          AssetCheckoutLog[]
+  softwareLicenses           SoftwareLicense[]
+  licenseSeats               LicenseSeat[]
+  hardwareInventorySnapshots HardwareInventorySnapshot[]
+  tickets                    Ticket[]
+  ticketFollowups            TicketFollowup[]
+
+  // --- Part 2: DCIM & IPAM ---
+  sites                    Site[]
+  racks                    Rack[]
+  rackUnitAllocations      RackUnitAllocation[]
+  deviceInterfaces         DeviceInterface[]
+  cableConnections         CableConnection[]
+  vlans                    Vlan[]
+  ipPrefixes               IpPrefix[]
+  ipAddresses              IpAddress[]
+  snmpDeviceProfiles       SnmpDeviceProfile[]
+  interfaceMetricSnapshots InterfaceMetricSnapshot[]
+
   @@index([isActive])
   @@map("companies")
 }
@@ -119,6 +149,16 @@ model User {
   sessions     Session[]
   accesses     UserCompanyAccess[]
   activityLogs ActivityLog[]
+
+  // --- Part 2: ITAM & Service Desk (relasi balik) ---
+  managedDepartments Department[]       @relation("DepartmentManager")
+  assignedAssets     Asset[]            @relation("AssetAssignee")
+  checkoutLogActions AssetCheckoutLog[] @relation("CheckoutLogActor")
+  checkoutLogTargets AssetCheckoutLog[] @relation("CheckoutLogTarget")
+  requestedTickets   Ticket[]           @relation("TicketRequester")
+  assignedTickets    Ticket[]           @relation("TicketAssignee")
+  ticketFollowups    TicketFollowup[]
+  licenseSeats       LicenseSeat[]
 
   /// Offline cache fallback: now() - last_hris_sync_at <= ttl (bab 5.2)
   @@index([lastHrisSyncAt])
@@ -462,4 +502,869 @@ model AgentEnrollmentToken {
   @@index([companyId])
   @@index([expiresAt])
   @@map("agent_enrollment_tokens")
+}
+
+// =============================================================================
+// PART 2 — ITAM & SERVICE DESK (pola Snipe-IT/GLPI: state machine status label,
+//          checkout/checkin atomik, lisensi seat, tiket ITIL)
+//          Semua model mengikat company_id (FK Restrict, terindeks) — bab 5.6
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// Enum ITAM & Service Desk
+// -----------------------------------------------------------------------------
+
+/// Tipe kategori item (Snipe-IT category_type + kategori ITIL GLPI)
+enum CategoryType {
+  ASSET
+  ACCESSORY
+  COMPONENT
+  CONSUMABLE
+  LICENSE
+  TICKET
+
+  @@map("category_type")
+}
+
+/// Kelompok state machine status Snipe-IT
+/// (deployable = !assigned_to && !deleted && deployable && !archived)
+enum StatusLabelType {
+  DEPLOYABLE
+  PENDING
+  ARCHIVED
+
+  @@map("status_label_type")
+}
+
+/// Status fisik/logis node (ala NetBox Device status)
+enum AssetStatus {
+  ACTIVE
+  PLANNED
+  STAGED
+  OFFLINE
+  FAILED
+  DECOMMISSIONED
+
+  @@map("asset_status")
+}
+
+/// Aksi log checkout/checkin aset (Snipe-IT action_logs)
+enum CheckoutAction {
+  CHECKOUT
+  CHECKIN
+
+  @@map("checkout_action")
+}
+
+/// Mode lisensi perangkat lunak
+enum LicenseType {
+  PERPETUAL
+  SUBSCRIPTION
+  OEM
+  VOLUME
+
+  @@map("license_type")
+}
+
+/// Status tiket mengikuti state int GLPI (1=new .. 8=under approval)
+enum TicketStatus {
+  NEW
+  ASSIGNED
+  PLANNED
+  PENDING
+  SOLVED
+  CLOSED
+  ACCEPTED
+  UNDER_APPROVAL
+
+  @@map("ticket_status")
+}
+
+enum TicketPriority {
+  VERY_LOW
+  LOW
+  MEDIUM
+  HIGH
+  VERY_HIGH
+
+  @@map("ticket_priority")
+}
+
+enum TicketType {
+  INCIDENT
+  REQUEST
+
+  @@map("ticket_type")
+}
+
+// -----------------------------------------------------------------------------
+// Master referensi ITAM (semua unique per company)
+// -----------------------------------------------------------------------------
+
+/// Unit organisasi per Company (GLPI departments)
+model Department {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId     String    @map("company_id") @db.Uuid
+  name          String    @db.VarChar(150)
+  notes         String?   @db.VarChar(500)
+  managerUserId String?   @map("manager_user_id") @db.Uuid
+  isActive      Boolean   @default(true) @map("is_active")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  manager User?   @relation("DepartmentManager", fields: [managerUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  assets  Asset[]
+  tickets Ticket[]
+
+  @@unique([companyId, name])
+  @@index([companyId, isActive])
+  @@map("departments")
+}
+
+/// Lokasi fisik per Company (Snipe-IT locations), tree via parent_id
+model Location {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String    @map("company_id") @db.Uuid
+  name      String    @db.VarChar(150)
+  address   String?   @db.VarChar(300)
+  city      String?   @db.VarChar(100)
+  parentId  String?   @map("parent_id") @db.Uuid
+  notes     String?   @db.VarChar(500)
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  company  Company    @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  parent   Location?  @relation("LocationTree", fields: [parentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  children Location[] @relation("LocationTree")
+
+  assets             Asset[]
+  checkoutLogTargets AssetCheckoutLog[]
+
+  @@unique([companyId, name])
+  @@index([parentId])
+  @@index([companyId, isActive])
+  @@map("locations")
+}
+
+/// Kategori item per Company (Snipe-IT categories; type termasuk TICKET untuk ITIL)
+model Category {
+  id        String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String       @map("company_id") @db.Uuid
+  name      String       @db.VarChar(150)
+  type      CategoryType @map("type")
+  notes     String?      @db.VarChar(500)
+  isActive  Boolean      @default(true) @map("is_active")
+  createdAt DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime?    @map("deleted_at") @db.Timestamptz(3)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  assetModels AssetModel[]
+  tickets     Ticket[]
+
+  @@unique([companyId, type, name])
+  @@index([companyId, type])
+  @@map("categories")
+}
+
+/// Pabrikan per Company (Snipe-IT manufacturers)
+model Manufacturer {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId    String    @map("company_id") @db.Uuid
+  name         String    @db.VarChar(200)
+  supportEmail String?   @map("support_email") @db.VarChar(255)
+  supportPhone String?   @map("support_phone") @db.VarChar(50)
+  supportUrl   String?   @map("support_url") @db.VarChar(500)
+  notes        String?   @db.VarChar(500)
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  assetModels AssetModel[]
+  licenses    SoftwareLicense[]
+
+  @@unique([companyId, name])
+  @@index([companyId, isActive])
+  @@map("manufacturers")
+}
+
+/// Pemasok/vendor per Company (Snipe-IT suppliers)
+model Supplier {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId    String    @map("company_id") @db.Uuid
+  name         String    @db.VarChar(200)
+  contactName  String?   @map("contact_name") @db.VarChar(150)
+  contactEmail String?   @map("contact_email") @db.VarChar(255)
+  contactPhone String?   @map("contact_phone") @db.VarChar(50)
+  address      String?   @db.VarChar(300)
+  websiteUrl   String?   @map("website_url") @db.VarChar(500)
+  notes        String?   @db.VarChar(500)
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  assets   Asset[]
+  licenses SoftwareLicense[]
+
+  @@unique([companyId, name])
+  @@index([companyId, isActive])
+  @@map("suppliers")
+}
+
+/// Status label = state machine aset ala Snipe-IT
+/// (availableForCheckout = !assigned_to && !deleted && deployable && !archived)
+model StatusLabel {
+  id        String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String          @map("company_id") @db.Uuid
+  name      String          @db.VarChar(150)
+  type      StatusLabelType
+  color     String?         @db.VarChar(20)
+  notes     String?         @db.VarChar(500)
+  isActive  Boolean         @default(true) @map("is_active")
+  createdAt DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime?       @map("deleted_at") @db.Timestamptz(3)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  assets Asset[]
+
+  @@unique([companyId, name])
+  @@index([companyId, type])
+  @@map("status_labels")
+}
+
+/// Model perangkat (ala Snipe-IT models / NetBox device types) — PROTECT bila
+/// masih dipakai Asset (pola NetBox: device_type tidak boleh terhapus diam-diam)
+model AssetModel {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId      String    @map("company_id") @db.Uuid
+  name           String    @db.VarChar(200)
+  modelNumber    String?   @map("model_number") @db.VarChar(150)
+  categoryId     String    @map("category_id") @db.Uuid
+  manufacturerId String    @map("manufacturer_id") @db.Uuid
+  eolMonths      Int?      @map("eol_months")
+  notes          String?   @db.VarChar(500)
+  isActive       Boolean   @default(true) @map("is_active")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  company      Company      @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  category     Category     @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  manufacturer Manufacturer @relation(fields: [manufacturerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  assets Asset[]
+
+  @@unique([companyId, name])
+  @@index([categoryId])
+  @@index([manufacturerId])
+  @@map("asset_models")
+}
+
+// -----------------------------------------------------------------------------
+// Entitas induk: Asset / ManagedNode (reengineering.md bab 3)
+// -----------------------------------------------------------------------------
+
+/// Entitas induk server / network device / workstation — hub FK tunggal bagi
+/// seluruh modul (ITAM, DCIM, telemetry P3, PAM P3). Integrasi Snipe-IT/GLPI/
+/// NetBox: state machine (statusLabel + status), inventaris agent-driven
+/// (isDynamic, lastSeenAt, source), hierarki lokasi (site + locationPath).
+/// Validasi koherensi (checkout availability, unique partial hostname/serial)
+/// di-enforce app-level di osc_rest (transaction + SELECT ... FOR UPDATE).
+model Asset {
+  id               String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId        String      @map("company_id") @db.Uuid
+  name             String      @db.VarChar(150)
+  assetTag         String      @map("asset_tag") @db.VarChar(100)
+  nodeType         NodeType    @default(HOST) @map("node_type")
+  status           AssetStatus @default(ACTIVE)
+  hostname         String?     @db.VarChar(255)
+  fqdn             String?     @db.VarChar(255)
+  mgmtIp           String?     @map("mgmt_ip") @db.Inet
+  serialNumber     String?     @map("serial_number") @db.VarChar(255)
+  assetModelId     String      @map("asset_model_id") @db.Uuid
+  statusLabelId    String      @map("status_label_id") @db.Uuid
+  siteId           String?     @map("site_id") @db.Uuid
+  departmentId     String?     @map("department_id") @db.Uuid
+  locationId       String?     @map("location_id") @db.Uuid
+  supplierId       String?     @map("supplier_id") @db.Uuid
+  assignedToUserId String?     @map("assigned_to_user_id") @db.Uuid
+  locationPath     String?     @map("location_path") @db.VarChar(500)
+  purchaseDate     DateTime?   @map("purchase_date") @db.Date
+  purchaseCost     Decimal?    @map("purchase_cost") @db.Decimal(12, 2)
+  warrantyMonths   Int?        @map("warranty_months")
+  lastSeenAt       DateTime?   @map("last_seen_at") @db.Timestamptz(3)
+  isDynamic        Boolean     @default(false) @map("is_dynamic")
+  source           String?     @db.VarChar(100)
+  notes            String?     @db.Text
+  metadata         Json?       @db.JsonB
+  customFields     Json?       @map("custom_fields") @db.JsonB
+  createdAt        DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt        DateTime?   @map("deleted_at") @db.Timestamptz(3)
+
+  company     Company     @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  assetModel  AssetModel  @relation(fields: [assetModelId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  statusLabel StatusLabel @relation(fields: [statusLabelId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  site        Site?       @relation(fields: [siteId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  department  Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  location    Location?   @relation(fields: [locationId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  supplier    Supplier?   @relation(fields: [supplierId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  assignedTo  User?       @relation("AssetAssignee", fields: [assignedToUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  checkoutLogs      AssetCheckoutLog[]
+  hardwareSnapshots HardwareInventorySnapshot[]
+  interfaces        DeviceInterface[]
+  rackAllocations   RackUnitAllocation[]
+  ipAddresses       IpAddress[]
+  snmpProfile       SnmpDeviceProfile?
+  tickets           Ticket[]
+  licenseSeats      LicenseSeat[]
+
+  @@unique([companyId, assetTag])
+  @@index([companyId, nodeType])
+  @@index([companyId, status])
+  @@index([assetModelId])
+  @@index([statusLabelId])
+  @@index([siteId])
+  @@index([departmentId])
+  @@index([locationId])
+  @@index([assignedToUserId])
+  @@index([lastSeenAt])
+  @@map("assets")
+}
+
+/// Log checkout/checkin aset (Snipe-IT action_logs; append-only timeline)
+model AssetCheckoutLog {
+  id                String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId         String         @map("company_id") @db.Uuid
+  assetId           String         @map("asset_id") @db.Uuid
+  action            CheckoutAction
+  actorUserId       String?        @map("actor_user_id") @db.Uuid
+  targetUserId      String?        @map("target_user_id") @db.Uuid
+  targetLocationId  String?        @map("target_location_id") @db.Uuid
+  expectedCheckinAt DateTime?      @map("expected_checkin_at") @db.Timestamptz(3)
+  notes             String?        @db.Text
+  createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  company        Company   @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  asset          Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  actor          User?     @relation("CheckoutLogActor", fields: [actorUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  target         User?     @relation("CheckoutLogTarget", fields: [targetUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  targetLocation Location? @relation(fields: [targetLocationId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([assetId, createdAt(sort: Desc)])
+  @@index([companyId, createdAt(sort: Desc)])
+  @@index([targetUserId])
+  @@index([expectedCheckinAt])
+  @@map("asset_checkout_logs")
+}
+
+// -----------------------------------------------------------------------------
+// Lisensi perangkat lunak (Snipe-IT licenses + seats)
+// -----------------------------------------------------------------------------
+
+model SoftwareLicense {
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId      String      @map("company_id") @db.Uuid
+  name           String      @db.VarChar(200)
+  /// Kunci lisensi — disarankan dienkripsi Envelope AES-256-GCM app-side
+  licenseKey     String?     @map("license_key") @db.VarChar(500)
+  type           LicenseType @default(PERPETUAL) @map("type")
+  seatsTotal     Int         @default(1) @map("seats_total")
+  manufacturerId String?     @map("manufacturer_id") @db.Uuid
+  supplierId     String?     @map("supplier_id") @db.Uuid
+  purchaseDate   DateTime?   @map("purchase_date") @db.Date
+  expiryDate     DateTime?   @map("expiry_date") @db.Date
+  purchaseCost   Decimal?    @map("purchase_cost") @db.Decimal(12, 2)
+  notes          String?     @db.VarChar(500)
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt      DateTime?   @map("deleted_at") @db.Timestamptz(3)
+
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  manufacturer Manufacturer? @relation(fields: [manufacturerId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  supplier     Supplier?     @relation(fields: [supplierId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  seats LicenseSeat[]
+
+  @@unique([companyId, name])
+  @@index([companyId, expiryDate])
+  @@map("software_licenses")
+}
+
+/// Seat lisensi individual (claim/assign atomik ala Snipe-IT checkout seat)
+model LicenseSeat {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId       String   @map("company_id") @db.Uuid
+  licenseId       String   @map("license_id") @db.Uuid
+  seatNumber      Int      @map("seat_number")
+  assignedUserId  String?  @map("assigned_user_id") @db.Uuid
+  assignedAssetId String?  @map("assigned_asset_id") @db.Uuid
+  notes           String?  @db.VarChar(500)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  company       Company         @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  license       SoftwareLicense @relation(fields: [licenseId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  assignedTo    User?           @relation(fields: [assignedUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  assignedAsset Asset?          @relation(fields: [assignedAssetId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@unique([licenseId, seatNumber])
+  @@index([companyId])
+  @@index([assignedUserId])
+  @@index([assignedAssetId])
+  @@map("license_seats")
+}
+
+// -----------------------------------------------------------------------------
+// Inventaris perangkat keras agent-driven (GLPI inventory snapshots)
+// -----------------------------------------------------------------------------
+
+/// Snapshot inventaris hardware per aset (append-only, time-series) — diproduksi
+/// agent enrollment / host_telemetry (field-locking GLPI). Retensi mengikuti
+/// policy bab 5.8 (batch purge terjadwal).
+model HardwareInventorySnapshot {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId         String   @map("company_id") @db.Uuid
+  assetId           String   @map("asset_id") @db.Uuid
+  collectedAt       DateTime @default(now()) @map("collected_at") @db.Timestamptz(3)
+  cpuModel          String?  @map("cpu_model") @db.VarChar(200)
+  cpuCores          Int?     @map("cpu_cores")
+  memoryTotalBytes  BigInt?  @map("memory_total_bytes")
+  storageTotalBytes BigInt?  @map("storage_total_bytes")
+  osName            String?  @map("os_name") @db.VarChar(150)
+  osVersion         String?  @map("os_version") @db.VarChar(100)
+  /// Payload inventaris mentah (komponen, disk, NIC) — GLPI glpi_items_* generik
+  payload           Json     @db.JsonB
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  asset   Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([assetId, collectedAt(sort: Desc)])
+  @@index([companyId, collectedAt(sort: Desc)])
+  @@map("hardware_inventory_snapshots")
+}
+
+// -----------------------------------------------------------------------------
+// Service Desk / Helpdesk ITIL (GLPI tickets + followups)
+// -----------------------------------------------------------------------------
+
+model Ticket {
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId       String         @map("company_id") @db.Uuid
+  /// Nomor tiket per company (sequence app-generated, pola GLPI tickets_id)
+  code            String         @db.VarChar(50)
+  title           String         @db.VarChar(300)
+  description     String?        @db.Text
+  type            TicketType     @default(INCIDENT) @map("type")
+  status          TicketStatus   @default(NEW)
+  priority        TicketPriority @default(MEDIUM)
+  categoryId      String?        @map("category_id") @db.Uuid
+  assetId         String?        @map("asset_id") @db.Uuid
+  requesterUserId String?        @map("requester_user_id") @db.Uuid
+  requesterEmail  String?        @map("requester_email") @db.VarChar(255)
+  assigneeUserId  String?        @map("assignee_user_id") @db.Uuid
+  openedAt        DateTime       @default(now()) @map("opened_at") @db.Timestamptz(3)
+  dueAt           DateTime?      @map("due_at") @db.Timestamptz(3)
+  resolvedAt      DateTime?      @map("resolved_at") @db.Timestamptz(3)
+  closedAt        DateTime?      @map("closed_at") @db.Timestamptz(3)
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  category  Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  asset     Asset?    @relation(fields: [assetId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  requester User?     @relation("TicketRequester", fields: [requesterUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  assignee  User?     @relation("TicketAssignee", fields: [assigneeUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  followups    TicketFollowup[]
+  department   Department?      @relation(fields: [departmentId], references: [id])
+  departmentId String?          @db.Uuid
+
+  @@unique([companyId, code])
+  @@index([companyId, status])
+  @@index([companyId, openedAt(sort: Desc)])
+  @@index([assigneeUserId])
+  @@index([assetId])
+  @@index([dueAt])
+  @@map("tickets")
+}
+
+/// Follow-up tiket (ITIL timeline; isPrivate = catatan internal teknisi)
+model TicketFollowup {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId    String   @map("company_id") @db.Uuid
+  ticketId     String   @map("ticket_id") @db.Uuid
+  authorUserId String?  @map("author_user_id") @db.Uuid
+  body         String   @db.Text
+  isPrivate    Boolean  @default(false) @map("is_private")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  ticket  Ticket  @relation(fields: [ticketId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  author  User?   @relation(fields: [authorUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([ticketId, createdAt(sort: Desc)])
+  @@index([companyId, createdAt(sort: Desc)])
+  @@map("ticket_followups")
+}
+
+// =============================================================================
+// PART 2 — DCIM & IPAM (pola NetBox/LibreNMS: path enumeration app-side,
+//          inet/cidr + GIST via migration SQL, uniqueness app-level, SNMP
+//          polling profile + delta/rate snapshot time-series)
+//          Semua model mengikat company_id (FK Restrict, terindeks) — bab 5.6
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// Enum DCIM & IPAM
+// -----------------------------------------------------------------------------
+
+/// Sisi mounting pada rack (front/rear face ala NetBox)
+enum RackFace {
+  FRONT
+  REAR
+
+  @@map("rack_face")
+}
+
+/// Status kabel fisik (ala NetBox Cable status)
+enum CableStatus {
+  CONNECTED
+  PLANNED
+  DECOMMISSIONING
+
+  @@map("cable_status")
+}
+
+/// Status VLAN
+enum VlanStatus {
+  ACTIVE
+  RESERVED
+  DEPRECATED
+
+  @@map("vlan_status")
+}
+
+/// Status prefix (CONTAINER = prefix induk ala NetBox container prefix)
+enum PrefixStatus {
+  ACTIVE
+  RESERVED
+  CONTAINER
+  DEPRECATED
+
+  @@map("prefix_status")
+}
+
+/// Status alamat IP
+enum IpAddressStatus {
+  ACTIVE
+  RESERVED
+  DEPRECATED
+  DHCP
+  SLAAC
+
+  @@map("ip_address_status")
+}
+
+/// Versi protokol SNMP (LibreNMS device polling)
+enum SnmpVersion {
+  V1
+  V2C
+  V3
+
+  @@map("snmp_version")
+}
+
+// -----------------------------------------------------------------------------
+// DCIM: Site -> Rack -> RackUnitAllocation, DeviceInterface, CableConnection
+// -----------------------------------------------------------------------------
+
+/// Site/datacenter per Company (ala NetBox Site; hierarki region via path
+/// enumeration app-side, bukan ltree Prisma)
+model Site {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String    @map("company_id") @db.Uuid
+  name      String    @db.VarChar(150)
+  code      String?   @db.VarChar(50)
+  address   String?   @db.VarChar(300)
+  city      String?   @db.VarChar(100)
+  latitude  Decimal?  @db.Decimal(9, 6)
+  longitude Decimal?  @db.Decimal(9, 6)
+  notes     String?   @db.VarChar(500)
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  racks      Rack[]
+  assets     Asset[]
+  vlans      Vlan[]
+  ipPrefixes IpPrefix[]
+
+  @@unique([companyId, name])
+  @@index([companyId, isActive])
+  @@map("sites")
+}
+
+/// Rak fisik per Site (ala NetBox Rack; uHeight = kapasitas unit)
+model Rack {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  siteId    String   @map("site_id") @db.Uuid
+  name      String   @db.VarChar(100)
+  uHeight   Int      @default(42) @map("u_height")
+  model     String?  @db.VarChar(150)
+  notes     String?  @db.VarChar(500)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  site    Site    @relation(fields: [siteId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  allocations RackUnitAllocation[]
+
+  @@unique([companyId, siteId, name])
+  @@index([siteId])
+  @@map("racks")
+}
+
+/// Okupansi unit rack per aset (validasi overlap & kapasitas di app-level
+/// osc_rest dengan transaksi + SELECT ... FOR UPDATE — pola bab 3)
+model RackUnitAllocation {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId  String   @map("company_id") @db.Uuid
+  rackId     String   @map("rack_id") @db.Uuid
+  assetId    String   @map("asset_id") @db.Uuid
+  unitNumber Int      @map("unit_number")
+  face       RackFace @default(FRONT)
+  notes      String?  @db.VarChar(500)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  rack    Rack    @relation(fields: [rackId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  asset   Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([rackId, unitNumber, face])
+  @@index([assetId])
+  @@index([companyId])
+  @@map("rack_unit_allocations")
+}
+
+/// Interface jaringan per aset (ala NetBox Interface; type = slug NetBox
+/// e.g. "1000base-t", "10gbase-x-sfp+")
+model DeviceInterface {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  assetId     String   @map("asset_id") @db.Uuid
+  name        String   @db.VarChar(100)
+  type        String   @default("ethernet") @db.VarChar(50)
+  macAddress  String?  @map("mac_address") @db.VarChar(50)
+  mtu         Int?
+  speedMbps   Int?     @map("speed_mbps")
+  isEnabled   Boolean  @default(true) @map("is_enabled")
+  description String?  @db.VarChar(300)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  asset   Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  ipAddresses     IpAddress[]
+  cableEndA       CableConnection[]         @relation("CableEndA")
+  cableEndB       CableConnection[]         @relation("CableEndB")
+  metricSnapshots InterfaceMetricSnapshot[]
+
+  @@unique([assetId, name])
+  @@index([companyId, assetId])
+  @@map("device_interfaces")
+}
+
+/// Koneksi kabel fisik A<->B (uniqueness satu-termination-satu-cable di-enforce
+/// app-level ala NetBox; CablePath JSONB menyusul di P3 bila diperlukan)
+model CableConnection {
+  id        String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String      @map("company_id") @db.Uuid
+  label     String?     @db.VarChar(150)
+  type      String?     @db.VarChar(50)
+  status    CableStatus @default(PLANNED)
+  portAId   String      @map("port_a_id") @db.Uuid
+  portBId   String      @map("port_b_id") @db.Uuid
+  lengthM   Decimal?    @map("length_m") @db.Decimal(8, 2)
+  notes     String?     @db.VarChar(500)
+  createdAt DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  company Company         @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  portA   DeviceInterface @relation("CableEndA", fields: [portAId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  portB   DeviceInterface @relation("CableEndB", fields: [portBId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([companyId, status])
+  @@index([portAId])
+  @@index([portBId])
+  @@map("cable_connections")
+}
+
+// -----------------------------------------------------------------------------
+// IPAM: Vlan -> IpPrefix -> IpAddress
+// -----------------------------------------------------------------------------
+
+/// VLAN per Company (ala NetBox VLAN; vid 1..4094 divalidasi app-level)
+model Vlan {
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId   String     @map("company_id") @db.Uuid
+  vid         Int
+  name        String     @db.VarChar(150)
+  status      VlanStatus @default(ACTIVE)
+  siteId      String?    @map("site_id") @db.Uuid
+  description String?    @db.VarChar(300)
+  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  site    Site?   @relation(fields: [siteId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  ipPrefixes IpPrefix[]
+
+  @@unique([companyId, vid])
+  @@index([companyId, siteId])
+  @@map("vlans")
+}
+
+/// Prefix IP (cidr disimpan VarChar; GIST index pada cast inet dibuat via
+/// migration SQL — Prisma tidak mengekspose cidr/GIST). Overlap containment
+/// divalidasi app-level (pola NetBox).
+model IpPrefix {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId   String       @map("company_id") @db.Uuid
+  /// CIDR notation, e.g. "10.10.0.0/24"
+  prefix      String       @db.VarChar(64)
+  status      PrefixStatus @default(ACTIVE)
+  siteId      String?      @map("site_id") @db.Uuid
+  vlanId      String?      @map("vlan_id") @db.Uuid
+  isPool      Boolean      @default(false) @map("is_pool")
+  description String?      @db.VarChar(300)
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  site    Site?   @relation(fields: [siteId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  vlan    Vlan?   @relation(fields: [vlanId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  ipAddresses IpAddress[]
+
+  @@unique([companyId, prefix])
+  @@index([siteId])
+  @@index([vlanId])
+  @@map("ip_prefixes")
+}
+
+/// Alamat IP individual (tipe native INET; unique per company) — assignment ke
+/// interface divalidasi app-level agar tenant interface == tenant IP
+model IpAddress {
+  id          String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId   String          @map("company_id") @db.Uuid
+  address     String          @db.Inet
+  status      IpAddressStatus @default(ACTIVE)
+  prefixId    String?         @map("prefix_id") @db.Uuid
+  interfaceId String?         @map("interface_id") @db.Uuid
+  isGateway   Boolean         @default(false) @map("is_gateway")
+  dnsName     String?         @map("dns_name") @db.VarChar(255)
+  description String?         @db.VarChar(300)
+  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  company   Company          @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  prefix    IpPrefix?        @relation(fields: [prefixId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  interface DeviceInterface? @relation(fields: [interfaceId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  asset     Asset?           @relation(fields: [assetId], references: [id])
+  assetId   String?          @db.Uuid
+
+  @@unique([companyId, address])
+  @@index([prefixId])
+  @@index([interfaceId])
+  @@index([status])
+  @@map("ip_addresses")
+}
+
+// -----------------------------------------------------------------------------
+// Network telemetry: SNMP profile + interface metric snapshot (LibreNMS)
+// -----------------------------------------------------------------------------
+
+/// Profil SNMP polling per aset network device — kredensial (community v1/v2c,
+/// auth/priv v3) TIDAK pernah plaintext: Envelope AES-256-GCM app-level (bytea)
+model SnmpDeviceProfile {
+  id                  String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId           String      @map("company_id") @db.Uuid
+  assetId             String      @map("asset_id") @db.Uuid
+  version             SnmpVersion @default(V2C)
+  port                Int         @default(161)
+  /// Community string v1/v2c — terenkripsi Envelope AES-256-GCM
+  communityEncrypted  Bytes?      @map("community_encrypted")
+  v3Username          String?     @map("v3_username") @db.VarChar(100)
+  v3AuthProtocol      String?     @map("v3_auth_protocol") @db.VarChar(20)
+  /// Auth passphrase v3 — terenkripsi Envelope AES-256-GCM
+  v3AuthPassEncrypted Bytes?      @map("v3_auth_pass_encrypted")
+  v3PrivProtocol      String?     @map("v3_priv_protocol") @db.VarChar(20)
+  /// Priv passphrase v3 — terenkripsi Envelope AES-256-GCM
+  v3PrivPassEncrypted Bytes?      @map("v3_priv_pass_encrypted")
+  pollIntervalSeconds Int         @default(300) @map("poll_interval_seconds")
+  lastPolledAt        DateTime?   @map("last_polled_at") @db.Timestamptz(3)
+  isActive            Boolean     @default(true) @map("is_active")
+  createdAt           DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  asset   Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([assetId])
+  @@index([companyId, isActive])
+  @@index([lastPolledAt])
+  @@map("snmp_device_profiles")
+}
+
+/// Snapshot metrik interface (time-series append-only, delta/rate dihitung
+/// poller ala LibreNMS) — composite index (interface_id, collected_at DESC);
+/// retensi 30–90 hari via job terjadwal (bab 5.8), kandidat partitioning
+/// range bulanan pada collected_at.
+model InterfaceMetricSnapshot {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId         String   @map("company_id") @db.Uuid
+  interfaceId       String   @map("interface_id") @db.Uuid
+  collectedAt       DateTime @default(now()) @map("collected_at") @db.Timestamptz(3)
+  inOctets          BigInt
+  outOctets         BigInt
+  inUnicastPackets  BigInt?  @map("in_unicast_packets")
+  outUnicastPackets BigInt?  @map("out_unicast_packets")
+  inErrors          BigInt?  @map("in_errors")
+  outErrors         BigInt?  @map("out_errors")
+  inDiscards        BigInt?  @map("in_discards")
+  outDiscards       BigInt?  @map("out_discards")
+  /// Hasil komputasi delta/rate poller (bits per second)
+  inRateBps         BigInt?  @map("in_rate_bps")
+  outRateBps        BigInt?  @map("out_rate_bps")
+
+  company   Company         @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  interface DeviceInterface @relation(fields: [interfaceId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([interfaceId, collectedAt(sort: Desc)])
+  @@index([companyId, collectedAt(sort: Desc)])
+  @@map("interface_metric_snapshots")
 }
