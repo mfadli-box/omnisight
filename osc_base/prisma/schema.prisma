@@ -2,9 +2,12 @@
 // omnisight — Core Schema Part 1 (Multi-Company, HRIS Cache, MFA, RBAC,
 //              Menu Privilege, Studio Metadata, Notification, Agent Enrollment)
 //              + Part 2 (ITAM & Service Desk: Snipe-IT/GLPI; DCIM & IPAM: NetBox/LibreNMS)
+//              + Part 3 (Telemetry & Retention, Uptime/Status Page, Nginx Control
+//                Plane, Docker/Compose, Alerting, SecOps SIEM/FIM/CVE/SCA, PAM
+//                Bastion & Vault, File Asset Registry)
 // Author    : ai-base (Database Engineer)
 // Blueprint : osc_docs/reengineering.md (bab 3, 5.1–5.8)
-// Doc       : osc_docs/base/schema-p1.md + osc_docs/base/schema-p2.md
+// Doc       : osc_docs/base/schema-p1.md + osc_docs/base/schema-p2.md + osc_docs/base/schema-p3.md
 //
 // Konvensi (mengikuti schema-core.md bootstrap):
 //   - Model PascalCase, field camelCase -> snake_case di PostgreSQL via
@@ -25,7 +28,6 @@ datasource db {
   provider = "postgresql"
   // DATABASE_URL dibaca dari osc_base/.env untuk Prisma CLI (migrasi/format/
   // validate); container runtime (osc_rest) memakai DATABASE_URL internal.
-  url      = env("DATABASE_URL")
 }
 
 // -----------------------------------------------------------------------------
@@ -116,6 +118,28 @@ model Company {
   snmpDeviceProfiles       SnmpDeviceProfile[]
   interfaceMetricSnapshots InterfaceMetricSnapshot[]
 
+  // --- Part 3: Telemetry, Uptime, Nginx, Docker, Alerting, SecOps, PAM ---
+  uptimeMonitors           UptimeMonitor[]
+  uptimeHeartbeats         UptimeHeartbeat[]
+  statusPages              StatusPage[]
+  nginxNodes               NginxNode[]
+  nginxVirtualHosts        NginxVirtualHost[]
+  dockerHosts              DockerHost[]
+  composeStacks            ComposeStack[]
+  systemMetricSnapshots    SystemMetricSnapshot[]
+  containerMetricSnapshots ContainerMetricSnapshot[]
+  alertRules               AlertRule[]
+  alertHistories           AlertHistory[]
+  fimBaselineEvents        FimBaselineEvent[]
+  securityAlertEvents      SecurityAlertEvent[]
+  vulnerabilityFindings    VulnerabilityFinding[]
+  complianceCheckResults   ComplianceCheckResult[]
+  pamVaultAccounts         PamVaultAccount[]
+  pamAccessPolicies        PamAccessPolicy[]
+  pamSessionLogs           PamSessionLog[]
+  fileAssets               FileAsset[]
+  statusPageMonitors       StatusPageMonitor[]
+
   @@index([isActive])
   @@map("companies")
 }
@@ -159,6 +183,11 @@ model User {
   assignedTickets    Ticket[]           @relation("TicketAssignee")
   ticketFollowups    TicketFollowup[]
   licenseSeats       LicenseSeat[]
+
+  // --- Part 3: SecOps & PAM (relasi balik) ---
+  acknowledgedSecurityAlerts SecurityAlertEvent[] @relation("SecurityAlertAcknowledger")
+  resolvedFimEvents          FimBaselineEvent[]   @relation("FimEventResolver")
+  pamSessionLogs             PamSessionLog[]
 
   /// Offline cache fallback: now() - last_hris_sync_at <= ttl (bab 5.2)
   @@index([lastHrisSyncAt])
@@ -475,6 +504,8 @@ model NotificationChannel {
   deletedAt   DateTime?               @map("deleted_at") @db.Timestamptz(3)
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  alertRules AlertRule[]
 
   @@unique([companyId, type])
   @@index([companyId, isActive])
@@ -833,6 +864,17 @@ model Asset {
   snmpProfile       SnmpDeviceProfile?
   tickets           Ticket[]
   licenseSeats      LicenseSeat[]
+
+  // --- Part 3: Telemetry, Uptime, Infra Control, SecOps, PAM (relasi balik) ---
+  uptimeMonitors         UptimeMonitor[]
+  nginxNodes             NginxNode[]
+  dockerHosts            DockerHost[]
+  systemMetricSnapshots  SystemMetricSnapshot[]
+  fimBaselineEvents      FimBaselineEvent[]
+  securityAlertEvents    SecurityAlertEvent[]
+  vulnerabilityFindings  VulnerabilityFinding[]
+  complianceCheckResults ComplianceCheckResult[]
+  pamVaultAccounts       PamVaultAccount[]
 
   @@unique([companyId, assetTag])
   @@index([companyId, nodeType])
@@ -1367,4 +1409,801 @@ model InterfaceMetricSnapshot {
   @@index([interfaceId, collectedAt(sort: Desc)])
   @@index([companyId, collectedAt(sort: Desc)])
   @@map("interface_metric_snapshots")
+}
+
+// =============================================================================
+// PART 3 — TELEMETRY, UPTIME, NGINX, DOCKER, ALERTING, SECOPS, PAM, FILE ASSET
+//          (pola Uptime Kuma / Nginx UI / Dockge+Arcane / Beszel / Wazuh /
+//           JumpServer). Semua model mengikat company_id (FK Restrict,
+//           terindeks) — bab 5.6 Strict Tenant Isolation.
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// Enum Part 3
+// -----------------------------------------------------------------------------
+
+/// Tipe monitor uptime (polymorphic ala Uptime Kuma; detail di config JSONB)
+enum UptimeMonitorType {
+  HTTP
+  HTTPS
+  TCP
+  ICMP
+  DNS
+  KEYWORD
+  PUSH
+
+  @@map("uptime_monitor_type")
+}
+
+/// Status heartbeat monitor (Uptime Kuma heartbeat status)
+enum HeartbeatStatus {
+  UP
+  DOWN
+  PENDING
+  MAINTENANCE
+
+  @@map("heartbeat_status")
+}
+
+/// Status virtual host dalam pipeline Nginx UI
+/// (validasi sandbox -> applied -> gagal -> rollback)
+enum NginxVhostStatus {
+  DRAFT
+  TESTING
+  APPLIED
+  FAILED
+  ROLLED_BACK
+
+  @@map("nginx_vhost_status")
+}
+
+/// Status kehadiran node agent (Nginx node / Docker host polling)
+enum NodeOnlineStatus {
+  ONLINE
+  OFFLINE
+  UNKNOWN
+
+  @@map("node_online_status")
+}
+
+/// Status drift Compose stack (Arcane/Dockge: file vs state runtime)
+enum DriftStatus {
+  IN_SYNC
+  DRIFTED
+  UNKNOWN
+
+  @@map("drift_status")
+}
+
+/// Operator pembanding rule alert (Beszel-style hysteresis)
+enum AlertOperator {
+  GT
+  GTE
+  LT
+  LTE
+  EQ
+  NEQ
+
+  @@map("alert_operator")
+}
+
+/// Tingkat keparahan alert (notif event_filter "alert_metrik", bab 5.8)
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+
+  @@map("alert_severity")
+}
+
+/// Status lifecycle alert (firing -> resolved; histeresis app-level)
+enum AlertState {
+  FIRING
+  RESOLVED
+
+  @@map("alert_state")
+}
+
+/// Tipe event FIM dual-event Wazuh (realtime inotify + scheduled checksum)
+enum FimEventType {
+  CREATED
+  MODIFIED
+  DELETED
+  ATTRIBUTE_CHANGED
+
+  @@map("fim_event_type")
+}
+
+/// Sumber deteksi FIM (dual-event: inotify realtime vs scan terjadwal)
+enum FimDetectionSource {
+  REALTIME
+  SCHEDULED
+
+  @@map("fim_detection_source")
+}
+
+/// Tingkat keparahan temuan keamanan (SIEM alert, CVE, SCA — skala Wazuh)
+enum SecuritySeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+
+  @@map("security_severity")
+}
+
+/// Status penanganan temuan CVE (decide: fix / accept / false positive)
+enum VulnerabilityStatus {
+  OPEN
+  FIXED
+  ACCEPTED
+  FALSE_POSITIVE
+
+  @@map("vulnerability_status")
+}
+
+/// Hasil compliance check / SCA (Wazuh SCA; CIS benchmark pass/fail)
+enum ComplianceStatus {
+  PASS
+  FAIL
+  ERROR
+  SKIPPED
+
+  @@map("compliance_status")
+}
+
+/// Tipe akun vault PAM (JumpServer asset permission)
+enum PamAccountType {
+  SSH_PASSWORD
+  SSH_KEY
+  DATABASE
+  HTTP_ENDPOINT
+
+  @@map("pam_account_type")
+}
+
+/// Status sesi PAM (authorize -> active -> closed / denied / expired)
+enum PamSessionStatus {
+  REQUESTED
+  AUTHORIZED
+  ACTIVE
+  CLOSED
+  DENIED
+  EXPIRED
+
+  @@map("pam_session_status")
+}
+
+/// Kategori file asset di RustFS (replay PAM, backup config, excel, lampiran)
+enum FileAssetCategory {
+  PAM_RECORDING
+  CONFIG_BACKUP
+  EXCEL_EXPORT
+  ATTACHMENT
+
+  @@map("file_asset_category")
+}
+
+/// Tier retensi snapshot metrik host (bab 5.8: 1m -> 30 hari, 10m -> 90 hari,
+/// konfigurabel 30-90 hari)
+enum MetricTier {
+  TIER_1M
+  TIER_10M
+
+  @@map("metric_tier")
+}
+
+// -----------------------------------------------------------------------------
+// Uptime & Status Page (pola Uptime Kuma: monitor polymorphic + heartbeat)
+// -----------------------------------------------------------------------------
+
+/// Monitor uptime per Company (polymorphic: http/tcp/icmp/dns/keyword/push —
+/// konfigurasi detail di config JSONB). Terikat opsional ke Asset (ManagedNode)
+/// untuk dashboard NOC; standalone boleh (target eksternal).
+model UptimeMonitor {
+  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId       String            @map("company_id") @db.Uuid
+  assetId         String?           @map("asset_id") @db.Uuid
+  name            String            @db.VarChar(150)
+  type            UptimeMonitorType @default(HTTP)
+  /// Target monitor (URL, host:port, hostname DNS) — validasi SSRF app-level
+  target          String            @db.VarChar(500)
+  /// Konfigurasi polymorphic per tipe (headers, keyword, auth) — nilai sensitif
+  /// terenkripsi Envelope AES-256-GCM app-level
+  config          Json?             @db.JsonB
+  intervalSeconds Int               @default(60) @map("interval_seconds")
+  retries         Int               @default(1)
+  /// Token one-time push heartbeat (mode PUSH); hash disimpan, bukan plaintext
+  pushTokenHash   String?           @unique @map("push_token_hash") @db.VarChar(255)
+  isActive        Boolean           @default(true) @map("is_active")
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt       DateTime?         @map("deleted_at") @db.Timestamptz(3)
+
+  company     Company             @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  asset       Asset?              @relation(fields: [assetId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  heartbeats  UptimeHeartbeat[]
+  statusPages StatusPageMonitor[]
+
+  @@unique([companyId, name])
+  @@index([companyId, isActive])
+  @@index([assetId])
+  @@map("uptime_monitors")
+}
+
+/// Heartbeat hasil eksekusi monitor (time-series append-only). Raw retensi
+/// 30 hari default (bab 5.8); agregat stat bucket dihitung poller. Index
+/// partial `important` dibuat via migration SQL (Prisma tidak expose partial).
+model UptimeHeartbeat {
+  id         String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId  String          @map("company_id") @db.Uuid
+  monitorId  String          @map("monitor_id") @db.Uuid
+  recordedAt DateTime        @default(now()) @map("recorded_at") @db.Timestamptz(3)
+  status     HeartbeatStatus @default(PENDING)
+  /// Latensi round-trip milidetik (NULL untuk status DOWN)
+  pingMs     Int?            @map("ping_ms")
+  /// Flag baris penting (transisi UP<->DOWN) — index partial via migration SQL
+  important  Boolean         @default(false)
+  msg        String?         @db.VarChar(500)
+
+  company Company       @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  monitor UptimeMonitor @relation(fields: [monitorId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([monitorId, recordedAt(sort: Desc)])
+  @@index([companyId, recordedAt(sort: Desc)])
+  @@map("uptime_heartbeats")
+}
+
+/// Halaman status publik per Company (aggregate monitor; slug akses publik)
+model StatusPage {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId   String    @map("company_id") @db.Uuid
+  slug        String    @db.VarChar(100)
+  title       String    @db.VarChar(150)
+  description String?   @db.VarChar(500)
+  isPublished Boolean   @default(false) @map("is_published")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  company  Company             @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  monitors StatusPageMonitor[]
+
+  @@unique([companyId, slug])
+  @@index([isPublished])
+  @@map("status_pages")
+}
+
+/// Join m2m StatusPage <-> UptimeMonitor (urutan tampil di status page)
+model StatusPageMonitor {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId    String   @map("company_id") @db.Uuid
+  statusPageId String   @map("status_page_id") @db.Uuid
+  monitorId    String   @map("monitor_id") @db.Uuid
+  sortOrder    Int      @default(0) @map("sort_order")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  company    Company       @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  statusPage StatusPage    @relation(fields: [statusPageId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  monitor    UptimeMonitor @relation(fields: [monitorId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([statusPageId, monitorId])
+  @@index([monitorId])
+  @@index([companyId])
+  @@map("status_page_monitors")
+}
+
+// -----------------------------------------------------------------------------
+// Nginx Control Plane (pola Nginx UI: pipeline validasi -> history ->
+//   atomic write -> nginx -t -> rollback -> reload)
+// -----------------------------------------------------------------------------
+
+/// Node Nginx terkelola (proxy ke agent infra_control pada ManagedNode).
+/// Konfigurasi final di-backup ke RustFS (bucket osc-config-backups).
+model NginxNode {
+  id           String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId    String           @map("company_id") @db.Uuid
+  assetId      String?          @map("asset_id") @db.Uuid
+  name         String           @db.VarChar(150)
+  /// Endpoint agent (host:port); kredensial agent via HMAC enrollment bab 5.8
+  endpoint     String           @db.VarChar(255)
+  configDir    String?          @map("config_dir") @db.VarChar(500)
+  status       NodeOnlineStatus @default(UNKNOWN)
+  nginxVersion String?          @map("nginx_version") @db.VarChar(50)
+  lastSeenAt   DateTime?        @map("last_seen_at") @db.Timestamptz(3)
+  isActive     Boolean          @default(true) @map("is_active")
+  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt    DateTime?        @map("deleted_at") @db.Timestamptz(3)
+
+  company      Company            @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  asset        Asset?             @relation(fields: [assetId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  virtualHosts NginxVirtualHost[]
+
+  @@unique([companyId, name])
+  @@index([companyId, isActive])
+  @@index([assetId])
+  @@index([status])
+  @@map("nginx_nodes")
+}
+
+/// Virtual host / server block Nginx. Konten config disimpan di DB untuk
+/// preview + pointer RustFS; pipeline simpan (nginx -t sandbox) di-enforce
+/// app-level osc_rest; status FAILED/ROLLED_BACK wajib menyimpan reason.
+model NginxVirtualHost {
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId       String           @map("company_id") @db.Uuid
+  nginxNodeId     String           @map("nginx_node_id") @db.Uuid
+  serverName      String           @map("server_name") @db.VarChar(255)
+  listenPort      Int              @default(80) @map("listen_port")
+  status          NginxVhostStatus @default(DRAFT)
+  /// Isi server block (gonginx AST verbatim preview)
+  configContent   String           @map("config_content") @db.Text
+  sslCertPath     String?          @map("ssl_cert_path") @db.VarChar(500)
+  sslKeyPath      String?          @map("ssl_key_path") @db.VarChar(500)
+  /// Pointer objek backup config di RustFS (bucket osc-config-backups)
+  backupObjectKey String?          @map("backup_object_key") @db.VarChar(500)
+  lastError       String?          @map("last_error") @db.VarChar(500)
+  validatedAt     DateTime?        @map("validated_at") @db.Timestamptz(3)
+  appliedAt       DateTime?        @map("applied_at") @db.Timestamptz(3)
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt       DateTime?        @map("deleted_at") @db.Timestamptz(3)
+
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  nginxNode NginxNode @relation(fields: [nginxNodeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([nginxNodeId, serverName, listenPort])
+  @@index([companyId, status])
+  @@map("nginx_virtual_hosts")
+}
+
+// -----------------------------------------------------------------------------
+// Docker & Compose Control Plane (pola Dockge/Arcane: lifecycle + drift +
+//   journal rollback; env berlapis; image update 2 lapis + admission lease)
+// -----------------------------------------------------------------------------
+
+/// Host Docker terkelola (daemon socket via agent infra_control)
+model DockerHost {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId      String           @map("company_id") @db.Uuid
+  assetId        String?          @map("asset_id") @db.Uuid
+  name           String           @db.VarChar(150)
+  /// Endpoint daemon (unix:// atau tcp://) — hanya via agent, bukan langsung
+  endpoint       String           @db.VarChar(255)
+  dockerVersion  String?          @map("docker_version") @db.VarChar(50)
+  status         NodeOnlineStatus @default(UNKNOWN)
+  containerCount Int?             @map("container_count")
+  lastSeenAt     DateTime?        @map("last_seen_at") @db.Timestamptz(3)
+  isActive       Boolean          @default(true) @map("is_active")
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt      DateTime?        @map("deleted_at") @db.Timestamptz(3)
+
+  company                  Company                   @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  asset                    Asset?                    @relation(fields: [assetId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  stacks                   ComposeStack[]
+  containerMetricSnapshots ContainerMetricSnapshot[]
+
+  @@unique([companyId, name])
+  @@index([companyId, isActive])
+  @@index([assetId])
+  @@index([status])
+  @@map("docker_hosts")
+}
+
+/// Compose stack per Docker host (Arcane/Dockge: deploy journal + rollback).
+/// Nilai env sensitif TIDAK plaintext — env berlapis dienkripsi Envelope
+/// AES-256-GCM app-level; file compose di-backup ke RustFS.
+model ComposeStack {
+  id              String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId       String      @map("company_id") @db.Uuid
+  dockerHostId    String      @map("docker_host_id") @db.Uuid
+  name            String      @db.VarChar(150)
+  workingDir      String      @map("working_dir") @db.VarChar(500)
+  /// Isi compose.yaml ter-deploy (compose-go parse app-level)
+  composeContent  String      @map("compose_content") @db.Text
+  /// Env overrides terenkripsi Envelope AES-256-GCM (bytea)
+  envEncrypted    Bytes?      @map("env_encrypted")
+  driftStatus     DriftStatus @default(UNKNOWN) @map("drift_status")
+  /// Pointer backup config di RustFS (bucket osc-config-backups)
+  backupObjectKey String?     @map("backup_object_key") @db.VarChar(500)
+  lastDeployedAt  DateTime?   @map("last_deployed_at") @db.Timestamptz(3)
+  lastSyncedAt    DateTime?   @map("last_synced_at") @db.Timestamptz(3)
+  lastError       String?     @map("last_error") @db.VarChar(500)
+  isActive        Boolean     @default(true) @map("is_active")
+  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt       DateTime?   @map("deleted_at") @db.Timestamptz(3)
+
+  company    Company    @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  dockerHost DockerHost @relation(fields: [dockerHostId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([dockerHostId, name])
+  @@index([companyId, driftStatus])
+  @@map("compose_stacks")
+}
+
+// -----------------------------------------------------------------------------
+// Telemetry host & container (pola Beszel: delta keyed per interval, tier
+//   1m -> 10m, retensi 30-90 hari; bab 5.8 Data Retention Policy)
+// -----------------------------------------------------------------------------
+
+/// Snapshot metrik host per interval polling agent host_telemetry_agent
+/// (append-only, time-series). Kolom host_id = FK ke assets. Index komposit
+/// (company_id, host_id, recorded_at) mendukung job retention cleanup 30-90
+/// hari (DELETE batch per rentang waktu per tenant) dan grafik per host;
+/// kandidat partitioning range bulanan pada recorded_at.
+model SystemMetricSnapshot {
+  id             String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId      String     @map("company_id") @db.Uuid
+  hostId         String     @map("host_id") @db.Uuid
+  recordedAt     DateTime   @default(now()) @map("recorded_at") @db.Timestamptz(3)
+  tier           MetricTier @default(TIER_1M)
+  cpuUsagePct    Decimal?   @map("cpu_usage_pct") @db.Decimal(5, 2)
+  load1          Decimal?   @db.Decimal(6, 2)
+  load5          Decimal?   @db.Decimal(6, 2)
+  load15         Decimal?   @db.Decimal(6, 2)
+  memUsedBytes   BigInt?    @map("mem_used_bytes")
+  memTotalBytes  BigInt?    @map("mem_total_bytes")
+  diskUsedBytes  BigInt?    @map("disk_used_bytes")
+  diskTotalBytes BigInt?    @map("disk_total_bytes")
+  netInBps       BigInt?    @map("net_in_bps")
+  netOutBps      BigInt?    @map("net_out_bps")
+  uptimeSeconds  BigInt?    @map("uptime_seconds")
+  agentId        String?    @map("agent_id") @db.Uuid
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  host    Asset   @relation(fields: [hostId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([companyId, hostId, recordedAt])
+  @@index([hostId, recordedAt(sort: Desc)])
+  @@index([recordedAt])
+  @@map("system_metric_snapshots")
+}
+
+/// Snapshot metrik container per Docker host (append-only). Index komposit
+/// (company_id, host_id, recorded_at) untuk retention cleanup 30-90 hari.
+model ContainerMetricSnapshot {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId     String   @map("company_id") @db.Uuid
+  hostId        String   @map("host_id") @db.Uuid
+  /// Docker container ID (string hex 64) atau container name — bukan FK
+  containerRef  String   @map("container_ref") @db.VarChar(100)
+  containerName String?  @map("container_name") @db.VarChar(150)
+  recordedAt    DateTime @default(now()) @map("recorded_at") @db.Timestamptz(3)
+  cpuUsagePct   Decimal? @map("cpu_usage_pct") @db.Decimal(5, 2)
+  memUsedBytes  BigInt?  @map("mem_used_bytes")
+  memLimitBytes BigInt?  @map("mem_limit_bytes")
+  netInBps      BigInt?  @map("net_in_bps")
+  netOutBps     BigInt?  @map("net_out_bps")
+  blockReadBps  BigInt?  @map("block_read_bps")
+  blockWriteBps BigInt?  @map("block_write_bps")
+  pids          Int?
+  isRunning     Boolean  @default(true) @map("is_running")
+
+  company Company    @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  host    DockerHost @relation(fields: [hostId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([companyId, hostId, recordedAt])
+  @@index([hostId, recordedAt(sort: Desc)])
+  @@index([containerRef, recordedAt(sort: Desc)])
+  @@index([recordedAt])
+  @@map("container_metric_snapshots")
+}
+
+// -----------------------------------------------------------------------------
+// Alerting (pola Beszel: histeresis + notif channel; bab 5.8 dispatcher)
+// -----------------------------------------------------------------------------
+
+/// Rule alert per Company: threshold metrik (host/container/uptime/FIM/CVE)
+/// dengan operator + durasi (histeresis di-evaluasi app-level osc_rest)
+model AlertRule {
+  id                    String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId             String        @map("company_id") @db.Uuid
+  name                  String        @db.VarChar(150)
+  /// Sumber metrik, e.g. "system.cpu_pct", "container.mem_pct", "uptime.down",
+  /// "fim.event", "vuln.cve" (dot-path tervalidasi app-level)
+  metric                String        @db.VarChar(100)
+  operator              AlertOperator @default(GT)
+  threshold             Decimal       @db.Decimal(12, 2)
+  /// Durasi kondisi bertahan sebelum firing (anti flapping)
+  durationSeconds       Int           @default(60) @map("duration_seconds")
+  severity              AlertSeverity @default(WARNING)
+  /// Filter target opsional (host/container/tag) — JSON object
+  targetFilter          Json?         @map("target_filter") @db.JsonB
+  notificationChannelId String?       @map("notification_channel_id") @db.Uuid
+  isActive              Boolean       @default(true) @map("is_active")
+  createdAt             DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt             DateTime?     @map("deleted_at") @db.Timestamptz(3)
+
+  company   Company              @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  channel   NotificationChannel? @relation(fields: [notificationChannelId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  histories AlertHistory[]
+
+  @@unique([companyId, name])
+  @@index([companyId, isActive])
+  @@index([notificationChannelId])
+  @@map("alert_rules")
+}
+
+/// Riwayat alert append-only (firing -> resolved; notif via outbox worker)
+model AlertHistory {
+  id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId   String        @map("company_id") @db.Uuid
+  alertRuleId String        @map("alert_rule_id") @db.Uuid
+  state       AlertState    @default(FIRING)
+  severity    AlertSeverity @default(WARNING)
+  /// Ref target yang beralarm (asset uuid / container ref / monitor id)
+  targetRef   String?       @map("target_ref") @db.VarChar(150)
+  value       Decimal?      @db.Decimal(12, 2)
+  message     String?       @db.VarChar(500)
+  firedAt     DateTime      @default(now()) @map("fired_at") @db.Timestamptz(3)
+  resolvedAt  DateTime?     @map("resolved_at") @db.Timestamptz(3)
+
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  alertRule AlertRule @relation(fields: [alertRuleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([alertRuleId, firedAt(sort: Desc)])
+  @@index([companyId, firedAt(sort: Desc)])
+  @@index([resolvedAt])
+  @@map("alert_histories")
+}
+
+// -----------------------------------------------------------------------------
+// SecOps: SIEM/FIM/CVE/SCA (pola Wazuh 5.x: event store vs detector terpisah,
+//   FIM dual-event + checksum, CVE feed matching, SCA compliance)
+// -----------------------------------------------------------------------------
+
+/// Event FIM (File Integrity Monitoring) dual-event per ManagedNode: sumber
+/// realtime (inotify) + scheduled (checksum baseline). Baseline versioning
+/// memungkinkan diff antar baseline; retensi mengikuti policy 30-90 hari.
+model FimBaselineEvent {
+  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId        String             @map("company_id") @db.Uuid
+  assetId          String             @map("asset_id") @db.Uuid
+  path             String             @db.VarChar(1000)
+  eventType        FimEventType       @map("event_type")
+  detectionSource  FimDetectionSource @default(SCHEDULED) @map("detection_source")
+  baselineVersion  Int                @default(1) @map("baseline_version")
+  oldChecksum      String?            @map("old_checksum") @db.VarChar(64)
+  newChecksum      String?            @map("new_checksum") @db.VarChar(64)
+  /// Atribut lama/baru (mode, uid, gid, mtime, size) — diff app-level
+  oldAttrs         Json?              @map("old_attrs") @db.JsonB
+  newAttrs         Json?              @map("new_attrs") @db.JsonB
+  sizeBytes        BigInt?            @map("size_bytes")
+  detectedAt       DateTime           @default(now()) @map("detected_at") @db.Timestamptz(3)
+  isResolved       Boolean            @default(false) @map("is_resolved")
+  resolvedByUserId String?            @map("resolved_by_user_id") @db.Uuid
+  resolvedAt       DateTime?          @map("resolved_at") @db.Timestamptz(3)
+
+  company    Company @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  asset      Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  resolvedBy User?   @relation("FimEventResolver", fields: [resolvedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([companyId, assetId, detectedAt(sort: Desc)])
+  @@index([assetId, path, detectedAt(sort: Desc)])
+  @@index([isResolved])
+  @@index([detectedAt])
+  @@map("fim_baseline_events")
+}
+
+/// Security alert SIEM (detector terpisah dari event store; kandidat rule
+/// Sigma/Syscheck Wazuh). Acknowledgement tercatat untuk audit SOC.
+model SecurityAlertEvent {
+  id                   String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId            String           @map("company_id") @db.Uuid
+  assetId              String?          @map("asset_id") @db.Uuid
+  ruleName             String           @map("rule_name") @db.VarChar(200)
+  /// Kategori, e.g. "authentication", "malware", "web_attack"
+  category             String?          @db.VarChar(100)
+  severity             SecuritySeverity @default(MEDIUM)
+  mitreTactic          String?          @map("mitre_tactic") @db.VarChar(100)
+  mitreTechnique       String?          @map("mitre_technique") @db.VarChar(100)
+  sourceIp             String?          @map("source_ip") @db.Inet
+  /// Payload alert mentah (decoded fields Wazuh)
+  payload              Json?            @db.JsonB
+  detectedAt           DateTime         @default(now()) @map("detected_at") @db.Timestamptz(3)
+  isAcknowledged       Boolean          @default(false) @map("is_acknowledged")
+  acknowledgedByUserId String?          @map("acknowledged_by_user_id") @db.Uuid
+  acknowledgedAt       DateTime?        @map("acknowledged_at") @db.Timestamptz(3)
+
+  company        Company @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  asset          Asset?  @relation(fields: [assetId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  acknowledgedBy User?   @relation("SecurityAlertAcknowledger", fields: [acknowledgedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([companyId, detectedAt(sort: Desc)])
+  @@index([assetId, detectedAt(sort: Desc)])
+  @@index([severity])
+  @@index([isAcknowledged])
+  @@index([detectedAt])
+  @@map("security_alert_events")
+}
+
+/// Temuan CVE per aset (matching feed + inventory version matcher; dedupe
+/// unique per asset+cve; status penanganan untuk triage SOC)
+model VulnerabilityFinding {
+  id               String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId        String              @map("company_id") @db.Uuid
+  assetId          String              @map("asset_id") @db.Uuid
+  cveId            String              @map("cve_id") @db.VarChar(20)
+  title            String              @db.VarChar(300)
+  severity         SecuritySeverity    @default(MEDIUM)
+  cvssScore        Decimal?            @map("cvss_score") @db.Decimal(3, 1)
+  versionInstalled String?             @map("version_installed") @db.VarChar(150)
+  versionFixed     String?             @map("version_fixed") @db.VarChar(150)
+  status           VulnerabilityStatus @default(OPEN)
+  sourceFeed       String?             @map("source_feed") @db.VarChar(100)
+  firstDetectedAt  DateTime            @default(now()) @map("first_detected_at") @db.Timestamptz(3)
+  lastDetectedAt   DateTime            @default(now()) @map("last_detected_at") @db.Timestamptz(3)
+  resolvedAt       DateTime?           @map("resolved_at") @db.Timestamptz(3)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  asset   Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([assetId, cveId])
+  @@index([companyId, status])
+  @@index([companyId, severity])
+  @@index([lastDetectedAt])
+  @@map("vulnerability_findings")
+}
+
+/// Hasil compliance check / SCA per aset (CIS benchmark, policy ID Wazuh)
+model ComplianceCheckResult {
+  id        String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String           @map("company_id") @db.Uuid
+  assetId   String           @map("asset_id") @db.Uuid
+  /// Benchmark, e.g. "CIS Ubuntu 22.04 LTS L1"
+  benchmark String           @db.VarChar(100)
+  /// ID check dalam benchmark, e.g. "5.2.3"
+  checkId   String           @map("check_id") @db.VarChar(50)
+  title     String           @db.VarChar(300)
+  status    ComplianceStatus @default(FAIL)
+  severity  SecuritySeverity @default(MEDIUM)
+  /// Bukti hasil (command output ringkas, expected/actual)
+  evidence  Json?            @db.JsonB
+  checkedAt DateTime         @default(now()) @map("checked_at") @db.Timestamptz(3)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  asset   Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([assetId, benchmark, checkId, checkedAt])
+  @@index([companyId, assetId, checkedAt(sort: Desc)])
+  @@index([companyId, status])
+  @@index([checkedAt])
+  @@map("compliance_check_results")
+}
+
+// -----------------------------------------------------------------------------
+// PAM Bastion & Vault (pola JumpServer: vault 2 lapis Envelope AES-256-GCM,
+//   ACL staging mfa/review/ticket, command filter, session recording RustFS)
+// -----------------------------------------------------------------------------
+
+/// Kebijakan akses PAM per Company (ACL staging JumpServer-style): wajib MFA
+/// (mandatory, bab 5.3), step-up 15 menit, approval/ticket, command filter
+/// deny/confirm/allow, batas durasi & rentang IP sumber
+model PamAccessPolicy {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId           String    @map("company_id") @db.Uuid
+  name                String    @db.VarChar(150)
+  /// Selalu true — PAM tidak menerima sesi tanpa MFA (bab 5.3); di-enforce
+  /// app-level: 403 MFA_REQUIRED_FOR_PAM bila user.mfa_enabled == false
+  mfaRequired         Boolean   @default(true) @map("mfa_required")
+  /// Step-up OTP jika verifikasi TOTP terakhir > 15 menit
+  stepUpWindowMinutes Int       @default(15) @map("step_up_window_minutes")
+  approvalRequired    Boolean   @default(false) @map("approval_required")
+  ticketRequired      Boolean   @default(false) @map("ticket_required")
+  /// Command filter: { deny: [...], confirm: [...], allow: [...] }
+  commandFilter       Json?     @map("command_filter") @db.JsonB
+  /// CIDR allowlist sumber koneksi (Inet[] native PostgreSQL)
+  allowedSourceCidrs  String[]  @default([]) @map("allowed_source_cidrs") @db.Inet
+  maxSessionMinutes   Int       @default(120) @map("max_session_minutes")
+  isActive            Boolean   @default(true) @map("is_active")
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt           DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  company        Company           @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  accounts       PamVaultAccount[]
+  pamSessionLogs PamSessionLog[]
+
+  @@unique([companyId, name])
+  @@index([companyId, isActive])
+  @@map("pam_access_policies")
+}
+
+/// Akun kredensial terpusat per ManagedNode (JumpServer account). Secret
+/// (password/key) TIDAK pernah plaintext — vault 2 lapis Envelope AES-256-GCM
+/// (KEK master terpisah dari DEK per record, bab 5.3/audit-c §6).
+model PamVaultAccount {
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId       String         @map("company_id") @db.Uuid
+  assetId         String         @map("asset_id") @db.Uuid
+  policyId        String?        @map("policy_id") @db.Uuid
+  label           String         @db.VarChar(150)
+  accountType     PamAccountType @default(SSH_PASSWORD) @map("account_type")
+  username        String         @db.VarChar(150)
+  /// Secret terenkripsi Envelope AES-256-GCM (password atau private key)
+  secretEncrypted Bytes          @map("secret_encrypted")
+  /// Port service target (default SSH 22)
+  port            Int            @default(22)
+  isActive        Boolean        @default(true) @map("is_active")
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt       DateTime?      @map("deleted_at") @db.Timestamptz(3)
+
+  company     Company          @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  asset       Asset            @relation(fields: [assetId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  policy      PamAccessPolicy? @relation(fields: [policyId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  sessionLogs PamSessionLog[]
+
+  @@unique([assetId, username])
+  @@index([companyId, isActive])
+  @@index([policyId])
+  @@map("pam_vault_accounts")
+}
+
+/// Log sesi PAM (audit immutable): authorize -> active -> closed; WS ticket
+/// ephemeral disimpan sebagai hash; recording (.cast.gz/.mp4) diarsipkan ke
+/// RustFS — DB hanya metadata + pointer object key (bab 5.8).
+model PamSessionLog {
+  id                 String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId          String           @map("company_id") @db.Uuid
+  accountId          String           @map("account_id") @db.Uuid
+  policyId           String?          @map("policy_id") @db.Uuid
+  requestedByUserId  String?          @map("requested_by_user_id") @db.Uuid
+  status             PamSessionStatus @default(REQUESTED)
+  sourceIp           String?          @map("source_ip") @db.Inet
+  /// Hash WS ticket ephemeral (ticket mentah tidak pernah disimpan)
+  wsTicketHash       String?          @map("ws_ticket_hash") @db.VarChar(255)
+  commandCount       Int              @default(0) @map("command_count")
+  /// Pointer rekaman sesi di RustFS (bucket osc-pam-recordings)
+  recordingObjectKey String?          @map("recording_object_key") @db.VarChar(500)
+  deniedReason       String?          @map("denied_reason") @db.VarChar(300)
+  startedAt          DateTime?        @map("started_at") @db.Timestamptz(3)
+  endedAt            DateTime?        @map("ended_at") @db.Timestamptz(3)
+  durationSeconds    Int?             @map("duration_seconds")
+  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  company     Company          @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  account     PamVaultAccount  @relation(fields: [accountId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  policy      PamAccessPolicy? @relation(fields: [policyId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  requestedBy User?            @relation(fields: [requestedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([companyId, createdAt(sort: Desc)])
+  @@index([accountId, startedAt(sort: Desc)])
+  @@index([requestedByUserId])
+  @@index([status])
+  @@map("pam_session_logs")
+}
+
+// -----------------------------------------------------------------------------
+// File Asset registry (metadata + pointer RustFS; DB tidak menyimpan blob)
+// -----------------------------------------------------------------------------
+
+/// Registry objek file di RustFS (S3): replay PAM, backup konfigurasi
+/// nginx/compose, export excel, lampiran. DB hanya metadata + pointer —
+/// integritas diverifikasi via sha256 saat download.
+model FileAsset {
+  id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId        String            @map("company_id") @db.Uuid
+  category         FileAssetCategory @default(ATTACHMENT)
+  bucket           String            @db.VarChar(100)
+  objectKey        String            @map("object_key") @db.VarChar(500)
+  fileName         String            @map("file_name") @db.VarChar(255)
+  mimeType         String?           @map("mime_type") @db.VarChar(150)
+  sizeBytes        BigInt            @map("size_bytes")
+  sha256           String?           @db.VarChar(64)
+  uploadedByUserId String?           @map("uploaded_by_user_id") @db.Uuid
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt        DateTime?         @map("deleted_at") @db.Timestamptz(3)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([bucket, objectKey])
+  @@index([companyId, category, createdAt(sort: Desc)])
+  @@index([uploadedByUserId])
+  @@map("file_assets")
 }
