@@ -44,8 +44,9 @@ class ApiResponseSnapshot:
     content_type: str | None
     body_text: str  # dibatasi panjangnya oleh adapter (anti memory bloat)
     body_json: Any | None  # hasil parse JSON bila content-type json
-    elapsed_ms: float
-    captured_at: str  # ISO-8601 UTC
+    body_bytes: bytes | None = None  # payload mentah (binary export/upload)
+    elapsed_ms: float = 0.0
+    captured_at: str = ""  # ISO-8601 UTC
 
 
 @dataclass(frozen=True)

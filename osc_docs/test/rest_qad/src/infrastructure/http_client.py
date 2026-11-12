@@ -70,11 +70,16 @@ def snapshot_from_httpx_response(response: httpx.Response) -> ApiResponseSnapsho
             body_json = response.json()
         except ValueError:
             body_json = None  # content-type json tetapi body rusak
+    try:
+        body_text = response.text[:MAX_BODY_CHARS]
+    except UnicodeDecodeError:  # payload biner tanpa charset — tetap aman
+        body_text = ""
     return ApiResponseSnapshot(
         status_code=response.status_code,
         headers=dict(response.headers),
         content_type=content_type,
-        body_text=response.text[:MAX_BODY_CHARS],
+        body_text=body_text,
+        body_bytes=response.content[:MAX_BODY_CHARS],
         body_json=body_json,
         elapsed_ms=response.elapsed.total_seconds() * 1000.0,
         captured_at=datetime.now(timezone.utc).isoformat(),

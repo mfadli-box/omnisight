@@ -31,8 +31,9 @@ class AuditEvidence:
     status_code: int
     response_headers: Mapping[str, str]
     body_excerpt: str  # dibatasi panjangnya oleh adapter
-    elapsed_ms: float
-    captured_at: str  # ISO-8601 UTC
+    body_bytes: bytes | None = None  # payload mentah (export xlsx binary)
+    elapsed_ms: float = 0.0
+    captured_at: str = ""  # ISO-8601 UTC
 
 
 @dataclass(frozen=True)

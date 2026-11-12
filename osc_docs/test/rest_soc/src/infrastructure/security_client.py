@@ -91,13 +91,18 @@ def evidence_from_httpx_response(
     response: httpx.Response,
 ) -> AuditEvidence:
     """Bingkai interaksi menjadi bukti audit ter-redaksi (evidence ringkas)."""
+    try:
+        body_text = response.text[:MAX_BODY_CHARS]
+    except UnicodeDecodeError:  # payload biner tanpa charset — tetap aman
+        body_text = ""
     return AuditEvidence(
         request_method=method,
         request_path=path,
         request_headers=redact_headers(request_headers),
         status_code=response.status_code,
         response_headers=dict(response.headers),
-        body_excerpt=response.text[:MAX_BODY_CHARS],
+        body_excerpt=body_text,
+        body_bytes=response.content[:MAX_BODY_CHARS],
         elapsed_ms=response.elapsed.total_seconds() * 1000.0,
         captured_at=datetime.now(timezone.utc).isoformat(),
     )

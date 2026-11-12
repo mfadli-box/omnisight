@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "openpyxl>=3.1"]
 
 [tool.pytest.ini_options]
 testpaths = ["test"]
@@ -27,4 +27,5 @@ markers = [
     "regression: reproduksi bug minimal (fail sebelum fix, pass sesudah)",
     "excel: verifikasi alur import/export .xlsx (fase excel)",
     "contract: verifikasi bentuk respons sesuai osc_docs/rest",
+    "wave1: test fungsional Wave 1 (auth dual-mode HRIS, MFA, switcher, ITAM, Excel)",
 ]
