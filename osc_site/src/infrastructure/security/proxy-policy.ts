@@ -13,18 +13,38 @@ const ALLOWED_METHODS = new Set(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
 /**
- * Pola path UPSTREAM yang boleh diproxy.
- * Catatan: perluasan endpoint per fitur WAJIB ditambahkan di sini —
- * default-deny, bukan default-allow.
+ * Pola path UPSTREAM yang boleh diproxy — Wave 1 (api-w1.md).
+ * Default-deny: endpoint baru WAJIB didaftarkan di sini.
  */
 const ALLOWED_PATH_PATTERNS: readonly RegExp[] = [
   /^\/api\/v1\/health$/,
-  // Fase auth (login/refresh/logout mengeluarkan cookie HttpOnly):
-  /^\/api\/v1\/auth\/(?:login|refresh|logout)$/,
-  // Contoh resource CRUD (fase fitur):
-  /^\/api\/v1\/users(?:\/[\w-]+)?$/,
-  // Fase excel:
-  /^\/api\/v1\/excel\/[\w-]+\/(?:import|export)$/,
+  // Auth dual-mode + MFA + switcher:
+  /^\/api\/v1\/auth\/companies$/,
+  /^\/api\/v1\/auth\/login$/,
+  /^\/api\/v1\/auth\/logout$/,
+  /^\/api\/v1\/auth\/switch-company$/,
+  /^\/api\/v1\/auth\/mfa\/(?:setup|enable|verify|disable|reset-request|reset-confirm)$/,
+  // Navigasi & profil:
+  /^\/api\/v1\/me\/navigation$/,
+  // Studio (koleksi dinamis):
+  /^\/api\/v1\/collections$/,
+  /^\/api\/v1\/collections\/[a-z][a-z0-9_]{0,49}\/fields$/,
+  /^\/api\/v1\/items\/[a-z][a-z0-9_]{0,49}$/,
+  // ITAM:
+  /^\/api\/v1\/assets$/,
+  /^\/api\/v1\/assets\/[\w-]+$/,
+  /^\/api\/v1\/assets\/[\w-]+\/(?:checkout|checkin)$/,
+  /^\/api\/v1\/assets\/import$/,
+  /^\/api\/v1\/assets\/export$/,
+  /^\/api\/v1\/licenses$/,
+  /^\/api\/v1\/tickets$/,
+  // DCIM/IPAM:
+  /^\/api\/v1\/dcim\/racks$/,
+  /^\/api\/v1\/ipam\/prefixes$/,
+  /^\/api\/v1\/ipam\/addresses$/,
+  // RustFS files:
+  /^\/api\/v1\/files$/,
+  /^\/api\/v1\/files\/[\w-]+$/,
 ]
 
 /** Header respons ke browser yang dipasang proxy (di atas header upstream). */
@@ -47,9 +67,8 @@ export function requiresSameOrigin(method: string): boolean {
  * Normalisasi path anti-traversal: decode per-segmen, tolak `.`, `..`,
  * backslash, NUL, segmen kosong, atau %-encoding tidak valid.
  * Mengembalikan path UPSTREAM final — SELALU ber-awalan `/api/` (prefix
- * gateway kontrak osc_rest: `/api/proxy/<X>` → `/api/<X>`, tabel mapping
- * osc_docs/site) — atau `null` bila mencurigakan. TIDAK pernah membentuk
- * URL dari input mentah user.
+ * gateway kontrak osc_rest: `/api/proxy/<X>` → `/api/<X>`) — atau `null`
+ * bila mencurigakan. TIDAK pernah membentuk URL dari input mentah user.
  */
 export function normalizeProxyPath(pathname: string): string | null {
   if (!pathname.startsWith(PROXY_PREFIX)) return null
@@ -72,13 +91,28 @@ export function normalizeProxyPath(pathname: string): string | null {
     encoded.push(encodeURIComponent(value))
   }
   // Prefix gateway: browser memanggil `/api/proxy/<X>` → upstream `/api/<X>`.
-  // Segmen sudah disanitasi (tanpa `.`/`..`), sehingga prefix ini tidak
-  // bisa di-escape lewat traversal.
   return `/api/${encoded.join('/')}`
 }
 
 export function isAllowedPath(upstreamPath: string): boolean {
   return ALLOWED_PATH_PATTERNS.some((pattern) => pattern.test(upstreamPath))
+}
+
+/** Correlation ID: UUID bila nilai terlihat wajar, else null. */
+function saneCorrelationId(value: string | null): string | null {
+  if (!value) return null
+  const trimmed = value.trim()
+  if (trimmed.length === 0 || trimmed.length > 64) return null
+  if (!/^[\w.-]+$/.test(trimmed)) return null
+  return trimmed
+}
+
+/** Baca correlation ID dari klien (bila valid) atau generate UUID baru. */
+export function resolveCorrelationId(headers: Headers): string {
+  const fromClient =
+    saneCorrelationId(headers.get('x-correlation-id')) ??
+    saneCorrelationId(headers.get('x-request-id'))
+  return fromClient ?? crypto.randomUUID()
 }
 
 /**
@@ -101,7 +135,13 @@ export function copyAllowedRequestHeaders(
   source: Headers,
   target: Headers,
 ): void {
-  for (const name of ['accept', 'accept-language', 'content-type'] as const) {
+  for (const name of [
+    'accept',
+    'accept-language',
+    'content-type',
+    // Propagasi trace end-to-end (di-echo upstream, UUIDv7 bila absen):
+    'x-correlation-id',
+  ] as const) {
     const value = source.get(name)
     if (value) target.set(name, value)
   }
@@ -113,9 +153,32 @@ export function copyAllowedResponseHeaders(
   target: Headers,
 ): void {
   for (
-    const name of ['content-type', 'content-disposition', 'content-length', 'cache-control'] as const
+    const name of [
+      'content-type',
+      'content-disposition',
+      'content-length',
+      'content-transfer-encoding',
+      'cache-control',
+      'x-correlation-id',
+    ] as const
   ) {
     const value = source.get(name)
     if (value) target.set(name, value)
   }
+}
+
+/**
+ * Sanitasi filename dari header `Content-Disposition` upstream (Excel export
+ * & unduhan RustFS) — buang karakter berbahaya sebelum dipakai di browser.
+ */
+export function sanitizeFilename(contentDisposition: string | null): string {
+  const fallback = 'export.xlsx'
+  if (!contentDisposition) return fallback
+  const utf8 = /filename\*=UTF-8''([^;]+)/i.exec(contentDisposition)
+  const plain = /filename="?([^";]+)"?/i.exec(contentDisposition)
+  const raw = (utf8?.[1] ?? plain?.[1] ?? '').trim()
+  if (raw.length === 0) return fallback
+  // Hanya karakter aman: alfanumerik, spasi, titik, dash, underscore.
+  const safe = raw.replace(/[^A-Za-z0-9 ._\-]/g, '_').replace(/\.{2,}/g, '.')
+  return safe.length > 0 ? safe : fallback
 }

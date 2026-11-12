@@ -53,3 +53,18 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Animasi caret untuk shadcn/ui InputOTP (input-otp). */
+@keyframes caret-blink {
+  0%,
+  70%,
+  80% {
+    opacity: 1;
+  }
+  20% {
+    opacity: 0;
+  }
+}
+.animate-caret-blink {
+  animation: caret-blink 1.2s ease-out infinite;
+}

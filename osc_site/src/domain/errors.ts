@@ -14,4 +14,23 @@ export interface ApiErrorEnvelope {
     code: string
     message: string
   }
+  correlation_id?: string
+}
+
+/**
+ * Error tipe-aman yang dilempar gateway infrastructure saat upstream/proxy
+ * mengembalikan envelope error atau respons tidak valid.
+ */
+export class ApiClientError extends Error {
+  readonly code: string
+  readonly status: number
+  readonly correlationId: string | null
+
+  constructor(code: string, message: string, status: number, correlationId?: string | null) {
+    super(message)
+    this.name = 'ApiClientError'
+    this.code = code
+    this.status = status
+    this.correlationId = correlationId ?? null
+  }
 }

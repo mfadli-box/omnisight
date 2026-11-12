@@ -1,11 +1,12 @@
 import type { Metadata } from 'next'
+import { Toaster } from 'sonner'
 
 import './globals.css'
 
 export const metadata: Metadata = {
   title: 'omnisight',
   description:
-    'Workspace multi-service omnisight — Next.js BFF (osc_site) + Rust API (osc_rest)',
+    'Unified Enterprise IT, Network, Container & SecOps Platform — osc_site (Next.js BFF) + osc_rest (Rust API)',
 }
 
 export default function RootLayout({
@@ -13,7 +14,10 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="id">
-      <body className="min-h-screen antialiased">{children}</body>
+      <body className="min-h-screen antialiased">
+        {children}
+        <Toaster richColors position="top-right" />
+      </body>
     </html>
   )
 }
