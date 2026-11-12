@@ -1,17 +1,19 @@
 // =============================================================================
-// omnisight — Core Schema (bootstrap)
+// omnisight — Core Schema Part 1 (Multi-Company, HRIS Cache, MFA, RBAC,
+//              Menu Privilege, Studio Metadata, Notification, Agent Enrollment)
 // Author    : ai-base (Database Engineer)
-// Blueprint : osc_docs/architecture.md
-// Doc       : osc_docs/base/schema-core.md
+// Blueprint : osc_docs/reengineering.md (bab 5.1–5.8)
+// Doc       : osc_docs/base/schema-p1.md
 //
-// Konvensi:
+// Konvensi (mengikuti schema-core.md bootstrap):
 //   - Model PascalCase, field camelCase -> snake_case di PostgreSQL via
 //     @map("column_name") dan @@map("table_name")
 //   - Tipe native PostgreSQL eksplisit (@db.Uuid, @db.Timestamptz(3), ...)
 //   - Referential actions eksplisit (onDelete/onUpdate) di setiap relasi
 //   - Audit fields (createdAt/updatedAt) + soft-delete (deletedAt)
-//   - UUID PK memakai gen_random_uuid() (native sejak PostgreSQL 13,
-//     tanpa perlu ekstensi pgcrypto)
+//   - UUID PK memakai gen_random_uuid() (native sejak PostgreSQL 13)
+//   - Secret (TOTP, webhook/bot token, config channel) TIDAK pernah plaintext:
+//     dienkripsi Envelope AES-256-GCM di level osc_rest (Bytes = bytea)
 // =============================================================================
 
 generator client {
@@ -20,52 +22,444 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  // The connection URL is configured in prisma.config.ts for migrations,
+  // and PrismaClient is initialized with either adapter or accelerateUrl.
 }
 
-//Role pengguna (enum PG: user_role)
-enum Role {
-  USER
-  ADMIN
+// -----------------------------------------------------------------------------
+// Enum
+// -----------------------------------------------------------------------------
 
-  @@map("user_role")
+/// Aksi CRUD Directus-style untuk Permission
+enum PermissionAction {
+  CREATE
+  READ
+  UPDATE
+  DELETE
+
+  @@map("permission_action")
 }
 
-//Pengguna aplikasi (tabel: users)
+/// Tipe channel notifikasi (reengineering.md bab 5.8)
+enum NotificationChannelType {
+  SMTP_EMAIL
+  TELEGRAM
+  WEBHOOK
+
+  @@map("notification_channel_type")
+}
+
+/// Tipe node target enrollment agent (reengineering.md bab 3 — dipakai P2/P3)
+enum NodeType {
+  HOST
+  NETWORK
+  VIRTUAL
+  CONTAINER
+  RACK_MOUNTED
+  SERVICE
+
+  @@map("node_type")
+}
+
+// -----------------------------------------------------------------------------
+// Multi-Company tenant master (bab 5.1)
+// -----------------------------------------------------------------------------
+
+/// Master tenant. hris_login_url NULL/kosong = Local Login mode;
+/// terisi = HRIS ASMX template URL ({\(U} username, {\)P} password).
+model Company {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name              String    @db.VarChar(150)
+  code              String    @unique @db.VarChar(50)
+  hrisLoginUrl      String?   @map("hris_login_url") @db.VarChar(500)
+  hrisCacheTtlHours Int       @default(72) @map("hris_cache_ttl_hours")
+  isActive          Boolean   @default(true) @map("is_active")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt         DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  accesses              UserCompanyAccess[]
+  menuPrivileges        CompanyMenuPrivilege[]
+  sessions              Session[]
+  notificationChannels  NotificationChannel[]
+  webhookFlows          WebhookFlow[]
+  agentEnrollmentTokens AgentEnrollmentToken[]
+  activityLogs          ActivityLog[]
+
+  @@index([isActive])
+  @@map("companies")
+}
+
+// -----------------------------------------------------------------------------
+// Identity, HRIS sync & MFA (bab 5.1–5.3)
+// -----------------------------------------------------------------------------
+
+/// Pengguna aplikasi. password_hash = Argon2id cache dari HRIS login
+/// (atau hash lokal untuk Local Login mode); tidak pernah menyimpan plaintext.
 model User {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  username            String    @unique @db.VarChar(100)
+  email               String    @unique @db.VarChar(255)
+  passwordHash        String?   @map("password_hash") @db.VarChar(255)
+  displayName         String?   @map("display_name") @db.VarChar(100)
+  lastHrisSyncAt      DateTime? @map("last_hris_sync_at") @db.Timestamptz(3)
+  mfaEnabled          Boolean   @default(false) @map("mfa_enabled")
+  /// TOTP secret terenkripsi Envelope AES-256-GCM (KEK terpisah)
+  mfaSecretEncrypted  Bytes?    @map("mfa_secret_encrypted")
+  /// Anti-replay: step TOTP terakhir yang lolos; step sama/lebih lama ditolak
+  mfaLastVerifiedStep BigInt?   @map("mfa_last_verified_step")
+  /// Kode backup sekali pakai (hash Argon2id; tercairkan = dihapus dari array)
+  mfaBackupCodesHash  String[]  @default([]) @map("mfa_backup_codes_hash") @db.VarChar(255)
+  isSuperAdmin        Boolean   @default(false) @map("is_super_admin")
+  isActive            Boolean   @default(true) @map("is_active")
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt           DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  sessions     Session[]
+  accesses     UserCompanyAccess[]
+  activityLogs ActivityLog[]
+
+  /// Offline cache fallback: now() - last_hris_sync_at <= ttl (bab 5.2)
+  @@index([lastHrisSyncAt])
+  @@index([isActive])
+  @@map("users")
+}
+
+/// Sesi login revocable DB-backed (pola Nginx UI AuthToken; bab 5.4).
+/// Token acuan disimpan sebagai hash, bukan plaintext.
+model Session {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String    @map("user_id") @db.Uuid
+  activeCompanyId String?   @map("active_company_id") @db.Uuid
+  tokenHash       String    @unique @map("token_hash") @db.VarChar(255)
+  ipAddress       String?   @map("ip_address") @db.Inet
+  userAgent       String?   @map("user_agent") @db.VarChar(500)
+  expiresAt       DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt       DateTime? @map("revoked_at") @db.Timestamptz(3)
+  lastUsedAt      DateTime? @map("last_used_at") @db.Timestamptz(3)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  company Company? @relation(fields: [activeCompanyId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([userId])
+  @@index([activeCompanyId])
+  @@index([expiresAt])
+  @@map("user_sessions")
+}
+
+// -----------------------------------------------------------------------------
+// RBAC: Role -> Policy -> Permission (pola Directus; bab 4 "Policy RBAC")
+// -----------------------------------------------------------------------------
+
+/// Peran pengguna dalam konteks Company (via UserCompanyAccess)
+model Role {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String   @unique @db.VarChar(100)
+  description String?  @db.VarChar(500)
+  isSystem    Boolean  @default(false) @map("is_system")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  accesses       UserCompanyAccess[]
+  menuPrivileges CompanyMenuPrivilege[]
+  policies       RolePolicy[]
+
+  @@map("roles")
+}
+
+/// Policy = kumpulan permission yang dapat dipakai lintas role (Directus-style)
+model Policy {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String   @unique @db.VarChar(100)
+  description String?  @db.VarChar(500)
+  isSystem    Boolean  @default(false) @map("is_system")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  roles       RolePolicy[]
+  permissions Permission[]
+
+  @@map("policies")
+}
+
+/// Join m2m Role <-> Policy
+model RolePolicy {
+  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  roleId   String @map("role_id") @db.Uuid
+  policyId String @map("policy_id") @db.Uuid
+
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  policy Policy @relation(fields: [policyId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([roleId, policyId])
+  @@index([policyId])
+  @@map("role_policies")
+}
+
+/// Permission CRUD per koleksi: union multi-policy (OR) dievaluasi di
+/// osc_rest; fieldsAllowed = field-level allowed columns; rowFilter = aturan
+/// filter baris JSON (AST -> SQL parameterized, identifier tervalidasi).
+model Permission {
+  id            String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  policyId      String           @map("policy_id") @db.Uuid
+  collection    String           @db.VarChar(100)
+  action        PermissionAction
+  /// Kolom yang diizinkan; [] / NULL = semua field
+  fieldsAllowed String[]         @default([]) @map("fields_allowed") @db.VarChar(100)
+  /// JSON row filter rules (Filter AST parameterized) — NULL = semua baris
+  rowFilter     Json?            @map("row_filter") @db.JsonB
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  policy Policy @relation(fields: [policyId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([policyId, collection, action])
+  @@index([collection, action])
+  @@map("permissions")
+}
+
+// -----------------------------------------------------------------------------
+// Company Switcher (bab 5.4)
+// -----------------------------------------------------------------------------
+
+/// Akses user ke Company dengan role berbeda per Company.
+/// User boleh punya >1 role pada company yang sama (UNIQUE 3 kolom);
+/// tepat satu baris is_default=true per user di-enforce level aplikasi.
+model UserCompanyAccess {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  roleId    String   @map("role_id") @db.Uuid
+  isDefault Boolean  @default(false) @map("is_default")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  role    Role    @relation(fields: [roleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([userId, companyId, roleId])
+  @@index([companyId])
+  @@index([roleId])
+  @@map("user_company_access")
+}
+
+// -----------------------------------------------------------------------------
+// Menu Privilege / sidebar dinamis (bab 5.5)
+// -----------------------------------------------------------------------------
+
+/// Registry master modul/menu (tree via parent_id), diisi seeder idempotent
+/// dari manifest deklaratif kode
+model MenuModule {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code      String   @unique @db.VarChar(100)
+  label     String   @db.VarChar(150)
+  routePath String?  @map("route_path") @db.VarChar(300)
+  icon      String?  @db.VarChar(100)
+  parentId  String?  @map("parent_id") @db.Uuid
+  sortOrder Int      @default(0) @map("sort_order")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  parent     MenuModule?            @relation("MenuModuleTree", fields: [parentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  children   MenuModule[]           @relation("MenuModuleTree")
+  privileges CompanyMenuPrivilege[]
+
+  @@index([parentId])
+  @@index([isActive, sortOrder])
+  @@map("menu_modules")
+}
+
+/// Privilege menu per Company + Role: item can_view=false tidak dikirim ke UI
+model CompanyMenuPrivilege {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  roleId    String   @map("role_id") @db.Uuid
+  menuId    String   @map("menu_id") @db.Uuid
+  canView   Boolean  @default(false) @map("can_view")
+  canCreate Boolean  @default(false) @map("can_create")
+  canUpdate Boolean  @default(false) @map("can_update")
+  canDelete Boolean  @default(false) @map("can_delete")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  company Company    @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  role    Role       @relation(fields: [roleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  menu    MenuModule @relation(fields: [menuId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([companyId, roleId, menuId])
+  @@index([roleId])
+  @@index([menuId])
+  @@map("company_menu_privileges")
+}
+
+// -----------------------------------------------------------------------------
+// Studio: metadata koleksi dinamis (3 tabel Directus-style; DDL runtime di
+// osc_rest via dynamic SQL — BUKAN via Prisma migrate)
+// -----------------------------------------------------------------------------
+
+/// Metadata koleksi dinamis (tabel 1/3 Directus collections)
+model CollectionMeta {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  collection String    @unique @db.VarChar(100)
+  icon       String?   @db.VarChar(100)
+  note       String?   @db.VarChar(500)
+  isHidden   Boolean   @default(false) @map("is_hidden")
+  isSystem   Boolean   @default(false) @map("is_system")
+  sortOrder  Int       @default(0) @map("sort_order")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  fields         FieldMeta[]
+  relations      RelationMeta[] @relation("CollectionRelations")
+  relatedInCount RelationMeta[] @relation("RelatedCollectionRelations")
+
+  @@index([isHidden])
+  @@map("collection_meta")
+}
+
+/// Metadata field per koleksi (tabel 2/3 Directus fields)
+model FieldMeta {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  collectionId String   @map("collection_id") @db.Uuid
+  field        String   @db.VarChar(100)
+  isRequired   Boolean  @default(false) @map("is_required")
+  isHidden     Boolean  @default(false) @map("is_hidden")
+  /// Special flags ala Directus (uuid, cast-tipe, dst.)
+  special      String?  @db.VarChar(255)
+  /// Metadata tambahan (ui options, validasi)
+  meta         Json?    @db.JsonB
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  collection CollectionMeta @relation(fields: [collectionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([collectionId, field])
+  @@map("field_meta")
+}
+
+/// Metadata relasi antar koleksi (tabel 3/3 Directus relations)
+model RelationMeta {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  collectionId        String   @map("collection_id") @db.Uuid
+  field               String   @db.VarChar(100)
+  relatedCollectionId String?  @map("related_collection_id") @db.Uuid
+  /// M2O | O2M | M2M | M2A
+  relationType        String   @map("relation_type") @db.VarChar(20)
+  /// Aksi referential yang di-enforce saat DDL runtime (CASCADE/SET_NULL/...)
+  onDeleteAction      String?  @map("on_delete_action") @db.VarChar(20)
+  meta                Json?    @db.JsonB
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  collection        CollectionMeta  @relation("CollectionRelations", fields: [collectionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  relatedCollection CollectionMeta? @relation("RelatedCollectionRelations", fields: [relatedCollectionId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@unique([collectionId, field])
+  @@index([relatedCollectionId])
+  @@map("relation_meta")
+}
+
+// -----------------------------------------------------------------------------
+// Activity Log (audit trail multi-tenant, bab 5.6)
+// -----------------------------------------------------------------------------
+
+/// Jejak aktivitas per Company (tenant isolation): login HRIS offline cache,
+/// MFA reset, percobaan lintas tenant (security event), dst.
+model ActivityLog {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId  String?  @map("company_id") @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
+  action     String   @db.VarChar(100)
+  entityType String?  @map("entity_type") @db.VarChar(100)
+  entityId   String?  @map("entity_id") @db.Uuid
+  ipAddress  String?  @map("ip_address") @db.Inet
+  userAgent  String?  @map("user_agent") @db.VarChar(500)
+  detail     Json?    @db.JsonB
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  company Company? @relation(fields: [companyId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([companyId, createdAt])
+  @@index([userId, createdAt])
+  @@index([entityType, entityId])
+  @@index([action])
+  @@map("activity_logs")
+}
+
+// -----------------------------------------------------------------------------
+// Notification & Flow Dispatcher (bab 5.8 — eksekusi oleh flow_worker_agent)
+// -----------------------------------------------------------------------------
+
+/// Flow otomasi webhook per Company; config (URL/secret) dienkripsi
+/// Envelope AES-256-GCM di level aplikasi sebelum disimpan
+model WebhookFlow {
   id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  email        String    @unique @db.VarChar(255)
-  passwordHash String    @map("password_hash") @db.VarChar(255)
-  displayName  String?   @map("display_name") @db.VarChar(100)
-  role         Role      @default(USER)
+  companyId    String    @map("company_id") @db.Uuid
+  name         String    @db.VarChar(150)
+  triggerEvent String    @map("trigger_event") @db.VarChar(100)
+  /// Konfigurasi flow (target URL, header, payload template) — nilai sensitif
+  /// terenkripsi app-side
+  config       Json      @db.JsonB
   isActive     Boolean   @default(true) @map("is_active")
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt    DateTime? @map("deleted_at") @db.Timestamptz(3)
 
-  auditLogs AuditLog[]
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
-  @@index([role])
-  @@index([isActive])
-  @@map("users")
+  @@index([companyId, isActive])
+  @@index([triggerEvent])
+  @@map("webhook_flows")
 }
 
-//Jejak audit aksi pengguna/sistem (tabel: audit_logs)
-model AuditLog {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  actorId    String?  @map("actor_id") @db.Uuid
-  action     String   @db.VarChar(100)
-  entityType String?  @map("entity_type") @db.VarChar(100)
-  entityId   String?  @map("entity_id") @db.Uuid
-  ipAddress  String?  @map("ip_address") @db.Inet
-  detail     Json?    @map("detail") @db.JsonB
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+/// Channel notifikasi per Company (SMTP/Telegram/Webhook); osc_rest hanya
+/// menulis antrean outbox — pengiriman asinkron oleh flow_worker_agent
+model NotificationChannel {
+  id          String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId   String                  @map("company_id") @db.Uuid
+  type        NotificationChannelType
+  /// Config channel (SMTP password, bot token, webhook URL) — terenkripsi
+  /// Envelope AES-256-GCM di level aplikasi
+  config      Json                    @db.JsonB
+  /// Filter event (email reset MFA, alert metrik, downtime, SIEM findings)
+  eventFilter String[]                @default([]) @map("event_filter") @db.VarChar(100)
+  isActive    Boolean                 @default(true) @map("is_active")
+  createdAt   DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime                @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt   DateTime?               @map("deleted_at") @db.Timestamptz(3)
 
-  //Aksi sistem yang tidak terikat pengguna memakai actor_id = NULL
-  //(onDelete: SetNull agar riwayat audit tidak ikut terhapus saat user dihapus)
-  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
-  @@index([actorId])
-  @@index([entityType, entityId])
-  @@index([createdAt])
-  @@map("audit_logs")
+  @@unique([companyId, type])
+  @@index([companyId, isActive])
+  @@map("notification_channels")
+}
+
+// -----------------------------------------------------------------------------
+// Agent Enrollment (bab 5.8 — one-time token terikat company)
+// -----------------------------------------------------------------------------
+
+/// Token enrollment one-time terikat Company. DB hanya menyimpan HASH token
+/// (token mentah ditampilkan sekali di UI admin); single-use di-enforce via
+/// usedAt + validasi TTL saat POST /api/v1/agents/enroll
+model AgentEnrollmentToken {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String    @map("company_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash") @db.VarChar(255)
+  nodeType  NodeType? @map("node_type")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(3)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([companyId])
+  @@index([expiresAt])
+  @@map("agent_enrollment_tokens")
 }

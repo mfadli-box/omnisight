@@ -24,7 +24,7 @@ Setiap sesi harian baru boleh dicentang `[x]` apabila seluruh poin berikut terpe
 - [x] **Hari 3 (`SESI 0.3`)** | `ai-main` | Variant: `medium` | Audit Grup C & D (Dockge, Arcane, Beszel, Wazuh, JumpServer) -> `osc_docs/audit-group-c.md`
 - [x] **Hari 4 (`SESI 0.4`)** | `ai-main` | Variant: `high` | Penyusunan Master Blueprint (`osc_docs/reengineering.md`) + Pembersihan `.rea_docs/`
 - [x] **Hari 5 (`SESI 1.1`)** | `ai-main` | Variant: `medium` | Setup Fondasi Docker (`postgres`, `rustfs`, `rustfs-init`, `.env.example`) -> `osc_docs/infrastructure.md`
-- [ ] **Hari 6 (`SESI 1.2`)** | `ai-base` | Variant: `high` | Skema Prisma Bagian 1: Multi-Company, HRIS Cache, TOTP MFA, Menu Privilege, Directus RBAC, Notification & Agent Enrollment -> `osc_docs/base/schema-p1.md`
+- [x] **Hari 6 (`SESI 1.2`)** | `ai-base` | Variant: `high` | Skema Prisma Bagian 1: Multi-Company, HRIS Cache, TOTP MFA, Menu Privilege, Directus RBAC, Notification & Agent Enrollment -> `osc_docs/base/schema-p1.md`
 - [ ] **Hari 7 (`SESI 1.3`)** | `ai-base` | Variant: `high` | Skema Prisma Bagian 2: ITAM (Snipe-IT/GLPI) & DCIM/IPAM (NetBox/LibreNMS) terikat `company_id` -> `osc_docs/base/schema-p2.md`
 
 ### Minggu 2: Finalisasi Skema, Wave 1 Full-Stack & Wave 2 Control Plane
@@ -51,8 +51,9 @@ Setiap sesi harian baru boleh dicentang `[x]` apabila seluruh poin berikut terpe
 
 | Tanggal | Sesi | Status | Ringkasan Hasil & Catatan Verifikasi |
 | :--- | :--- | :--- | :--- |
-| - | `SESI 0.1` | Selesai | Audit statis Grup A (Directus, Snipe-IT, GLPI) tersimpan di `osc_docs/audit-group-a.md`. |
-| - | `SESI 0.2` | Selesai | Audit statis Grup B (NetBox, LibreNMS, Uptime Kuma, Nginx UI) tersimpan di `osc_docs/audit-group-b.md`. |
-| - | `SESI 0.3` | Selesai | Audit statis Grup C & D (Dockge, Arcane, Beszel, Wazuh, JumpServer) tersimpan di `osc_docs/audit-group-c.md`. |
-| - | `SESI 0.4` | Selesai | Master Blueprint `osc_docs/reengineering.md` selesai disusun & `.rea_docs/` dibersihkan. |
-| - | `SESI 1.1` | Selesai | Fondasi Docker (`postgres`, `rustfs`, `rustfs-init`) & `.env.example` tervalidasi via `docker compose config`. |
+| 2026-11-12 | `SESI 0.1` | Selesai | Audit statis Grup A (Directus, Snipe-IT, GLPI) tersimpan di `osc_docs/audit-group-a.md`. |
+| 2026-11-12 | `SESI 0.2` | Selesai | Audit statis Grup B (NetBox, LibreNMS, Uptime Kuma, Nginx UI) tersimpan di `osc_docs/audit-group-b.md`. |
+| 2026-11-12 | `SESI 0.3` | Selesai | Audit statis Grup C & D (Dockge, Arcane, Beszel, Wazuh, JumpServer) tersimpan di `osc_docs/audit-group-c.md`. |
+| 2026-11-12 | `SESI 0.4` | Selesai | Master Blueprint `osc_docs/reengineering.md` selesai disusun & `.rea_docs/` dibersihkan. |
+| 2026-11-12 | `SESI 1.1` | Selesai | Fondasi Docker (`postgres`, `rustfs`, `rustfs-init`) & `.env.example` tervalidasi via `docker compose config`. |
+| 2026-11-12 | `SESI 1.2` | Selesai | Skema Prisma P1 di `osc_base/prisma/schema.prisma`: 17 model (`Company` + HRIS URL/TTL, `User` + MFA/HRIS sync, `Role`/`Policy`/`RolePolicy`/`Permission` CRUD+field-level+row filter JSON, `Session`, `UserCompanyAccess`, `MenuModule` + `CompanyMenuPrivilege`, Studio 3 tabel metadata, `ActivityLog` multi-tenant, `WebhookFlow`, `NotificationChannel`, `AgentEnrollmentToken`). Enum bootstrap `user_role` diganti model `Role` dinamis; `audit_logs` diganti `activity_logs` (tenant isolation). Verifikasi: `npx prisma format` OK + `npx prisma validate` OK (Prisma 6.19.3, exit 0). ERD & spesifikasi: `osc_docs/base/schema-p1.md`. |
