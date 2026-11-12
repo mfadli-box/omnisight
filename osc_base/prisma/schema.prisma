@@ -28,7 +28,6 @@ datasource db {
   provider = "postgresql"
   // DATABASE_URL dibaca dari osc_base/.env untuk Prisma CLI (migrasi/format/
   // validate); container runtime (osc_rest) memakai DATABASE_URL internal.
-  url      = env("DATABASE_URL")
 }
 
 // -----------------------------------------------------------------------------
