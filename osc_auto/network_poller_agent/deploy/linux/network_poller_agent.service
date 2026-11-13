@@ -1,0 +1,60 @@
+# =============================================================================
+# network_poller_agent — systemd unit (omnisight)
+#
+# Pemasangan:
+#   sudo install -m 0755 bin/network_poller_agent /usr/local/bin/
+#   sudo install -m 0644 deploy/linux/network_poller_agent.service /etc/systemd/system/
+#   sudo mkdir -p /etc/network_poller_agent
+#   sudo install -m 0600 configs/network_poller_agent.env.example /etc/network_poller_agent/network_poller_agent.env
+#   sudo install -m 0600 configs/monitors.json.example /etc/network_poller_agent/monitors.json  # isi monitor_id nyata
+#   # enroll sekali (token dari admin osc_rest):
+#   sudo /usr/local/bin/network_poller_agent --enroll <TOKEN> \
+#        --asset-model <UUID> --status-label <UUID>
+#   sudo systemctl daemon-reload && sudo systemctl enable --now network_poller_agent
+# =============================================================================
+
+[Unit]
+Description=omnisight network_poller_agent - uptime probe & SNMP polling
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# User dinamis non-root (UID unik per-service, dibuat systemd).
+DynamicUser=yes
+StateDirectory=network_poller_agent
+StateDirectoryMode=0700
+EnvironmentFile=-/etc/network_poller_agent/network_poller_agent.env
+ExecStart=/usr/local/bin/network_poller_agent
+Restart=on-failure
+RestartSec=5s
+
+# --- Hardening (least privilege) ---------------------------------------------
+# Probe ICMP memakai binary ping setuid/capabilitas (bukan raw socket),
+# sehingga tanpa CAP_NET_RAW pun tetap jalan.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictAddressFamilies=AF_INET AF_INET6
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+# --- Logging -------------------------------------------------------------------
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=network_poller_agent
+
+[Install]
+WantedBy=multi-user.target

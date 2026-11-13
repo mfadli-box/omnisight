@@ -1,0 +1,42 @@
+{
+  "_comment": "Daftar tugas polling network_poller_agent. monitor_id & interface_id = uuid yang dibuat di osc_rest (Uptime Monitors / Device Interfaces) — salin manual dari API/UI. chmod 0600 (memuat community SNMP).",
+  "monitors": [
+    {
+      "monitor_id": "018f4b1e-0000-7000-8000-000000000001",
+      "type": "HTTPS",
+      "target": "https://portal.example.com/healthz",
+      "timeout_seconds": 10
+    },
+    {
+      "monitor_id": "018f4b1e-0000-7000-8000-000000000002",
+      "type": "KEYWORD",
+      "target": "https://portal.example.com/status",
+      "keyword": "operational"
+    },
+    {
+      "monitor_id": "018f4b1e-0000-7000-8000-000000000003",
+      "type": "TCP",
+      "target": "db-node-01:5432"
+    },
+    {
+      "monitor_id": "018f4b1e-0000-7000-8000-000000000004",
+      "type": "ICMP",
+      "target": "gateway.internal"
+    },
+    {
+      "monitor_id": "018f4b1e-0000-7000-8000-000000000005",
+      "type": "DNS",
+      "target": "osc-rest.internal"
+    }
+  ],
+  "snmp_devices": [
+    {
+      "host": "10.10.1.1",
+      "community": "CHANGE-ME-v2c-public",
+      "interfaces": [
+        { "interface_id": "018f4b1e-0000-7000-8000-0000000000aa", "if_index": 1, "name": "uplink-wan" },
+        { "interface_id": "018f4b1e-0000-7000-8000-0000000000ab", "if_index": 2, "name": "lan-core" }
+      ]
+    }
+  ]
+}

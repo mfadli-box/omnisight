@@ -1,0 +1,64 @@
+# =============================================================================
+# host_telemetry_agent — systemd unit (omnisight)
+#
+# Pemasangan:
+#   sudo install -m 0755 bin/host_telemetry_agent /usr/local/bin/
+#   sudo install -m 0644 deploy/linux/host_telemetry_agent.service /etc/systemd/system/
+#   sudo mkdir -p /etc/host_telemetry_agent && sudo install -m 0600 \
+#        configs/host_telemetry_agent.env.example /etc/host_telemetry_agent/host_telemetry_agent.env
+#   # enroll sekali (token dari admin osc_rest):
+#   sudo -u omnisight /usr/local/bin/host_telemetry_agent --enroll <TOKEN> \
+#        --asset-model <UUID> --status-label <UUID>
+#   sudo systemctl daemon-reload && sudo systemctl enable --now host_telemetry_agent
+# =============================================================================
+
+[Unit]
+Description=omnisight host_telemetry_agent - host & Docker container telemetry
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+# User dinamis non-root (UID unik per-service, dibuat systemd).
+DynamicUser=yes
+# State kredensial (hmac_secret) membutuhkan StateDirectory milik service.
+StateDirectory=host_telemetry_agent
+StateDirectoryMode=0700
+EnvironmentFile=-/etc/host_telemetry_agent/host_telemetry_agent.env
+ExecStart=/usr/local/bin/host_telemetry_agent
+Restart=on-failure
+RestartSec=5s
+
+# --- Hardening (least privilege) ---------------------------------------------
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+# AF_UNIX dibutuhkan Docker Engine API (unix socket).
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+# Read access ke /var/run/docker.sock dibutuhkan untuk container stats —
+# beri anggota group docker (atau berikan ACL pada socket, jangan jalankan root).
+# SupplementaryGroups=docker
+
+# --- Logging -------------------------------------------------------------------
+# Agent menulis log JSON terstruktur ke stdout; journald yang mengumpulkan
+# (jurnalctl -u host_telemetry_agent -o json-pretty).
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=host_telemetry_agent
+
+[Install]
+WantedBy=multi-user.target

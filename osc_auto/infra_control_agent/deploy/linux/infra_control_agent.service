@@ -1,0 +1,70 @@
+# =============================================================================
+# infra_control_agent — systemd unit (omnisight)
+#
+# Pemasangan:
+#   sudo install -m 0755 bin/infra_control_agent /usr/local/bin/
+#   sudo install -m 0644 deploy/linux/infra_control_agent.service /etc/systemd/system/
+#   sudo mkdir -p /etc/infra_control_agent && sudo install -m 0600 \
+#        configs/infra_control_agent.env.example /etc/infra_control_agent/infra_control_agent.env
+#   # enroll sekali (token dari admin osc_rest):
+#   sudo /usr/local/bin/infra_control_agent --enroll <TOKEN> \
+#        --asset-model <UUID> --status-label <UUID>
+#   sudo systemctl daemon-reload && sudo systemctl enable --now infra_control_agent
+#
+# CATATAN least-privilege: agent menjalankan `docker compose` dan `nginx -t/-s
+# reload`. Jalankan sebagai user khusus yang berada di group `docker` (bukan
+# root) dan beri ACL baca nginx config bila memungkinkan:
+#   sudo useradd -r -s /usr/sbin/nologin omni_infra
+#   sudo usermod -aG docker omni_infra
+# lalu ganti DynamicUser=yes dengan User=omni_infra di unit ini.
+# =============================================================================
+
+[Unit]
+Description=omnisight infra_control_agent - Docker Compose & Nginx dispatch executor
+After=network-online.target docker.service nginx.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+# User dinamis non-root. Untuk akses docker/nginx lihat catatan pemasangan
+# di atas (ganti ke User= khusus ber-grup docker bila memungkinkan).
+DynamicUser=yes
+StateDirectory=infra_control_agent
+StateDirectoryMode=0700
+EnvironmentFile=-/etc/infra_control_agent/infra_control_agent.env
+ExecStart=/usr/local/bin/infra_control_agent
+Restart=on-failure
+RestartSec=5s
+
+# --- Hardening (least privilege — catatan pengecualian) -----------------------
+# ExecStart menjalankan docker CLI (unix socket docker) — butuh AF_UNIX.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+# AF_UNIX dibutuhkan Docker Engine API; AF_INET untuk osc_rest & docker pull.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+# Tulis hanya pada STACKS_DIR & nginx conf dir — sisanya read-only via
+# ProtectSystem=strict. Sesuaikan ReadWritePaths bila path kustom:
+# ReadWritePaths=/opt/omnisight/stacks /etc/nginx/conf.d
+
+# --- Logging -------------------------------------------------------------------
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=infra_control_agent
+
+[Install]
+WantedBy=multi-user.target
