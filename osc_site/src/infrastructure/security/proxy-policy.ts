@@ -64,6 +64,20 @@ const ALLOWED_PATH_PATTERNS: readonly RegExp[] = [
   /^\/api\/v1\/nginx\/vhosts\/[\w-]+\/dispatch$/,
   // Live Logs (SSE text/event-stream):
   /^\/api\/v1\/infra\/logs\/stream$/,
+  // Wave 3 (api-w3.md) — SecOps (SIEM/FIM/CVE):
+  /^\/api\/v1\/secops\/overview$/,
+  /^\/api\/v1\/secops\/alerts$/,
+  /^\/api\/v1\/secops\/vulnerabilities$/,
+  // Wave 3 — PAM Bastion (vault & sesi; ticket redeem via HMAC gateway internal):
+  /^\/api\/v1\/pam\/accounts$/,
+  /^\/api\/v1\/pam\/accounts\/[\w-]+$/,
+  /^\/api\/v1\/pam\/sessions$/,
+  /^\/api\/v1\/pam\/sessions\/authorize$/,
+  /^\/api\/v1\/pam\/sessions\/[\w-]+$/,
+  /^\/api\/v1\/pam\/sessions\/[\w-]+\/recording$/,
+  // Wave 3 — Notification Channels (config terenkripsi, secret di-mask):
+  /^\/api\/v1\/notifications\/channels$/,
+  /^\/api\/v1\/notifications\/channels\/[\w-]+$/,
   // CATATAN: endpoint agent HMAC (/agents/enroll, /agents/*/ingest,
   // /agents/uptime/ingest, /agents/logs) TIDAK diberitakan lewat proxy
   // browser — dipanggil langsung oleh agent `osc_auto` (HMAC, bukan JWT).

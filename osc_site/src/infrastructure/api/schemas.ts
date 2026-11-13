@@ -476,3 +476,173 @@ export const publicStatusPageSchema = z.object({
     )
     .default([]),
 })
+
+// ---------- wave 3: secops / pam / notifications (w3.openapi.yaml) ----------
+const severitySchema = z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'])
+
+export const secopsOverviewSchema = z.object({
+  counts: z.object({
+    fim_unresolved: z.number().default(0),
+    alerts_unacknowledged: z.number().default(0),
+    vulnerabilities_open: z.number().default(0),
+  }),
+  fim_recent: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        asset_id: z.string().nullable().default(null),
+        path: z.string(),
+        asset_name: z.string().nullable().default(null),
+        event_type: z
+          .enum(['CREATED', 'MODIFIED', 'DELETED', 'ATTRIBUTE_CHANGED'])
+          .default('MODIFIED'),
+        detection_source: z.enum(['REALTIME', 'SCHEDULED']).default('SCHEDULED'),
+        baseline_version: z.number().default(1),
+        old_checksum: z.string().nullable().default(null),
+        new_checksum: z.string().nullable().default(null),
+        size_bytes: z.number().nullable().default(null),
+        detected_at: z.string().default(''),
+        is_resolved: z.boolean().default(false),
+      }),
+    )
+    .default([]),
+})
+
+const assetNameSchema = z.string().nullable().default(null)
+
+export const securityAlertListSchema = z
+  .union([
+    z.object({ alerts: z.array(z.record(z.string(), z.unknown())) }),
+    z.array(z.record(z.string(), z.unknown())),
+  ])
+  .transform((v) => (Array.isArray(v) ? v : v.alerts))
+  .transform((rows) =>
+    rows.map((r) => ({
+      id: String(r.id ?? ''),
+      asset_id: (r.asset_id as string | null) ?? null,
+      asset_name: (r.asset_name as string | null) ?? null,
+      rule_name: String(r.rule_name ?? ''),
+      category: (r.category as string | null) ?? null,
+      severity: (severitySchema.safeParse(r.severity).success
+        ? r.severity
+        : 'MEDIUM') as z.infer<typeof severitySchema>,
+      mitre_tactic: (r.mitre_tactic as string | null) ?? null,
+      mitre_technique: (r.mitre_technique as string | null) ?? null,
+      source_ip: (r.source_ip as string | null) ?? null,
+      detected_at: String(r.detected_at ?? ''),
+      is_acknowledged: Boolean(r.is_acknowledged ?? false),
+    })),
+  )
+
+export const vulnerabilityListSchema = z
+  .union([
+    z.object({ vulnerabilities: z.array(z.record(z.string(), z.unknown())) }),
+    z.array(z.record(z.string(), z.unknown())),
+  ])
+  .transform((v) => (Array.isArray(v) ? v : v.vulnerabilities))
+  .transform((rows) =>
+    rows.map((r) => ({
+      id: String(r.id ?? ''),
+      asset_id: String(r.asset_id ?? ''),
+      asset_name: assetNameSchema.catch(null).parse(r.asset_name),
+      cve_id: String(r.cve_id ?? ''),
+      title: String(r.title ?? ''),
+      severity: (severitySchema.safeParse(r.severity).success
+        ? r.severity
+        : 'MEDIUM') as z.infer<typeof severitySchema>,
+      cvss_score:
+        typeof r.cvss_score === 'number' ? r.cvss_score : null,
+      version_installed: (r.version_installed as string | null) ?? null,
+      version_fixed: (r.version_fixed as string | null) ?? null,
+      first_detected_at: (r.first_detected_at as string | null) ?? null,
+      last_detected_at: String(r.last_detected_at ?? r.detected_at ?? ''),
+    })),
+  )
+
+const pamAccountSchema = z.object({
+  id: z.string().min(1),
+  asset_id: z.string().min(1),
+  asset_name: z.string().nullable().default(null),
+  policy_id: z.string().nullable().default(null),
+  policy_name: z.string().nullable().default(null),
+  label: z.string(),
+  account_type: z
+    .enum(['SSH_PASSWORD', 'SSH_KEY', 'DATABASE', 'HTTP_ENDPOINT'])
+    .default('SSH_PASSWORD'),
+  username: z.string(),
+  port: z.number().default(22),
+  is_active: z.boolean().default(true),
+  created_at: z.string().default(''),
+  updated_at: z.string().default(''),
+})
+
+export const pamAccountListSchema = z
+  .union([z.object({ accounts: z.array(pamAccountSchema) }), z.array(pamAccountSchema)])
+  .transform((v) => (Array.isArray(v) ? v : v.accounts))
+
+export const pamSessionSchema = z.object({
+  id: z.string().min(1),
+  account_id: z.string().min(1),
+  account_label: z.string().default(''),
+  policy_id: z.string().nullable().default(null),
+  status: z
+    .enum(['REQUESTED', 'AUTHORIZED', 'ACTIVE', 'CLOSED', 'DENIED', 'EXPIRED'])
+    .default('REQUESTED'),
+  source_ip: z.string().nullable().default(null),
+  command_count: z.number().nullable().default(null),
+  recording_object_key: z.string().nullable().default(null),
+  denied_reason: z.string().nullable().default(null),
+  started_at: z.string().nullable().default(null),
+  ended_at: z.string().nullable().default(null),
+  duration_seconds: z.number().nullable().default(null),
+  created_at: z.string().default(''),
+})
+
+export const pamSessionListSchema = z
+  .union([z.object({ sessions: z.array(pamSessionSchema) }), z.array(pamSessionSchema)])
+  .transform((v) => (Array.isArray(v) ? v : v.sessions))
+
+export const pamAuthorizeResultSchema = z.object({
+  session_id: z.string().min(1),
+  gateway: z.string().default('pam_bastion_gateway'),
+  ticket: z.string().min(1),
+  ticket_ttl_seconds: z.number().default(120),
+  duration_minutes: z.number().default(120),
+  account: z.object({
+    id: z.string().min(1),
+    label: z.string().default(''),
+    username: z.string().default(''),
+    account_type: z.string().default('SSH_PASSWORD'),
+    asset_id: z.string().default(''),
+    port: z.number().default(22),
+  }),
+  policy: z.object({
+    id: z.string().min(1),
+    name: z.string().default(''),
+    mfa_required: z.boolean().default(true),
+    command_filter: z.record(z.string(), z.unknown()).nullable().default(null),
+  }),
+})
+
+const channelSummarySchema = z
+  .record(z.string(), z.unknown())
+  .transform((r) => r as import('@/domain/entities/w3').ChannelConfigSummary)
+
+const channelTypeSchema = z.enum(['SMTP_EMAIL', 'TELEGRAM', 'WEBHOOK'])
+
+export const notificationChannelSchema = z.object({
+  id: z.string().min(1),
+  type: channelTypeSchema,
+  config: channelSummarySchema,
+  event_filter: z.array(z.string()).default([]),
+  is_active: z.boolean().default(true),
+  created_at: z.string().default(''),
+  updated_at: z.string().default(''),
+})
+
+export const notificationChannelListSchema = z
+  .union([
+    z.object({ channels: z.array(notificationChannelSchema) }),
+    z.array(notificationChannelSchema),
+  ])
+  .transform((v) => (Array.isArray(v) ? v : v.channels))

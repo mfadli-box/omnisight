@@ -20,3 +20,8 @@ export type { IStudioGateway } from './gateways/studio'
 export type { IFileGateway } from './gateways/files'
 export type { IExcelGateway, ImportProgress } from './gateways/excel'
 export type { IInfraGateway } from './gateways/infra'
+export type {
+  ISecOpsGateway,
+  IPamGateway,
+  INotificationGateway,
+} from './gateways/w3'
