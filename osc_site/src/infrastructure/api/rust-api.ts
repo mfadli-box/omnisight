@@ -125,12 +125,16 @@ export async function forwardToRustApi(req: NextRequest): Promise<ProxyResult> {
 
   // --- 9) Passthrough streaming request body -------------------------------
   const hasBody = req.method !== 'GET' && req.method !== 'HEAD'
+  // SSE (`/infra/logs/stream`) adalah koneksi long-lived: timeout request
+  // di-skip — pemutusan tetap dikendalikan upstream (graceful shutdown) atau
+  // AbortSignal klien. Bukan vektor SSRF karena path tervalidasi whitelist.
+  const isSseStream = upstreamPath === '/api/v1/infra/logs/stream'
   const init: RequestInit & { duplex?: 'half' } = {
     method: req.method,
     headers,
     body: hasBody ? req.body : undefined,
     redirect: 'manual',
-    signal: AbortSignal.timeout(appConfig.timeoutMs),
+    signal: isSseStream ? undefined : AbortSignal.timeout(appConfig.timeoutMs),
   }
   if (hasBody) {
     // wajib untuk stream body di Node fetch (undici)

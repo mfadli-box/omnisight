@@ -45,6 +45,28 @@ const ALLOWED_PATH_PATTERNS: readonly RegExp[] = [
   // RustFS files:
   /^\/api\/v1\/files$/,
   /^\/api\/v1\/files\/[\w-]+$/,
+  // Wave 2 (api-w2.md) — Agent Enrollment (admin, token ditampilkan sekali):
+  /^\/api\/v1\/agents\/enrollment-tokens$/,
+  // Uptime & Status Pages (slug publik [a-z0-9-] juga mencakup UUID id tenant):
+  /^\/api\/v1\/monitors$/,
+  /^\/api\/v1\/monitors\/[\w-]+$/,
+  /^\/api\/v1\/status-pages$/,
+  /^\/api\/v1\/status-pages\/[a-z0-9-]{1,100}$/,
+  // Docker Stack Control Plane:
+  /^\/api\/v1\/docker\/hosts$/,
+  /^\/api\/v1\/docker\/stacks$/,
+  /^\/api\/v1\/docker\/stacks\/[\w-]+$/,
+  /^\/api\/v1\/docker\/stacks\/[\w-]+\/dispatch$/,
+  // Nginx Reverse Proxy Control Plane:
+  /^\/api\/v1\/nginx\/nodes$/,
+  /^\/api\/v1\/nginx\/vhosts$/,
+  /^\/api\/v1\/nginx\/vhosts\/[\w-]+$/,
+  /^\/api\/v1\/nginx\/vhosts\/[\w-]+\/dispatch$/,
+  // Live Logs (SSE text/event-stream):
+  /^\/api\/v1\/infra\/logs\/stream$/,
+  // CATATAN: endpoint agent HMAC (/agents/enroll, /agents/*/ingest,
+  // /agents/uptime/ingest, /agents/logs) TIDAK diberitakan lewat proxy
+  // browser — dipanggil langsung oleh agent `osc_auto` (HMAC, bukan JWT).
 ]
 
 /** Header respons ke browser yang dipasang proxy (di atas header upstream). */

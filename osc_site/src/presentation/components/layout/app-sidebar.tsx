@@ -9,14 +9,23 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 import {
+  Activity,
+  BellRing,
   Boxes,
   ChevronRight,
+  Container,
   FileSpreadsheet,
+  Folder,
   FolderTree,
   Globe,
+  KeyRound,
   LayoutDashboard,
   Network,
+  Server,
+  Settings,
+  Shield,
   ShieldCheck,
+  Table2,
   Ticket,
 } from 'lucide-react'
 
@@ -27,13 +36,25 @@ import { cn } from '@/presentation/lib/utils'
 /** Peta ikon menu (nama ikon di MenuModule DB → komponen lucide). */
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   dashboard: LayoutDashboard,
+  'layout-dashboard': LayoutDashboard,
   assets: Boxes,
+  boxes: Boxes,
   licenses: FileSpreadsheet,
   tickets: Ticket,
+  ticket: Ticket,
   network: Network,
+  server: Server,
   studio: FolderTree,
+  'table-2': Table2,
   files: Globe,
+  folder: Folder,
   security: ShieldCheck,
+  shield: Shield,
+  activity: Activity,
+  container: Container,
+  'bell-ring': BellRing,
+  'key-round': KeyRound,
+  settings: Settings,
 }
 
 function MenuLink({ node, depth }: { node: MenuNode; depth: number }) {

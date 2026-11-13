@@ -101,3 +101,65 @@ export const mfaDisableFormSchema = z.object({
   otp: otpSchema,
 })
 export type MfaDisableFormValues = z.infer<typeof mfaDisableFormSchema>
+
+// ---------- wave 2: infra control plane (w2.openapi.yaml) ----------
+
+export const enrollmentTokenFormSchema = z.object({
+  node_type: z.enum(['HOST', 'NETWORK', 'VIRTUAL', 'CONTAINER', 'RACK_MOUNTED', 'SERVICE']),
+  ttl_hours: z
+    .number()
+    .int('Harus bilangan bulat')
+    .min(1, 'TTL minimal 1 jam')
+    .max(72, 'TTL maksimal 72 jam'),
+})
+export type EnrollmentTokenFormValues = z.infer<typeof enrollmentTokenFormSchema>
+
+/** Path absolut host tanpa traversal (`..`, `~`, backslash) — gerbang klien; otoritatif di osc_rest. */
+const workingDirSchema = z
+  .string()
+  .trim()
+  .min(1, 'Wajib diisi')
+  .max(500)
+  .startsWith('/', 'Harus path absolut (awal /)')
+  .refine((v) => !v.includes('\\') && !v.includes('~'), 'Karakter \\ dan ~ tidak diizinkan')
+  .refine((v) => !v.split('/').includes('..'), 'Path traversal (..) tidak diizinkan')
+
+export const stackCreateFormSchema = z.object({
+  docker_host_id: uuid,
+  name: z
+    .string()
+    .trim()
+    .regex(/^[a-zA-Z0-9_-]{1,150}$/, 'Huruf/angka/_/-, maks 150'),
+  working_dir: workingDirSchema,
+  compose_content: z.string().min(1, 'compose.yaml wajib diisi').max(262_144, 'Maks 256 KB'),
+  env: z.string().max(100_000).optional(),
+})
+export type StackCreateFormValues = z.infer<typeof stackCreateFormSchema>
+
+export const stackUpdateFormSchema = z.object({
+  compose_content: z.string().min(1, 'compose.yaml wajib diisi').max(262_144, 'Maks 256 KB'),
+  env: z.string().max(100_000).optional(),
+})
+export type StackUpdateFormValues = z.infer<typeof stackUpdateFormSchema>
+
+export const stackDispatchFormSchema = z.object({
+  command: z.enum(['up', 'down', 'pull', 'restart']),
+})
+export type StackDispatchFormValues = z.infer<typeof stackDispatchFormSchema>
+
+export const vhostCreateFormSchema = z.object({
+  nginx_node_id: uuid,
+  server_name: z.string().trim().min(1, 'Wajib diisi').max(255),
+  listen_port: z.number().int().min(1, 'Port 1–65535').max(65_535, 'Port 1–65535'),
+  config_content: z.string().min(1, 'Config wajib diisi').max(131_072, 'Maks 128 KB'),
+  ssl_cert_path: z.string().trim().max(500).optional(),
+  ssl_key_path: z.string().trim().max(500).optional(),
+})
+export type VhostCreateFormValues = z.infer<typeof vhostCreateFormSchema>
+
+export const vhostUpdateFormSchema = z.object({
+  config_content: z.string().min(1, 'Config wajib diisi').max(131_072, 'Maks 128 KB'),
+  ssl_cert_path: z.string().trim().max(500).optional(),
+  ssl_key_path: z.string().trim().max(500).optional(),
+})
+export type VhostUpdateFormValues = z.infer<typeof vhostUpdateFormSchema>

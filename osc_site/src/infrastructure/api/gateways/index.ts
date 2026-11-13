@@ -6,6 +6,7 @@
 import { AuthGateway } from '@/infrastructure/api/gateways/auth-gateway'
 import { ItamGateway, ExcelGateway } from '@/infrastructure/api/gateways/itam-gateway'
 import { FileGateway, NetGateway, StudioGateway } from '@/infrastructure/api/gateways/resource-gateways'
+import { InfraGateway } from '@/infrastructure/api/gateways/infra-gateway'
 
 let instance: ClientGateways | null = null
 
@@ -16,6 +17,7 @@ export interface ClientGateways {
   studio: StudioGateway
   net: NetGateway
   files: FileGateway
+  infra: InfraGateway
 }
 
 export function clientGateways(): ClientGateways {
@@ -27,6 +29,7 @@ export function clientGateways(): ClientGateways {
       studio: new StudioGateway(),
       net: new NetGateway(),
       files: new FileGateway(),
+      infra: new InfraGateway(),
     }
   }
   return instance

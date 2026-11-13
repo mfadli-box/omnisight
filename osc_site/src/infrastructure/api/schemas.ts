@@ -319,3 +319,160 @@ export const fileMetaSchema = z.object({
   created_at: z.string().default(''),
   presigned_url: z.string().nullable().default(null),
 })
+
+// ---------- wave 2: infra control plane (w2.openapi.yaml) ----------
+export const enrollmentTokenSchema = z.object({
+  id: z.string().min(1),
+  token: z.string().min(1),
+  node_type: z.string().default('HOST'),
+  expires_at: z.string(),
+})
+
+const hostRefSchema = z.object({
+  id: z.string().min(1),
+  name: z.string(),
+  status: z.enum(['ONLINE', 'OFFLINE', 'UNKNOWN']).default('UNKNOWN'),
+  docker_version: z.string().nullable().default(null),
+  container_count: z.number().nullable().default(null),
+  last_seen_at: z.string().nullable().default(null),
+})
+
+export const dockerHostListSchema = z
+  .union([z.object({ hosts: z.array(hostRefSchema) }), z.array(hostRefSchema)])
+  .transform((v) => (Array.isArray(v) ? v : v.hosts))
+
+export const nginxNodeListSchema = z
+  .union([
+    z.object({
+      nodes: z.array(
+        z.object({
+          id: z.string().min(1),
+          name: z.string(),
+          status: z.enum(['ONLINE', 'OFFLINE', 'UNKNOWN']).default('UNKNOWN'),
+          nginx_version: z.string().nullable().default(null),
+          last_seen_at: z.string().nullable().default(null),
+        }),
+      ),
+    }),
+    z.array(
+      z.object({
+        id: z.string().min(1),
+        name: z.string(),
+        status: z.enum(['ONLINE', 'OFFLINE', 'UNKNOWN']).default('UNKNOWN'),
+        nginx_version: z.string().nullable().default(null),
+        last_seen_at: z.string().nullable().default(null),
+      }),
+    ),
+  ])
+  .transform((v) => (Array.isArray(v) ? v : v.nodes))
+
+export const composeStackSchema = z.object({
+  id: z.string().min(1),
+  docker_host_id: z.string().min(1),
+  host_name: z.string().default(''),
+  name: z.string(),
+  working_dir: z.string(),
+  compose_content: z.string().nullable().default(null),
+  drift_status: z.enum(['IN_SYNC', 'DRIFTED', 'UNKNOWN']).default('UNKNOWN'),
+  backup_object_key: z.string().nullable().default(null),
+  last_deployed_at: z.string().nullable().default(null),
+  last_synced_at: z.string().nullable().default(null),
+  last_error: z.string().nullable().default(null),
+  is_active: z.boolean().default(true),
+  created_at: z.string().default(''),
+  updated_at: z.string().default(''),
+})
+
+export const stackListSchema = z
+  .union([z.object({ stacks: z.array(composeStackSchema) }), z.array(composeStackSchema)])
+  .transform((v) => (Array.isArray(v) ? v : v.stacks))
+
+export const nginxVhostSchema = z.object({
+  id: z.string().min(1),
+  nginx_node_id: z.string().min(1),
+  node_name: z.string().default(''),
+  server_name: z.string(),
+  listen_port: z.number().default(80),
+  status: z
+    .enum(['DRAFT', 'TESTING', 'APPLIED', 'FAILED', 'ROLLED_BACK'])
+    .default('DRAFT'),
+  config_content: z.string().nullable().default(null),
+  ssl_cert_path: z.string().nullable().default(null),
+  ssl_key_path: z.string().nullable().default(null),
+  backup_object_key: z.string().nullable().default(null),
+  last_error: z.string().nullable().default(null),
+  validated_at: z.string().nullable().default(null),
+  applied_at: z.string().nullable().default(null),
+  created_at: z.string().default(''),
+  updated_at: z.string().default(''),
+})
+
+export const vhostListSchema = z
+  .union([z.object({ vhosts: z.array(nginxVhostSchema) }), z.array(nginxVhostSchema)])
+  .transform((v) => (Array.isArray(v) ? v : v.vhosts))
+
+export const createdIdSchema = z.object({ id: z.string().min(1) })
+
+export const stackDispatchSchema = z.object({
+  dispatch_ref: z.string().min(1),
+  command: z.string().default(''),
+  stack_id: z.string().min(1),
+})
+
+export const vhostDispatchSchema = z.object({
+  dispatch_ref: z.string().min(1),
+  command: z.string().default(''),
+  vhost_id: z.string().min(1),
+})
+
+export const monitorSchema = z.object({
+  id: z.string().min(1),
+  name: z.string(),
+  type: z.string().default('HTTP'),
+  target: z.string().default(''),
+  config: z.record(z.string(), z.unknown()).nullable().default(null),
+  interval_seconds: z.number().default(60),
+  retries: z.number().default(1),
+  is_active: z.boolean().default(true),
+  created_at: z.string().default(''),
+  updated_at: z.string().default(''),
+})
+
+export const monitorListSchema = z
+  .union([z.object({ monitors: z.array(monitorSchema) }), z.array(monitorSchema)])
+  .transform((v) => (Array.isArray(v) ? v : v.monitors))
+
+export const statusPageSchema = z.object({
+  id: z.string().min(1),
+  slug: z.string().min(1),
+  title: z.string(),
+  description: z.string().nullable().default(null),
+  is_published: z.boolean().default(false),
+  created_at: z.string().default(''),
+  updated_at: z.string().default(''),
+})
+
+export const statusPageListSchema = z
+  .union([z.object({ pages: z.array(statusPageSchema) }), z.array(statusPageSchema)])
+  .transform((v) => (Array.isArray(v) ? v : v.pages))
+
+export const publicStatusPageSchema = z.object({
+  id: z.string().min(1),
+  slug: z.string().min(1),
+  title: z.string(),
+  description: z.string().nullable().default(null),
+  is_published: z.boolean().default(false),
+  monitors: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        name: z.string(),
+        type: z.string().default('HTTP'),
+        status: z.string().nullable().default(null),
+        ping_ms: z.number().nullable().default(null),
+        message: z.string().nullable().default(null),
+        uptime_pct_24h: z.number().nullable().default(null),
+      }),
+    )
+    .default([]),
+})
