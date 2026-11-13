@@ -22,9 +22,14 @@ ENV NODE_ENV=production \
     CHECKPOINT_DISABLE=1
 
 COPY package.json package-lock.json ./
-RUN npm ci --no-audit --no-fund
+# --include=dev: prisma CLI & tsx adalah devDeps tapi WAJIB untuk
+# migrate deploy + seed (prisma db seed → tsx prisma/seed.ts).
+RUN npm ci --include=dev --no-audit --no-fund
 
 COPY --chown=node:node prisma ./prisma
+
+# Generate Prisma Client (wajib sebelum tsx prisma/seed.ts).
+RUN npx prisma generate
 
 USER node
 

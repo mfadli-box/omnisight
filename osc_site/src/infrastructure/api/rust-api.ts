@@ -109,7 +109,8 @@ export async function forwardToRustApi(req: NextRequest): Promise<ProxyResult> {
   headers.set('x-correlation-id', correlationId)
 
   // --- 7) Auth: token HANYA dari cookie HttpOnly server-side ---------------
-  const token = sessionToken(req)
+  // Prioritas cookie sesi; fallback cookie challenge MFA (login step-2).
+  const token = sessionToken(req) ?? mfaChallengeToken(req)
   if (token) headers.set('authorization', `Bearer ${token}`)
 
   // --- 8) Route auth ber-cookie: intercept respons (JSON kecil) ------------
@@ -177,6 +178,19 @@ export async function forwardToRustApi(req: NextRequest): Promise<ProxyResult> {
 function sessionToken(req: NextRequest): string | null {
   // Re-import di sini untuk menjaga fungsi murni; sama seperti session.ts.
   const token = req.cookies.get(SESSION_COOKIE)?.value
+  if (!token || token.length === 0 || token.length > 4096 || /[\s\0]/.test(token)) {
+    return null
+  }
+  return token
+}
+
+/**
+ * Token challenge MFA (scope=mfa_pending) untuk step-2 login: saat
+ * `mfa_required` sesi penuh BELUM ada — JWT challenge hidup di cookie
+ * tersendiri dan hanya berlaku pada path `/api/v1/auth/mfa/*`.
+ */
+function mfaChallengeToken(req: NextRequest): string | null {
+  const token = req.cookies.get(MFA_CHALLENGE_COOKIE)?.value
   if (!token || token.length === 0 || token.length > 4096 || /[\s\0]/.test(token)) {
     return null
   }

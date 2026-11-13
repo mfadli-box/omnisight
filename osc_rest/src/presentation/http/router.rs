@@ -217,7 +217,13 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/v1/auth/mfa/reset-request", post(handlers::mfa::reset_request))
         .route("/api/v1/agents/enroll", post(handlers::agents::enroll))
         // Status page publik (tanpa auth; hanya `is_published`).
-        .route("/api/v1/status-pages/{slug}", get(handlers::uptime::public_status_page));
+        // Path statis tersendiri — matchit menolak nama param berbeda pada
+        // posisi sama DAN method route GET ganda dengan route protected
+        // /api/v1/status-pages/{id} (panic saat startup).
+        .route(
+            "/api/v1/status-pages/public/{slug}",
+            get(handlers::uptime::public_status_page),
+        );
 
     let app = public
         .merge(protected)

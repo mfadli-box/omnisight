@@ -96,8 +96,8 @@ impl Store {
             .map(|d| d.chars().take(100).collect::<String>());
 
         let row = sqlx::query(sqlx::AssertSqlSafe(format!(
-            "INSERT INTO users (username, email, display_name)
-             VALUES ($1, $2, $3)
+            "INSERT INTO users (username, email, display_name, created_at, updated_at)
+             VALUES ($1, $2, $3, now(), now())
              RETURNING {USER_COLUMNS}"
         )))
         .bind(username)
@@ -178,8 +178,8 @@ impl Store {
     /// Get-or-create role non-sistem (untuk autoprovision HRIS).
     pub async fn role_ensure(&self, name: &str) -> Result<Uuid, DomainError> {
         let row = sqlx::query(
-            "INSERT INTO roles (name, description)
-             VALUES ($1, $2)
+            "INSERT INTO roles (name, description, created_at, updated_at)
+             VALUES ($1, $2, now(), now())
              ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
              RETURNING id",
         )
@@ -199,8 +199,8 @@ impl Store {
         role_id: Uuid,
     ) -> Result<(), DomainError> {
         sqlx::query(
-            "INSERT INTO user_company_access (user_id, company_id, role_id, is_default, is_active)
-             VALUES ($1, $2, $3, false, true)
+            "INSERT INTO user_company_access (user_id, company_id, role_id, is_default, is_active, created_at, updated_at)
+             VALUES ($1, $2, $3, false, true, now(), now())
              ON CONFLICT (user_id, company_id, role_id)
              DO UPDATE SET is_active = true, updated_at = now()",
         )

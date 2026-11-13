@@ -129,6 +129,7 @@ services:
     read_only: true
     tmpfs:
       - /tmp
+      - /logs
     environment:
       - RUSTFS_ADDRESS=:9000
       - RUSTFS_CONSOLE_ENABLE=false
@@ -159,8 +160,11 @@ services:
   # (RUSTFS_BUCKET lama tetap ada di volume; tidak dihapus — aman untuk
   #  konfigurasi existing. Exit 0 → container berhenti, tidak di-restart.)
   # ---------------------------------------------------------------------------
+  # CATATAN: minio/mc tidak lagi tersedia di Docker Hub (MinIO menarik image
+  # community-nya) → bootstrap bucket memakai amazon/aws-cli (s3api create-bucket
+  # idempoten: 409 BucketAlreadyOwnedByYou dianggap sukses).
   rustfs-init:
-    image: minio/mc:latest
+    image: amazon/aws-cli:latest
     container_name: rustfs-init
     logging: *default-logging
     security_opt:
@@ -170,9 +174,11 @@ services:
       - /root
       - /tmp
     environment:
+      - AWS_ACCESS_KEY_ID=${RUSTFS_ACCESS_KEY:-oscadmin}
+      - AWS_SECRET_ACCESS_KEY=${RUSTFS_SECRET_KEY:-password_osc_rustfs}
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_EC2_METADATA_DISABLED=true
       - RUSTFS_ENDPOINT=http://rustfs:9000
-      - RUSTFS_ACCESS_KEY=${RUSTFS_ACCESS_KEY:-oscadmin}
-      - RUSTFS_SECRET_KEY=${RUSTFS_SECRET_KEY:-password_osc_rustfs}
       - RUSTFS_BUCKET_FILES=${RUSTFS_BUCKET_FILES:-osc-assets-files}
       - RUSTFS_BUCKET_PAM=${RUSTFS_BUCKET_PAM:-osc-pam-recordings}
       - RUSTFS_BUCKET_BACKUPS=${RUSTFS_BUCKET_BACKUPS:-osc-config-backups}
@@ -180,10 +186,11 @@ services:
     command:
       - -c
       - >-
-        mc alias set local "$${RUSTFS_ENDPOINT}" "$${RUSTFS_ACCESS_KEY}" "$${RUSTFS_SECRET_KEY}" &&
-        mc mb --ignore-existing "local/$${RUSTFS_BUCKET_FILES}" &&
-        mc mb --ignore-existing "local/$${RUSTFS_BUCKET_PAM}" &&
-        mc mb --ignore-existing "local/$${RUSTFS_BUCKET_BACKUPS}"
+        for b in "$${RUSTFS_BUCKET_FILES}" "$${RUSTFS_BUCKET_PAM}" "$${RUSTFS_BUCKET_BACKUPS}"; do
+        aws --endpoint-url "$${RUSTFS_ENDPOINT}" s3api create-bucket --bucket "$$b" >/dev/null 2>&1 || true;
+        aws --endpoint-url "$${RUSTFS_ENDPOINT}" s3api head-bucket --bucket "$$b" || exit 1;
+        done;
+        echo "bootstrap buckets OK"
     depends_on:
       rustfs:
         condition: service_healthy
@@ -274,7 +281,10 @@ services:
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:?set JWT_REFRESH_SECRET di .env (openssl rand -hex 32)}
       - APP_MASTER_ENCRYPTION_KEY=${APP_MASTER_ENCRYPTION_KEY:?set APP_MASTER_ENCRYPTION_KEY di .env (32 byte)}
       - AGENT_ENROLLMENT_SECRET=${AGENT_ENROLLMENT_SECRET:?set AGENT_ENROLLMENT_SECRET di .env}
-      - HRIS_ALLOWED_HOSTS=${HRIS_ALLOWED_HOSTS:-hris.internal.example.local}
+      # Anti-SSRF HRIS: CIDR & host allowlist (172.99.0.0/16 = pool jaringan
+      # docker default-address-pools deployment ini).
+      - HRIS_ALLOWLIST_CIDRS=${HRIS_ALLOWLIST_CIDRS:-127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,::1/128,172.99.0.0/16}
+      - HRIS_ALLOWLIST_HOSTS=${HRIS_ALLOWLIST_HOSTS:-}
       # Bootstrap seeder Day-2 (reengineering.md bab 5.8)
       - BOOTSTRAP_ADMIN_USERNAME=${BOOTSTRAP_ADMIN_USERNAME:-superadmin}
       - BOOTSTRAP_ADMIN_EMAIL=${BOOTSTRAP_ADMIN_EMAIL:-superadmin@example.local}

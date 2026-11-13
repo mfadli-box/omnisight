@@ -124,9 +124,10 @@ impl Store {
         let row = sqlx::query(
             "INSERT INTO assets
                  (company_id, name, asset_tag, node_type, status, hostname, mgmt_ip,
-                  asset_model_id, status_label_id, is_dynamic, source, metadata, last_seen_at)
+                  asset_model_id, status_label_id, is_dynamic, source, metadata, last_seen_at,
+                  created_at, updated_at)
              VALUES ($1, $2, $3, CAST($4 AS node_type), CAST('ACTIVE' AS asset_status),
-                     $5, CAST($6 AS inet), $7, $8, true, 'agent', $9, now())
+                     $5, CAST($6 AS inet), $7, $8, true, 'agent', $9, now(), now(), now())
              RETURNING id",
         )
         .bind(agent.company_id)

@@ -138,7 +138,6 @@ Gunakan skill `ai-base` untuk melengkapi `osc_base/prisma/schema.prisma`:
 3. Dokumentasikan spesifikasi penuh beserta tabel pemetaan tipe data Prisma-ke-SQLx di `osc_docs/base/schema-p3.md`.
 4. Jalankan `npx prisma db seed` untuk verifikasi seeder, lalu buka `osc_docs/checklist.md`, centang `[x]` pada baris **Hari 8 (`SESI 1.4`)**, isi tanggal hari ini, dan catat ringkasan hasil verifikasi di tabel log harian.
 
-
 ================================================================================
 TAHAP 2: WAVE 1 — CORE RBAC, HRIS/MFA AUTH, DYNAMIC ITEMS, ITAM & DCIM/IPAM
 ================================================================================
@@ -180,7 +179,6 @@ Gunakan skill `ai-test` untuk membaca `osc_docs/rest/api-w1.md` dan `osc_docs/si
 3. Di `osc_docs/test/rest_soc/test/wave1/`: Buat penetration test untuk bypass `mfa_challenge_token` ke endpoint bisnis, TOTP replay attack, IDOR `switch-company` ke company ilegal, kebocoran data lintas `company_id`, SQL injection pada dynamic `filter` AST, dan Excel formula injection (`=cmd|...`).
 4. Buat laporan teknis di `osc_docs/test/rest_qad/qar-w2.md` dan `osc_docs/test/rest_soc/soc-w1.md`, lalu centang `[x]` pada baris **Hari 11 (`SESI 2.3`)** di `osc_docs/checklist.md`.
 
-
 ================================================================================
 TAHAP 3: WAVE 2 — OBSERVABILITY, UPTIME, DOCKER & NGINX CONTROL PLANE
 ================================================================================
@@ -217,7 +215,6 @@ Gunakan skill `ai-test` untuk membaca `osc_docs/rest/api-w2.md`:
 1. Di `osc_docs/test/rest_qad/test/wave2/`: Buat test untuk agent enrollment, batch telemetry/uptime ingestion, CRUD `compose.yaml` stack, dan Nginx virtual host config.
 2. Di `osc_docs/test/rest_soc/test/wave2/`: Buat security test untuk replay/expired enrollment token, pemalsuan signature HMAC agent, **Path Traversal** pada nama stack `compose.yaml` (`../../etc/cron.d`), dan **Command Injection** pada konfigurasi Nginx upstream/server_name.
 3. Buat laporan di `osc_docs/test/rest_qad/qar-w2.md` dan `osc_docs/test/rest_soc/soc-w2.md`, lalu centang `[x]` pada baris **Hari 15 (`SESI 3.4`)** di `osc_docs/checklist.md`.
-
 
 ================================================================================
 TAHAP 4: WAVE 3 — SECOPS (SIEM/FIM/CVE), PAM BASTION & NOTIFICATION WORKER
@@ -260,7 +257,6 @@ Gunakan skill `ai-test` untuk membaca `osc_docs/rest/api-w3.md`:
    - Uji **Command ACL Evasion** pada `pam_bastion_gateway` dan verifikasi bahwa API response tidak pernah membocorkan plaintext kredensial vault.
    - Uji spoofing event SIEM/FIM tanpa HMAC valid.
 2. Buat laporan audit di `osc_docs/test/rest_soc/qar-w3.md`, lalu centang `[x]` pada baris **Hari 19 (`SESI 4.4`)** di `osc_docs/checklist.md`.
-
 
 ================================================================================
 TAHAP 5: FINALISASI FULL-STACK DOCKER & CLEANUP

@@ -52,6 +52,8 @@ const ALLOWED_PATH_PATTERNS: readonly RegExp[] = [
   /^\/api\/v1\/monitors\/[\w-]+$/,
   /^\/api\/v1\/status-pages$/,
   /^\/api\/v1\/status-pages\/[a-z0-9-]{1,100}$/,
+  // Status page publik (tanpa auth, path statis khusus di osc_rest):
+  /^\/api\/v1\/status-pages\/public\/[a-z0-9-]{1,100}$/,
   // Docker Stack Control Plane:
   /^\/api\/v1\/docker\/hosts$/,
   /^\/api\/v1\/docker\/stacks$/,
