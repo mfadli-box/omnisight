@@ -1,22 +1,42 @@
 # =============================================================================
-# omnisight — Master Docker Compose (bootstrap scaffolding)
-# Blueprint : osc_docs/architecture.md
+# omnisight — Master Docker Compose PRODUKSI (SESI 5.1 / Hari 20)
+# Blueprint : osc_docs/architecture.md  |  Panduan: osc_docs/production.md
 # Author    : ai-main (PM & Docker DevOps Architect)
 #
 # Services:
-#   osc_base  : PostgreSQL 18 (service existing — konvensi dipertahankan)
-#   osc_file  : RustFS S3-compatible object storage (internal only)
-#   osc_rest  : Rust REST API (internal only)     [Dockerfile: tersedia (ai-rest)]
-#   osc_site  : Next.js UI + BFF Proxy (public)   [Dockerfile: fase ai-site]
+#   postgres             : PostgreSQL 18 (data layer — service existing,
+#                          static IP 172.99.66.1 di blackbox dipertahankan)
+#   rustfs               : RustFS S3-compatible object storage
+#                          (static IP 172.99.66.2 di blackbox dipertahankan)
+#   rustfs-init          : one-shot bootstrap bucket (minio/mc, idempotent)
+#   prisma-migrate       : one-shot `prisma migrate deploy` + `db seed`
+#                          (runner Prisma CLI — osc_base/Dockerfile)
+#   osc_rest             : Rust REST API (distroless cc, non-root)
+#   osc_site             : Next.js UI + BFF Proxy (satu-satunya port publik)
+#   pam_bastion_gateway  : WS-to-SSH bastion proxy (distroless static)
+#   flow_worker_agent    : notifikasi SMTP/Telegram/Webhook + retention purge
 #
-# Network isolation:
-#   blackbox     (external, pre-existing) -> akses host/legacy + static IP
-#   osc_internal (internal: true)         -> postgres / rustfs / rest / site
-#   osc_edge     (public bridge)          -> osc_site saja; satu-satunya
-#                                            published port stack
+# Isolasi & hardening:
+#   osc_internal (internal: true) — seluruh service; TANPA rute keluar.
+#   osc_egress    (bridge biasa)  — HANYA service yang butuh outbound:
+#                                   osc_rest (HRIS), pam gateway (SSH target),
+#                                   flow_worker (SMTP/Telegram/webhook).
+#   osc_edge      (bridge publik) — osc_site saja (satu-satunya published port
+#                                   stack); pam gateway di-bind loopback.
+#   blackbox      (external)      — konvensi existing: akses host/legacy ke
+#                                   postgres/rustfs via static IP 172.99.66.x.
+#   read_only: true + tmpfs, no-new-privileges, cap_drop ALL (distroless &
+#   node non-root), log rotation, deploy.resources.limits.
 #
-# Catatan: seluruh service kini memiliki Dockerfile & healthcheck
-#          (ai-rest: osc_rest, ai-site: osc_site).
+# Urutan startup (dependency chain):
+#   postgres/rustfs (healthy) → rustfs-init (one-shot)
+#                             → prisma-migrate (one-shot, exit 0)
+#                             → osc_rest (healthy) → osc_site / agents
+#
+# Usage:
+#   cp .env.example .env   # lalu isi secret produksi (WAJIB ganti default)
+#   docker compose up -d --build
+#   docker compose ps
 # =============================================================================
 
 name: omnisight
@@ -25,34 +45,61 @@ networks:
   blackbox:
     name: blackbox
     external: true
+  osc_internal:
+    driver: bridge
+    internal: true # tanpa rute keluar ke internet
+  osc_egress:
+    driver: bridge # hanya untuk service berkebutuhan outbound
+  osc_edge:
+    driver: bridge # network publik: osc_site (dan proxy edge)
 
 volumes:
-  xbase: # PostgreSQL
+  xbase: # PostgreSQL — NAMA DIPERTAHANKAN (data existing)
     driver: local
-  xfile: # RustFS object storage
+  xfile: # RustFS object storage — NAMA DIPERTAHANKAN (data existing)
     driver: local
+  flow_worker_state: # state enrollment flow_worker_agent (persisten)
+    driver: local
+  pam_gateway_state: # state enrollment + known_hosts + rekaman PAM
+    driver: local
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-hardening: &default-hardening
+  security_opt:
+    - "no-new-privileges:true"
+
+x-limits-1g: &limits-1g
+  cpus: "1.0"
+  memory: 1G
 
 services:
   # ---------------------------------------------------------------------------
-  # PostgreSQL
+  # PostgreSQL 18 (data layer)
+  # read_only + tmpfs untuk socket & temp; data persisten di volume xbase.
+  # Tidak mempublish port ke host — akses host/legacy via network blackbox
+  # (static IP 172.99.66.1, konvensi existing). Admin: docker compose exec.
   # ---------------------------------------------------------------------------
-  osc_base:
+  postgres:
     image: postgres:18-alpine
-    container_name: osc_base
-    logging:
-      options:
-        max-size: "10m"
-        max-file: "3"
+    container_name: postgres
+    logging: *default-logging
     security_opt:
       - "no-new-privileges:true"
+    read_only: true
+    tmpfs:
+      - /var/run/postgresql
+      - /tmp
     environment:
       - TZ=${TZ:-Asia/Jakarta}
       - POSTGRES_DB=${PG_DATA:-osc}
       - POSTGRES_USER=${PG_USER:-dbe}
-      - POSTGRES_PASSWORD=${PG_PASS:-password_osc_dbe}
+      - POSTGRES_PASSWORD=${PG_PASS:?set PG_PASS di .env}
       - POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256 --auth-local=scram-sha-256
-    ports:
-      - "${PG_PORT:-5432}:5432"
     volumes:
       - xbase:/var/lib/postgresql
     healthcheck:
@@ -60,37 +107,38 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 15s
     restart: always
+    deploy:
+      resources:
+        limits: *limits-1g
     networks:
       blackbox:
         ipv4_address: 172.99.66.1
+      osc_internal:
 
   # ---------------------------------------------------------------------------
-  # RustFS — S3-compatible object storage
+  # RustFS — S3-compatible object storage (internal only)
   # ---------------------------------------------------------------------------
-  osc_file:
+  rustfs:
     image: rustfs/rustfs:1.0.4
-    container_name: osc_file
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
+    container_name: rustfs
+    logging: *default-logging
     security_opt:
       - "no-new-privileges:true"
+    read_only: true
+    tmpfs:
+      - /tmp
     environment:
       - RUSTFS_ADDRESS=:9000
-      - RUSTFS_CONSOLE_ENABLE=true
-      - RUSTFS_CONSOLE_ADDRESS=:9001
+      - RUSTFS_CONSOLE_ENABLE=false
       - RUSTFS_VOLUMES=/data
-      - RUSTFS_ACCESS_KEY=${RUSTFS_ACCESS_KEY:-oscadmin}
-      - RUSTFS_SECRET_KEY=${RUSTFS_SECRET_KEY:-password_osc_rustfs}
+      - RUSTFS_ACCESS_KEY=${RUSTFS_ACCESS_KEY:?set RUSTFS_ACCESS_KEY di .env}
+      - RUSTFS_SECRET_KEY=${RUSTFS_SECRET_KEY:?set RUSTFS_SECRET_KEY di .env}
     volumes:
       - xfile:/data
-    # ports:
-    # - "127.0.0.1:9001:9001"
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:9000/health"]
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9000/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -98,32 +146,31 @@ services:
     restart: unless-stopped
     deploy:
       resources:
-        limits:
-          cpus: "1.0"
-          memory: 1G
+        limits: *limits-1g
     networks:
       blackbox:
         ipv4_address: 172.99.66.2
+      osc_internal:
 
   # ---------------------------------------------------------------------------
-  # osc_save — one-shot bootstrap bucket (minio/mc)
-  # Membuat bucket default secara idempotent setelah osc_file healthy:
+  # rustfs-init — one-shot bootstrap bucket (idempotent)
+  # Membuat bucket default setelah rustfs healthy:
   #   osc-assets-files / osc-pam-recordings / osc-config-backups
   # (RUSTFS_BUCKET lama tetap ada di volume; tidak dihapus — aman untuk
   #  konfigurasi existing. Exit 0 → container berhenti, tidak di-restart.)
   # ---------------------------------------------------------------------------
-  osc_save:
+  rustfs-init:
     image: minio/mc:latest
-    container_name: osc_save
-    logging:
-      driver: json-file
-      options:
-        max-size: "5m"
-        max-file: "2"
+    container_name: rustfs-init
+    logging: *default-logging
     security_opt:
       - "no-new-privileges:true"
+    read_only: true
+    tmpfs:
+      - /root
+      - /tmp
     environment:
-      - RUSTFS_ENDPOINT=http://osc_file:9000
+      - RUSTFS_ENDPOINT=http://rustfs:9000
       - RUSTFS_ACCESS_KEY=${RUSTFS_ACCESS_KEY:-oscadmin}
       - RUSTFS_SECRET_KEY=${RUSTFS_SECRET_KEY:-password_osc_rustfs}
       - RUSTFS_BUCKET_FILES=${RUSTFS_BUCKET_FILES:-osc-assets-files}
@@ -138,7 +185,7 @@ services:
         mc mb --ignore-existing "local/$${RUSTFS_BUCKET_PAM}" &&
         mc mb --ignore-existing "local/$${RUSTFS_BUCKET_BACKUPS}"
     depends_on:
-      osc_file:
+      rustfs:
         condition: service_healthy
     restart: "no"
     deploy:
@@ -147,13 +194,52 @@ services:
           cpus: "0.25"
           memory: 128M
     networks:
-      blackbox:
-        ipv4_address: 172.99.66.5
+      osc_internal:
 
   # ---------------------------------------------------------------------------
-  # Rust Clean Architecture REST API
-  # Dockerfile: multi-stage cargo-chef -> bookworm-slim, non-root UID 10001
-  # (dibuat oleh fase ai-rest; lihat osc_docs/rest/api-core-foundation.md).
+  # prisma-migrate — one-shot runner Prisma CLI (osc_base/Dockerfile)
+  # npx prisma migrate deploy && npx prisma db seed  (keduanya idempotent)
+  # osc_rest menunggu service ini sukses (service_completed_successfully).
+  # ---------------------------------------------------------------------------
+  prisma-migrate:
+    build:
+      context: ./osc_base
+      dockerfile: Dockerfile
+    image: omnisight/osc_base:latest
+    container_name: prisma-migrate
+    logging: *default-logging
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    environment:
+      - TZ=${TZ:-Asia/Jakarta}
+      - DATABASE_URL=postgresql://${PG_USER:-dbe}:${PG_PASS:-password_osc_dbe}@postgres:5432/${PG_DATA:-osc}?sslmode=disable
+      # Seed bootstrap idempotent (upsert by username/email; tidak menimpa
+      # password yang sudah diubah — lihat osc_base/prisma/seed.ts)
+      - SUPERADMIN_USERNAME=${BOOTSTRAP_ADMIN_USERNAME:-superadmin}
+      - SUPERADMIN_EMAIL=${BOOTSTRAP_ADMIN_EMAIL:-superadmin@example.local}
+      - SUPERADMIN_INITIAL_PASSWORD=${BOOTSTRAP_ADMIN_PASSWORD:-change_me_on_first_login}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+    networks:
+      osc_internal:
+
+  # ---------------------------------------------------------------------------
+  # osc_rest — Rust Clean Architecture REST API (internal only)
+  # Distroless cc-debian12 non-root (UID 65532); healthcheck via busybox
+  # statis yang dibundel di image (distroless tidak punya shell/curl).
+  # osc_egress: hanya untuk klien HRIS ASMX (anti-SSRF via HRIS_ALLOWED_HOSTS).
   # ---------------------------------------------------------------------------
   osc_rest:
     build:
@@ -161,64 +247,75 @@ services:
       dockerfile: Dockerfile
     image: omnisight/osc_rest:latest
     container_name: osc_rest
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
+    logging: *default-logging
     security_opt:
       - "no-new-privileges:true"
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
     environment:
       - TZ=${TZ:-Asia/Jakarta}
       - REST_HOST=0.0.0.0
-      - REST_PORT=${REST_PORT:-8000}
-      - RUST_LOG=info
-      - DATABASE_URL=postgresql://${PG_USER:-dbe}:${PG_PASS:-password_osc_dbe}@osc_base:5432/${PG_DATA:-osc}?sslmode=disable
-      - RUSTFS_ENDPOINT=http://osc_file:9000
+      - REST_PORT=8000
+      - RUST_LOG=${RUST_LOG:-info}
+      - DATABASE_URL=postgresql://${PG_USER:-dbe}:${PG_PASS:-password_osc_dbe}@postgres:5432/${PG_DATA:-osc}?sslmode=disable
+      - RUSTFS_ENDPOINT=http://rustfs:9000
       - RUSTFS_ACCESS_KEY=${RUSTFS_ACCESS_KEY:-oscadmin}
       - RUSTFS_SECRET_KEY=${RUSTFS_SECRET_KEY:-password_osc_rustfs}
       - RUSTFS_BUCKET=${RUSTFS_BUCKET:-osc}
-      # Bucket per-fungsi (dibuat otomatis oleh osc_save)
+      # Bucket per-fungsi (dibuat otomatis oleh rustfs-init)
       - RUSTFS_BUCKET_FILES=${RUSTFS_BUCKET_FILES:-osc-assets-files}
       - RUSTFS_BUCKET_PAM=${RUSTFS_BUCKET_PAM:-osc-pam-recordings}
       - RUSTFS_BUCKET_BACKUPS=${RUSTFS_BUCKET_BACKUPS:-osc-config-backups}
-      # Keamanan & kriptografi (lihat .env.example — ganti semua default di staging/prod)
-      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:-change_me_jwt_access_secret_32bytes}
-      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-change_me_jwt_refresh_secret_32bytes}
-      - APP_MASTER_ENCRYPTION_KEY=${APP_MASTER_ENCRYPTION_KEY:-change_me_master_kek_32bytes}
-      - AGENT_ENROLLMENT_SECRET=${AGENT_ENROLLMENT_SECRET:-change_me_agent_enrollment_secret}
+      # Keamanan & kriptografi (lihat .env.example — ganti semua default di prod)
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:?set JWT_ACCESS_SECRET di .env (openssl rand -hex 32)}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:?set JWT_REFRESH_SECRET di .env (openssl rand -hex 32)}
+      - APP_MASTER_ENCRYPTION_KEY=${APP_MASTER_ENCRYPTION_KEY:?set APP_MASTER_ENCRYPTION_KEY di .env (32 byte)}
+      - AGENT_ENROLLMENT_SECRET=${AGENT_ENROLLMENT_SECRET:?set AGENT_ENROLLMENT_SECRET di .env}
       - HRIS_ALLOWED_HOSTS=${HRIS_ALLOWED_HOSTS:-hris.internal.example.local}
       # Bootstrap seeder Day-2 (reengineering.md bab 5.8)
       - BOOTSTRAP_ADMIN_USERNAME=${BOOTSTRAP_ADMIN_USERNAME:-superadmin}
       - BOOTSTRAP_ADMIN_EMAIL=${BOOTSTRAP_ADMIN_EMAIL:-superadmin@example.local}
       - BOOTSTRAP_ADMIN_PASSWORD=${BOOTSTRAP_ADMIN_PASSWORD:-change_me_on_first_login}
+      # Retention purge (executor: flow_worker_agent — allowlist agent_id)
+      - RETENTION_PURGE_AGENT_IDS=${RETENTION_PURGE_AGENT_IDS:-}
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:${REST_PORT:-8000}/api/v1/health || exit 1"]
+      test:
+        [
+          "CMD",
+          "/bin/busybox",
+          "wget",
+          "-qO-",
+          "http://127.0.0.1:8000/api/v1/health",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 20s
     depends_on:
-      osc_base:
+      postgres:
         condition: service_healthy
-      osc_file:
+      rustfs:
         condition: service_healthy
+      prisma-migrate:
+        condition: service_completed_successfully
+      rustfs-init:
+        condition: service_completed_successfully
     restart: unless-stopped
     deploy:
       resources:
-        limits:
-          cpus: "1.0"
-          memory: 512M
+        limits: *limits-1g
     networks:
-      blackbox:
-        ipv4_address: 172.99.66.3
+      osc_internal:
+      osc_egress:
 
   # ---------------------------------------------------------------------------
-  # Next.js UI + BFF Proxy
-  # BFF wajib memanggil Rust API server-to-server via RUST_API_INTERNAL_URL;
-  # browser tidak pernah berkomunikasi langsung dengan osc_rest.
-  # Dockerfile: multi-stage node:22-alpine standalone, non-root UID 1001
-  # (dibuat oleh fase ai-site; lihat osc_docs/site/proxy-and-architecture.md).
+  # osc_site — Next.js UI + BFF Proxy (SATU-SATUNYA port publik stack)
+  # BFF memanggil osc_rest server-to-server; browser tidak pernah melihat
+  # osc_rest. WebSocket PAM (/gateway/ws) difront oleh reverse proxy edge —
+  # lihat panduan reverse proxy di osc_docs/production.md.
   # ---------------------------------------------------------------------------
   osc_site:
     build:
@@ -226,23 +323,29 @@ services:
       dockerfile: Dockerfile
     image: omnisight/osc_site:latest
     container_name: osc_site
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
+    logging: *default-logging
     security_opt:
       - "no-new-privileges:true"
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/.next/cache
     environment:
       - TZ=${TZ:-Asia/Jakarta}
       - NODE_ENV=production
       - HOSTNAME=0.0.0.0
-      - PORT=${SITE_PORT:-3000}
-      - RUST_API_INTERNAL_URL=http://osc_rest:${REST_PORT:-8000}
+      - PORT=3000
+      - RUST_API_INTERNAL_URL=http://osc_rest:8000
     ports:
       - "${SITE_PORT:-3000}:3000"
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${SITE_PORT:-3000}/api/health >/dev/null 2>&1 || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://127.0.0.1:3000/api/health >/dev/null 2>&1 || exit 1",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -250,14 +353,155 @@ services:
     depends_on:
       osc_rest:
         condition: service_healthy
-      osc_file:
+      rustfs:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits: *limits-1g
+    networks:
+      osc_internal:
+      osc_edge:
+
+  # ---------------------------------------------------------------------------
+  # pam_bastion_gateway — WebSocket-to-SSH bastion proxy (distroless static)
+  # State enrollment + known_hosts (TOFU) + rekaman sesi di named volume.
+  # Port 8090 di-bind LOOPBACK SAJA: tujuannya untuk reverse proxy di host
+  # (nginx/Traefik) yang meneruskan /gateway/ws dari browser — tidak terekspos
+  # ke LAN. Bila memakai proxy edge container, hapus blok ports ini.
+  # osc_egress: gateway harus bisa dial SSH target di jaringan intranet.
+  # ---------------------------------------------------------------------------
+  pam_bastion_gateway:
+    build:
+      context: ./osc_auto/pam_bastion_gateway
+      dockerfile: Dockerfile
+    image: omnisight/pam_bastion_gateway:latest
+    container_name: pam_bastion_gateway
+    logging: *default-logging
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    environment:
+      - RUST_API_BASE_URL=http://osc_rest:8000
+      - PAM_GATEWAY_LISTEN=:8090
+      - PAM_GATEWAY_WS_PATH=${PAM_GATEWAY_WS_PATH:-/gateway/ws}
+      # Deny-by-default: WAJIB diisi origin publik osc_site (CSV), mis.
+      # https://omnisight.corp.local — anti cross-site WebSocket hijacking.
+      - PAM_GATEWAY_ALLOWED_ORIGINS=${PAM_GATEWAY_ALLOWED_ORIGINS:-}
+      - PAM_GATEWAY_MAX_SESSIONS=${PAM_GATEWAY_MAX_SESSIONS:-20}
+      - PAM_GATEWAY_STATE_PATH=/var/lib/pam_bastion_gateway/state.json
+      - PAM_GATEWAY_KNOWN_HOSTS=/var/lib/pam_bastion_gateway/known_hosts
+      - PAM_GATEWAY_RECORDING_DIR=/var/lib/pam_bastion_gateway/recordings
+      - PAM_GATEWAY_STATE_KEY_HEX=${PAM_GATEWAY_STATE_KEY_HEX:-}
+      - PAM_GATEWAY_LOG_LEVEL=${PAM_GATEWAY_LOG_LEVEL:-info}
+    ports:
+      # Loopback only — untuk reverse proxy host; bukan akses publik langsung.
+      - "127.0.0.1:${PAM_GATEWAY_PUBLIC_PORT:-8090}:8090"
+    volumes:
+      - pam_gateway_state:/var/lib/pam_bastion_gateway
+    healthcheck:
+      # Distroless tanpa shell → probe via busybox; status HTTP apa pun
+      # (404/400 pada path bukan-upgrade) tetap membuktikan listener hidup.
+      test:
+        [
+          "CMD",
+          "/bin/busybox",
+          "sh",
+          "-c",
+          "/bin/busybox wget -q -S -O /dev/null http://127.0.0.1:8090/ 2>&1 | /bin/busybox grep -qE 'HTTP/1.[0-9]' || exit 1",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      osc_rest:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits: *limits-1g
+    networks:
+      osc_internal:
+      osc_egress:
+
+  # ---------------------------------------------------------------------------
+  # flow_worker_agent — notifikasi SMTP/Telegram/Webhook + retention purge
+  # (distroless static non-root). Listener HMAC :8095 menerima enqueue dari
+  # osc_rest; dispatcher butuh outbound internet → osc_egress.
+  # Enrollment one-time (wajib sebelum agent berfungsi penuh):
+  #   docker compose run --rm flow_worker_agent --enroll "$AGENT_ENROLLMENT_TOKEN"
+  # ---------------------------------------------------------------------------
+  flow_worker_agent:
+    build:
+      context: ./osc_auto/flow_worker_agent
+      dockerfile: Dockerfile
+    image: omnisight/flow_worker_agent:latest
+    container_name: flow_worker_agent
+    logging: *default-logging
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    environment:
+      - RUST_API_BASE_URL=http://osc_rest:8000
+      - FLOW_WORKER_LISTEN_ENABLED=${FLOW_WORKER_LISTEN_ENABLED:-true}
+      - FLOW_WORKER_LISTEN=:8095
+      # Deny-by-default: agent menolak start saat listener aktif tanpa secret.
+      # Generate: openssl rand -hex 32 (sama dengan yang dipakai produsen).
+      - FLOW_WORKER_LISTEN_SECRET_HEX=${FLOW_WORKER_LISTEN_SECRET_HEX:-}
+      - FLOW_WORKER_WORKERS=${FLOW_WORKER_WORKERS:-4}
+      - FLOW_WORKER_MAX_ATTEMPTS=${FLOW_WORKER_MAX_ATTEMPTS:-5}
+      - FLOW_WORKER_DISPATCH_INTERVAL=${FLOW_WORKER_DISPATCH_INTERVAL:-1s}
+      - FLOW_WORKER_QUEUE_PATH=/var/lib/flow_worker_agent/queue.json
+      - FLOW_WORKER_QUEUE_KEY_HEX=${FLOW_WORKER_QUEUE_KEY_HEX:-}
+      - FLOW_WORKER_RETENTION_ENABLED=${FLOW_WORKER_RETENTION_ENABLED:-true}
+      - FLOW_WORKER_RETENTION_INTERVAL=${FLOW_WORKER_RETENTION_INTERVAL:-24h}
+      - FLOW_WORKER_RETENTION_DRY_RUN=${FLOW_WORKER_RETENTION_DRY_RUN:-false}
+      - FLOW_WORKER_STATE_PATH=/var/lib/flow_worker_agent/state.json
+      - FLOW_WORKER_STATE_KEY_HEX=${FLOW_WORKER_STATE_KEY_HEX:-}
+      - FLOW_WORKER_LOG_LEVEL=${FLOW_WORKER_LOG_LEVEL:-info}
+    volumes:
+      - flow_worker_state:/var/lib/flow_worker_agent
+    healthcheck:
+      # Probe listener HTTP (status apa pun = hidup; koneksi ditolak = gagal)
+      test:
+        [
+          "CMD",
+          "/bin/busybox",
+          "sh",
+          "-c",
+          "/bin/busybox wget -q -S -O /dev/null http://127.0.0.1:8095/ 2>&1 | /bin/busybox grep -qE 'HTTP/1.[0-9]' || exit 1",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      osc_rest:
         condition: service_healthy
     restart: unless-stopped
     deploy:
       resources:
         limits:
-          cpus: "1.0"
-          memory: 512M
+          cpus: "0.5"
+          memory: 256M
     networks:
-      blackbox:
-        ipv4_address: 172.99.66.4
+      osc_internal:
+      osc_egress:
+# =============================================================================
+# CATATAN OPERASIONAL (detail lengkap: osc_docs/production.md):
+# 1. Semua default kredensial di atas adalah placeholder development —
+#    produksi WAJIB mengisi .env dari .env.example dengan secret acak.
+# 2. Enrollment agent bersifat one-time; state persisten di named volume,
+#    jangan pernah `docker compose down -v` di produksi tanpa re-enroll.
+# 3. `docker compose ps` harus menampilkan STATUS healthy/Exited(0) untuk
+#    one-shot job (rustfs-init, prisma-migrate) sebelum dianggap siap.
+# =============================================================================

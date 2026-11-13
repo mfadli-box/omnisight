@@ -1,4 +1,4 @@
-target
-.git
+# osc_rest — build context
+target/
 .env
-*.env
+*.md

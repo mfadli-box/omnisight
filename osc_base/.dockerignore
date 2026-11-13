@@ -1,0 +1,4 @@
+# osc_base — build context (Prisma runner)
+node_modules/
+.env
+*.md

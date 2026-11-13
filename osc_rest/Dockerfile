@@ -1,12 +1,16 @@
 # syntax=docker/dockerfile:1
 # =============================================================================
-# osc_rest — multi-stage Dockerfile (standar ai-main):
+# osc_rest — multi-stage Dockerfile produksi (standar ai-main):
 #   builder : cargo-chef (dependency caching) di rust 1.99.1 slim-bookworm
 #             (PINNED — tag melayang `latest-rust-1` kini berbasis trixie
 #             yang glibc-nya lebih baru dari runtime bookworm → binary
 #             gagal jalan: "GLIBC_2.38 not found")
-#   runtime : debian:bookworm-slim + ca-certificates + curl (untuk healthcheck)
-#             berjalan sebagai non-root UID 10001
+#   runtime : gcr.io/distroless/cc-debian12:nonroot (non-root UID 65532)
+#             + /bin/busybox statis (dari busybox:stable-musl) HANYA sebagai
+#             probe healthcheck wget — distroless tidak punya shell/curl.
+#             CA certificates sudah dibundel di dalam distroless.
+# Catatan    : image runtime TIDAK punya shell → `docker exec` interaktif
+#             tidak tersedia; debugging via `docker logs` (JSON logging).
 # =============================================================================
 
 FROM lukemathwalker/cargo-chef:latest-rust-1.99.1-slim-bookworm AS chef
@@ -24,15 +28,13 @@ RUN cargo chef cook --release --recipe-path recipe.json
 COPY . .
 RUN cargo build --release --bin osc_rest
 
-FROM debian:bookworm-slim AS runtime
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && useradd --system --uid 10001 --no-create-home osc
-
+FROM gcr.io/distroless/cc-debian12:nonroot AS runtime
 COPY --from=builder /app/target/release/osc_rest /usr/local/bin/osc_rest
+# Busybox statis (musl) untuk probe healthcheck compose (wget/nc) —
+# tidak ada entrypoint-nya, tidak bisa dipakai sebagai shell.
+COPY --from=busybox:stable-musl /bin/busybox /bin/busybox
 
-USER osc
+USER nonroot:nonroot
 ENV REST_HOST=0.0.0.0 \
     REST_PORT=8000 \
     RUST_LOG=info

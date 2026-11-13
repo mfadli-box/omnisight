@@ -1,0 +1,7 @@
+# flow_worker_agent — build context
+bin/
+deploy/
+configs/*.env
+!configs/*.env.example
+.env
+*.md

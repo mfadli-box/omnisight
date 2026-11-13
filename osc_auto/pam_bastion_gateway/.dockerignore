@@ -1,0 +1,8 @@
+# pam_bastion_gateway — build context
+bin/
+deploy/
+delivery/
+configs/*.env
+!configs/*.env.example
+.env
+*.md
