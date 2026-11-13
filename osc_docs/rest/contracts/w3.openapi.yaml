@@ -1,0 +1,913 @@
+openapi: 3.1.0
+info:
+  title: omnisight osc_rest — Wave 3 (SecOps Ingest, PAM Vault & Mandatory MFA Session, Notification Channel, Retention)
+  version: 1.0.0-w3
+  description: |
+    Kontrak OpenAPI 3.1 untuk Wave 3 `osc_rest` (Hari 16 / SESI 4.1).
+    Autentikasi agent: HMAC-SHA256 per-request
+    (X-Agent-Id + X-Agent-Timestamp ±30s + X-Agent-Signature atas
+    "{ts}\n{METHOD}\n{path}\n{sha256_hex(body)}").
+    Autentikasi user: Bearer JWT (sesi DB-backed, active_company_id dari sesi).
+    PAM authorize MENOLAK akses dengan 403 MFA_REQUIRED_FOR_PAM bila
+    user.mfa_enabled == false, dan 403 PAM_STEP_UP_REQUIRED bila verifikasi
+    MFA terakhir > window policy (default 15 menit) tanpa OTP baru.
+    Seluruh endpoint meng-echo X-Correlation-ID.
+    Envelope error: {status:"error", error:{code,message}, correlation_id}.
+    Konvensi penamaan field: snake_case. Dokumentasi lengkap: osc_docs/rest/api-w3.md.
+servers:
+  - url: /api/v1
+tags:
+  - name: secops
+  - name: pam
+  - name: notifications
+  - name: retention
+
+paths:
+  # ====================================================================
+  # Security Telemetry Ingest (Agent HMAC)
+  # ====================================================================
+  /agents/security/ingest:
+    post:
+      tags: [secops]
+      summary: Ingest batch FIM dual-event, log anomali keamanan, matching CVE, hasil compliance/SCA
+      security: [{ AgentHmac: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/AgentTimestamp'
+        - $ref: '#/components/parameters/AgentSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SecurityIngestPayload' }
+      responses:
+        '202':
+          description: Batch diterima
+          headers:
+            X-Correlation-ID: { $ref: '#/components/headers/CorrelationId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SecurityIngestResult' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+
+  /secops/overview:
+    get:
+      tags: [secops]
+      summary: Ringkasan SOC tenant aktif (hitungan FIM/alert/CVE + FIM terbaru)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: OK
+          headers:
+            X-Correlation-ID: { $ref: '#/components/headers/CorrelationId' }
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: success }
+                  data:
+                    type: object
+                    properties:
+                      counts: { $ref: '#/components/schemas/SecOpsCounts' }
+                      fim_recent:
+                        type: array
+                        maxItems: 50
+                        items: { $ref: '#/components/schemas/FimEventView' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  # ====================================================================
+  # PAM Vault Accounts (JWT)
+  # ====================================================================
+  /pam/accounts:
+    get:
+      tags: [pam]
+      summary: Daftar akun vault tenant (tanpa secret)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 100 }
+      responses:
+        '200':
+          description: OK
+          headers:
+            X-Correlation-ID: { $ref: '#/components/headers/CorrelationId' }
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: success }
+                  data:
+                    type: object
+                    properties:
+                      accounts:
+                        type: array
+                        items: { $ref: '#/components/schemas/PamAccountView' }
+                      count: { type: integer }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [pam]
+      summary: Tambah akun vault (secret dienkripsi Envelope AES-256-GCM)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PamAccountCreate' }
+      responses:
+        '201':
+          description: Akun dibuat (secret tidak pernah dikembalikan)
+          headers:
+            X-Correlation-ID: { $ref: '#/components/headers/CorrelationId' }
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: success }
+                  data: { $ref: '#/components/schemas/PamAccountView' }
+        '400': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+
+  /pam/accounts/{id}:
+    get:
+      tags: [pam]
+      summary: Detail akun vault (tanpa secret)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: success }
+                  data: { $ref: '#/components/schemas/PamAccountView' }
+        '404': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [pam]
+      summary: Update akun (label/policy/port/aktif) + rotasi secret opsional
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PamAccountPatch' }
+      responses:
+        '200':
+          description: Diupdate
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: success }
+                  data: { $ref: '#/components/schemas/PamAccountView' }
+        '400': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [pam]
+      summary: Soft delete akun vault (audit tetap utuh)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Dihapus (soft)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: success }
+                  data:
+                    type: object
+                    properties: { deleted: { type: boolean, const: true } }
+        '404': { $ref: '#/components/responses/Error' }
+
+  # ====================================================================
+  # PAM Session Authorization (Mandatory MFA + Step-Up)
+  # ====================================================================
+  /pam/sessions/authorize:
+    post:
+      tags: [pam]
+      summary: >
+        Otorisasi sesi bastion — WAJIB MFA (403 MFA_REQUIRED_FOR_PAM bila
+        user.mfa_enabled == false) + step-up OTP bila verifikasi terakhir
+        > window policy (default 15 menit). Mengembalikan ephemeral WS ticket
+        (sekali tampil, TTL pendek) untuk pam_bastion_gateway.
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PamAuthorizeRequest' }
+      responses:
+        '201':
+          description: Sesi AUTHORIZED + ticket
+          headers:
+            X-Correlation-ID: { $ref: '#/components/headers/CorrelationId' }
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: success }
+                  data: { $ref: '#/components/schemas/PamAuthorizeResult' }
+        '403':
+          description: >
+            MFA_REQUIRED_FOR_PAM (mfa_enabled false) / PAM_STEP_UP_REQUIRED
+            (verifikasi terakhir > window, kirim otp) / PAM_POLICY_DENIED
+            (policy NULL/inaktif, CIDR, approval, ticket).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '401': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+
+  /pam/sessions:
+    get:
+      tags: [pam]
+      summary: Riwayat sesi PAM tenant (audit trail append-only)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 100 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: success }
+                  data:
+                    type: object
+                    properties:
+                      sessions:
+                        type: array
+                        items: { $ref: '#/components/schemas/PamSessionView' }
+                      count: { type: integer }
+        '401': { $ref: '#/components/responses/Error' }
+
+  /pam/sessions/{id}:
+    get:
+      tags: [pam]
+      summary: Detail satu sesi PAM (anti IDOR)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: success }
+                  data: { $ref: '#/components/schemas/PamSessionView' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /pam/sessions/{id}/recording:
+    post:
+      tags: [pam]
+      summary: >
+        Unggah rekaman terminal sesi (immutable) ke bucket privat RustFS
+        RUSTFS_BUCKET_PAM — body biner raw ber-HMAC, DB hanya pointer.
+      security: [{ AgentHmac: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/AgentTimestamp'
+        - $ref: '#/components/parameters/AgentSignature'
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [CAST_GZ, ASCIINEMA, MP4]
+            default: CAST_GZ
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: { type: string, format: binary }
+      responses:
+        '201':
+          description: Rekaman tersimpan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: success }
+                  data: { $ref: '#/components/schemas/PamRecordingResult' }
+        '400': { $ref: '#/components/responses/Error' }
+        '413': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+
+  /agents/pam/ticket/redeem:
+    post:
+      tags: [pam]
+      summary: >
+        pam_bastion_gateway menukar ticket sekali pakai dengan kredensial
+        target (didekripsi sekali, jalur internal) + mark sesi ACTIVE.
+      security: [{ AgentHmac: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/AgentTimestamp'
+        - $ref: '#/components/parameters/AgentSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [session_id, ticket]
+              properties:
+                session_id: { type: string, format: uuid }
+                ticket: { type: string, maxLength: 128 }
+      responses:
+        '200':
+          description: Ticket ditebus → kredensial target
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: success }
+                  data: { $ref: '#/components/schemas/PamRedeemResult' }
+        '401': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  # ====================================================================
+  # Notification Channels (JWT) — dispatcher flow_worker_agent
+  # ====================================================================
+  /notifications/channels:
+    get:
+      tags: [notifications]
+      summary: Daftar channel (config ter-mask)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: success }
+                  data:
+                    type: object
+                    properties:
+                      channels:
+                        type: array
+                        items: { $ref: '#/components/schemas/NotificationChannelView' }
+                      count: { type: integer }
+        '401': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [notifications]
+      summary: Buat channel SMTP/Telegram/Webhook (config terenkripsi)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NotificationChannelCreate' }
+      responses:
+        '201':
+          description: Channel dibuat
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: success }
+                  data:
+                    type: object
+                    properties:
+                      id: { type: string, format: uuid }
+                      config_summary: { $ref: '#/components/schemas/ChannelConfigSummary' }
+        '400': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+
+  /notifications/channels/{id}:
+    get:
+      tags: [notifications]
+      summary: Detail channel (config ter-mask)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: success }
+                  data: { $ref: '#/components/schemas/NotificationChannelView' }
+        '404': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [notifications]
+      summary: Update channel (config/event_filter/is_active)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                config: { $ref: '#/components/schemas/ChannelConfig' }
+                event_filter:
+                  type: array
+                  maxItems: 32
+                  items: { type: string, maxLength: 100 }
+                is_active: { type: boolean }
+      responses:
+        '200':
+          description: Diupdate
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: success }
+                  data: { $ref: '#/components/schemas/NotificationChannelView' }
+        '400': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [notifications]
+      summary: Soft delete channel
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Dihapus (soft)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: success }
+                  data:
+                    type: object
+                    properties: { deleted: { type: boolean, const: true } }
+        '404': { $ref: '#/components/responses/Error' }
+
+  # ====================================================================
+  # Retention Purge (internal — flow_worker_agent)
+  # ====================================================================
+  /agents/retention/purge:
+    post:
+      tags: [retention]
+      summary: >
+        Purge data retensi (metrik tier-1m/10m, heartbeat, FIM/alert/compliance)
+        — batch + throttling; hanya agent pada RETENTION_PURGE_AGENT_IDS (deny-by-default).
+      security: [{ AgentHmac: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/AgentTimestamp'
+        - $ref: '#/components/parameters/AgentSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dry_run: { type: boolean, default: false }
+      responses:
+        '202':
+          description: Purge dijalankan (hitungan per tabel)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: accepted }
+                  data:
+                    type: object
+                    properties:
+                      dry_run: { type: boolean }
+                      purged:
+                        type: object
+                        additionalProperties: { type: integer }
+        '403': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    AgentHmac:
+      type: apiKey
+      in: header
+      name: X-Agent-Signature
+      description: >
+        HMAC-SHA256 hex atas "{ts}\n{METHOD}\n{path}\n{sha256_hex(body)}"
+        dengan header X-Agent-Id + X-Agent-Timestamp (±30 s).
+
+  parameters:
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: false
+      schema: { type: string, format: uuid }
+      description: Di-echo balik; dibuat UUIDv7 bila tidak ada.
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    AgentId:
+      name: X-Agent-Id
+      in: header
+      required: true
+      schema: { type: string, format: uuid }
+    AgentTimestamp:
+      name: X-Agent-Timestamp
+      in: header
+      required: true
+      schema: { type: integer }
+      description: Unix detik — jendela replay ±30 detik.
+    AgentSignature:
+      name: X-Agent-Signature
+      in: header
+      required: true
+      schema: { type: string }
+      description: Hex HMAC-SHA256.
+
+  headers:
+    CorrelationId:
+      description: X-Correlation-ID respons
+      schema: { type: string, format: uuid }
+
+  responses:
+    Error:
+      description: Envelope error (kode sesuai trigger di deskripsi endpoint)
+      headers:
+        X-Correlation-ID: { $ref: '#/components/headers/CorrelationId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+  schemas:
+    ErrorEnvelope:
+      type: object
+      properties:
+        status: { type: string, const: error }
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              enum:
+                - VALIDATION_ERROR
+                - NOT_FOUND
+                - UNAUTHORIZED
+                - FORBIDDEN
+                - MFA_REQUIRED_FOR_PAM
+                - PAM_STEP_UP_REQUIRED
+                - PAM_POLICY_DENIED
+                - CONFLICT
+                - RATE_LIMITED
+                - PAYLOAD_TOO_LARGE
+                - INTERNAL_ERROR
+            message: { type: string }
+
+    SecurityIngestPayload:
+      type: object
+      properties:
+        fim_events:
+          type: array
+          maxItems: 500
+          items: { $ref: '#/components/schemas/FimEventIn' }
+        security_alerts:
+          type: array
+          maxItems: 200
+          items: { $ref: '#/components/schemas/SecurityAlertIn' }
+        vulnerabilities:
+          type: array
+          maxItems: 500
+          items: { $ref: '#/components/schemas/VulnerabilityIn' }
+        compliance_results:
+          type: array
+          maxItems: 500
+          items: { $ref: '#/components/schemas/ComplianceIn' }
+
+    FimEventIn:
+      type: object
+      required: [path, event_type]
+      properties:
+        asset_id: { type: string, format: uuid, description: Opsional; wajib = agent pelapor }
+        path: { type: string, minLength: 1, maxLength: 1000 }
+        event_type: { type: string, enum: [CREATED, MODIFIED, DELETED, ATTRIBUTE_CHANGED] }
+        detection_source: { type: string, enum: [REALTIME, SCHEDULED], default: SCHEDULED }
+        baseline_version: { type: integer, minimum: 1, default: 1 }
+        old_checksum: { type: string, pattern: '^[0-9a-fA-F]{64}$' }
+        new_checksum: { type: string, pattern: '^[0-9a-fA-F]{64}$' }
+        old_attrs: { type: object }
+        new_attrs: { type: object }
+        size_bytes: { type: integer, format: int64 }
+        detected_at: { type: string, format: date-time }
+
+    SecurityAlertIn:
+      type: object
+      required: [rule_name]
+      properties:
+        asset_id: { type: string, format: uuid }
+        rule_name: { type: string, minLength: 1, maxLength: 200 }
+        category: { type: string, maxLength: 100 }
+        severity: { type: string, enum: [LOW, MEDIUM, HIGH, CRITICAL], default: MEDIUM }
+        mitre_tactic: { type: string, maxLength: 100 }
+        mitre_technique: { type: string, maxLength: 100 }
+        source_ip: { type: string, format: ipv4 }
+        payload: { type: object }
+        detected_at: { type: string, format: date-time }
+
+    VulnerabilityIn:
+      type: object
+      required: [cve_id, title]
+      properties:
+        asset_id: { type: string, format: uuid }
+        cve_id:
+          type: string
+          pattern: '^CVE-\d{4}-\d{1,7}$'
+          maxLength: 20
+        title: { type: string, minLength: 1, maxLength: 300 }
+        severity: { type: string, enum: [LOW, MEDIUM, HIGH, CRITICAL], default: MEDIUM }
+        cvss_score: { type: number, minimum: 0, maximum: 10 }
+        version_installed: { type: string, maxLength: 150 }
+        version_fixed: { type: string, maxLength: 150 }
+        source_feed: { type: string, maxLength: 100 }
+        detected_at: { type: string, format: date-time }
+
+    ComplianceIn:
+      type: object
+      required: [benchmark, check_id, title]
+      properties:
+        asset_id: { type: string, format: uuid }
+        benchmark: { type: string, minLength: 1, maxLength: 100 }
+        check_id: { type: string, minLength: 1, maxLength: 50 }
+        title: { type: string, minLength: 1, maxLength: 300 }
+        status: { type: string, enum: [PASS, FAIL, ERROR, SKIPPED], default: FAIL }
+        severity: { type: string, enum: [LOW, MEDIUM, HIGH, CRITICAL], default: MEDIUM }
+        evidence: { type: object }
+        checked_at: { type: string, format: date-time }
+
+    SecurityIngestResult:
+      type: object
+      properties:
+        status: { type: string, const: accepted }
+        data:
+          type: object
+          properties:
+            fim_events: { type: integer }
+            security_alerts: { type: integer }
+            vulnerabilities: { type: integer }
+            compliance_results: { type: integer }
+
+    SecOpsCounts:
+      type: object
+      properties:
+        fim_unresolved: { type: integer }
+        alerts_unacknowledged: { type: integer }
+        vulnerabilities_open: { type: integer }
+
+    FimEventView:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        asset_id: { type: string, format: uuid }
+        path: { type: string }
+        event_type: { type: string }
+        detection_source: { type: string }
+        baseline_version: { type: integer }
+        old_checksum: { type: [string, 'null'] }
+        new_checksum: { type: [string, 'null'] }
+        size_bytes: { type: [integer, 'null'], format: int64 }
+        detected_at: { type: string, format: date-time }
+        is_resolved: { type: boolean }
+
+    PamAccountCreate:
+      type: object
+      required: [asset_id, label, account_type, username, secret]
+      properties:
+        asset_id: { type: string, format: uuid }
+        policy_id: { type: [string, 'null'], format: uuid }
+        label: { type: string, minLength: 1, maxLength: 150 }
+        account_type: { type: string, enum: [SSH_PASSWORD, SSH_KEY, DATABASE, HTTP_ENDPOINT] }
+        username: { type: string, minLength: 1, maxLength: 150 }
+        secret: { type: string, minLength: 1, maxLength: 32768, description: Dienkripsi Envelope AES-256-GCM — tidak pernah dikembalikan }
+        port: { type: integer, minimum: 1, maximum: 65535, default: 22 }
+
+    PamAccountPatch:
+      type: object
+      properties:
+        label: { type: string, maxLength: 150 }
+        policy_id:
+          oneOf:
+            - type: 'null'
+            - type: string
+              format: uuid
+        port: { type: integer, minimum: 1, maximum: 65535 }
+        is_active: { type: boolean }
+        secret: { type: string, maxLength: 32768, description: Rotasi — re-encrypt }
+
+    PamAccountView:
+      type: object
+      description: Tanpa secret (tidak pernah dikembalikan).
+      properties:
+        id: { type: string, format: uuid }
+        asset_id: { type: string, format: uuid }
+        asset_name: { type: string }
+        policy_id: { type: [string, 'null'], format: uuid }
+        policy_name: { type: [string, 'null'] }
+        label: { type: string }
+        account_type: { type: string }
+        username: { type: string }
+        port: { type: integer }
+        is_active: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    PamAuthorizeRequest:
+      type: object
+      required: [account_id]
+      properties:
+        account_id: { type: string, format: uuid }
+        otp: { type: string, description: Wajib bila step-up (verifikasi terakhir > window) }
+        reason: { type: string, maxLength: 300 }
+        duration_minutes: { type: integer, minimum: 1, description: Di-clamp ke policy.max_session_minutes (cap 480) }
+
+    PamAuthorizeResult:
+      type: object
+      properties:
+        session_id: { type: string, format: uuid }
+        gateway: { type: string, const: pam_bastion_gateway }
+        ticket: { type: string, description: Ephemeral — sekali tampil; DB hanya SHA-256 }
+        ticket_ttl_seconds: { type: integer, maximum: 600 }
+        duration_minutes: { type: integer }
+        account:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            label: { type: string }
+            username: { type: string }
+            account_type: { type: string }
+            asset_id: { type: string, format: uuid }
+            port: { type: integer }
+        policy:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+            mfa_required: { type: boolean, const: true }
+            command_filter: { type: [object, 'null'] }
+
+    PamSessionView:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        account_id: { type: string, format: uuid }
+        account_label: { type: string }
+        policy_id: { type: [string, 'null'], format: uuid }
+        requested_by_user_id: { type: [string, 'null'], format: uuid }
+        status: { type: string, enum: [REQUESTED, AUTHORIZED, ACTIVE, CLOSED, DENIED, EXPIRED] }
+        source_ip: { type: [string, 'null'] }
+        command_count: { type: integer }
+        recording_object_key: { type: [string, 'null'] }
+        denied_reason: { type: [string, 'null'] }
+        started_at: { type: [string, 'null'], format: date-time }
+        ended_at: { type: [string, 'null'], format: date-time }
+        duration_seconds: { type: [integer, 'null'] }
+        created_at: { type: string, format: date-time }
+
+    PamRecordingResult:
+      type: object
+      properties:
+        session_id: { type: string, format: uuid }
+        file_id: { type: string, format: uuid }
+        bucket: { type: string, description: RUSTFS_BUCKET_PAM }
+        object_key: { type: string }
+        size_bytes: { type: integer, format: int64 }
+        sha256: { type: string }
+
+    PamRedeemResult:
+      type: object
+      properties:
+        session_id: { type: string, format: uuid }
+        target:
+          type: object
+          properties:
+            asset_id: { type: string, format: uuid }
+            asset_name: { type: string }
+            host: { type: string, description: fqdn | hostname | mgmt_ip }
+            port: { type: integer }
+        account:
+          type: object
+          properties:
+            username: { type: string }
+            account_type: { type: string }
+            secret: { type: string, description: Dekripsi sekali — jalur internal gateway }
+        policy:
+          type: object
+          properties:
+            command_filter: { type: [object, 'null'] }
+            max_session_minutes: { type: integer }
+
+    NotificationChannelCreate:
+      type: object
+      required: [channel_type, config]
+      properties:
+        channel_type: { type: string, enum: [SMTP_EMAIL, TELEGRAM, WEBHOOK] }
+        config: { $ref: '#/components/schemas/ChannelConfig' }
+        event_filter:
+          type: array
+          maxItems: 32
+          items: { type: string, maxLength: 100 }
+        is_active: { type: boolean, default: true }
+
+    ChannelConfig:
+      type: object
+      description: >
+        SMTP_EMAIL: host (tanpa scheme), port, username, password (secret),
+        from_email, use_tls. TELEGRAM: bot_token (secret), chat_id, parse_mode.
+        WEBHOOK: url http(s) tanpa kredensial inline, secret (HMAC) opsional.
+      additionalProperties: true
+
+    ChannelConfigSummary:
+      type: object
+      description: Secret di-mask menjadi has_* boolean.
+      properties:
+        host: { type: string }
+        port: { type: integer }
+        username: { type: [string, 'null'] }
+        from_email: { type: string }
+        use_tls: { type: boolean }
+        has_password: { type: boolean }
+        chat_id: { type: string }
+        parse_mode: { type: [string, 'null'] }
+        has_bot_token: { type: boolean }
+        url: { type: string }
+        scheme: { type: string }
+        has_secret: { type: boolean }
+
+    NotificationChannelView:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        type: { type: string, enum: [SMTP_EMAIL, TELEGRAM, WEBHOOK] }
+        config: { $ref: '#/components/schemas/ChannelConfigSummary' }
+        event_filter:
+          type: array
+          items: { type: string }
+        is_active: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }

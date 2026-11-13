@@ -31,6 +31,21 @@ pub enum DomainError {
     /// Dependensi upstream (HRIS ASMX) gagal/invalid — dipetakan ke 502,
     /// berbeda dari 401 ("kredensial salah") dan 500 ("bug internal").
     Upstream(String),
+
+    #[error("mfa is mandatory for pam access")]
+    /// PAM bastion menolak user tanpa MFA aktif (bab 5.3 mandatory MFA) —
+    /// dipetakan ke 403 `MFA_REQUIRED_FOR_PAM` (bukan FORBIDDEN generik).
+    PamMfaRequired,
+
+    #[error("pam step-up otp required: {0}")]
+    /// Verifikasi OTP terakhir lebih tua dari window step-up policy —
+    /// klien wajib mengirim OTP baru. Dipetakan ke 403 `PAM_STEP_UP_REQUIRED`.
+    PamStepUpRequired(String),
+
+    #[error("pam policy denied: {0}")]
+    /// Pelanggaran ACL policy PAM (CIDR, approval, tiket) — dipetakan ke
+    /// 403 `PAM_POLICY_DENIED`.
+    PolicyDenied(String),
 }
 
 impl DomainError {

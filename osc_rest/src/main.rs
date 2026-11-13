@@ -65,6 +65,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "bucket RustFS belum terverifikasi"
         );
     }
+    // Bucket privat rekaman PAM (Wave 3) — diagnostik non-fatal yang sama.
+    if let Err(e) = storage.head_bucket_named(&config.rustfs_bucket_pam).await {
+        tracing::warn!(
+            bucket = %config.rustfs_bucket_pam,
+            error = %e,
+            "bucket RustFS PAM belum terverifikasi"
+        );
+    }
 
     let crypto = match CryptoProvider::new(&config.jwt_secret, &config.master_key_hex) {
         Ok(crypto) => Arc::new(crypto),

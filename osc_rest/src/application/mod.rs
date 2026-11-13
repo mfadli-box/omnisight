@@ -7,3 +7,6 @@ pub mod excel;
 pub mod health;
 pub mod infra_validate;
 pub mod mfa;
+pub mod notifications;
+pub mod pam;
+pub mod secops;

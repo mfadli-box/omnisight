@@ -42,6 +42,21 @@ pub enum AppError {
     /// Error upstream terkontrol (mis. HRIS invalid) — pesan aman.
     Upstream(String),
 
+    #[error("mfa is mandatory for pam access")]
+    /// PAM bastion menolak user tanpa MFA aktif (bab 5.3) — kode khusus
+    /// `MFA_REQUIRED_FOR_PAM` agar BFF memicu enrolment MFA, bukan generik.
+    PamMfaRequired,
+
+    #[error("{0}")]
+    /// Verifikasi OTP terakhir melampaui window step-up — kode khusus
+    /// `PAM_STEP_UP_REQUIRED` (klien wajib mengirim OTP baru).
+    PamStepUpRequired(String),
+
+    #[error("{0}")]
+    /// Pelanggaran ACL policy PAM (CIDR/approval/tiket) — kode khusus
+    /// `PAM_POLICY_DENIED`.
+    PolicyDenied(String),
+
     #[error("{0}")]
     /// Sudah dimask oleh `AppError::internal()` — tidak berisi detail internal.
     Internal(String),
@@ -71,6 +86,9 @@ impl From<DomainError> for AppError {
             DomainError::Conflict(message) => AppError::Conflict(message),
             DomainError::RateLimited => AppError::RateLimited,
             DomainError::Upstream(message) => AppError::Upstream(message),
+            DomainError::PamMfaRequired => AppError::PamMfaRequired,
+            DomainError::PamStepUpRequired(message) => AppError::PamStepUpRequired(message),
+            DomainError::PolicyDenied(message) => AppError::PolicyDenied(message),
             DomainError::Unavailable(detail) => AppError::internal(detail),
         }
     }
@@ -103,6 +121,17 @@ impl IntoResponse for AppError {
                 "HRIS_UPSTREAM_INVALID_RESPONSE",
                 msg,
             ),
+            // PAM mandatory MFA & step-up (bab 5.3): 403 dengan kode spesifik
+            // agar BFF osc_site memicu enrolment MFA / modal OTP step-up.
+            AppError::PamMfaRequired => (
+                StatusCode::FORBIDDEN,
+                "MFA_REQUIRED_FOR_PAM",
+                "MFA wajib aktif untuk mengakses PAM bastion".to_owned(),
+            ),
+            AppError::PamStepUpRequired(msg) => {
+                (StatusCode::FORBIDDEN, "PAM_STEP_UP_REQUIRED", msg)
+            }
+            AppError::PolicyDenied(msg) => (StatusCode::FORBIDDEN, "PAM_POLICY_DENIED", msg),
             AppError::Internal(msg) => (StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", msg),
         };
 

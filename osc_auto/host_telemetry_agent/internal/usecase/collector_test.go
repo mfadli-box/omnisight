@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -37,12 +38,21 @@ func (f *fakeDocker) CollectContainers(context.Context) ([]domain.ContainerSampl
 type fakeAPI struct {
 	inventories []domain.Inventory
 	batches     []domain.MetricsBatch
+	secBatches  []domain.SecurityBatch
 	invErr      error
 	metErr      error
+	secErr      error
 }
 
 func (f *fakeAPI) Enroll(context.Context, domain.EnrollRequest) (domain.Credentials, error) {
 	return domain.Credentials{}, nil
+}
+func (f *fakeAPI) IngestSecurity(_ context.Context, b domain.SecurityBatch) error {
+	if f.secErr != nil {
+		return f.secErr
+	}
+	f.secBatches = append(f.secBatches, b)
+	return nil
 }
 func (f *fakeAPI) IngestInventory(_ context.Context, inv domain.Inventory) error {
 	if f.invErr != nil {
@@ -72,7 +82,7 @@ func TestRunOnceSendsMetricsAndFirstInventory(t *testing.T) {
 	}}
 	api := &fakeAPI{}
 
-	c := NewCollector(sys, docker, true, time.Hour, api, testLogger())
+	c := NewCollector(sys, docker, true, time.Hour, nil, 0, api, testLogger())
 	if err := c.RunOnce(context.Background()); err != nil {
 		t.Fatalf("RunOnce: %v", err)
 	}
@@ -116,7 +126,7 @@ func TestRunOnceCollectErrorsAreNonFatal(t *testing.T) {
 	docker := &fakeDocker{err: errors.New("docker mati")}
 	api := &fakeAPI{}
 
-	c := NewCollector(sys, docker, true, time.Hour, api, testLogger())
+	c := NewCollector(sys, docker, true, time.Hour, nil, 0, api, testLogger())
 	err := c.RunOnce(context.Background())
 	if err == nil {
 		t.Fatal("error kolektor harus dilaporkan")
@@ -141,7 +151,7 @@ func TestRunOnceBatchLimitClamped(t *testing.T) {
 	}
 	sys := &fakeSystem{hst: domain.HostSample{RecordedAt: now}}
 	api := &fakeAPI{}
-	c := NewCollector(sys, &fakeDocker{containers: containers}, true, time.Hour, api, testLogger())
+	c := NewCollector(sys, &fakeDocker{containers: containers}, true, time.Hour, nil, 0, api, testLogger())
 	if err := c.RunOnce(context.Background()); err != nil {
 		t.Fatalf("RunOnce: %v", err)
 	}
@@ -155,7 +165,7 @@ func TestRunOnceDisabledDockerSendsNothing(t *testing.T) {
 	sys := &fakeSystem{hst: domain.HostSample{RecordedAt: now}}
 	api := &fakeAPI{}
 	c := NewCollector(sys, &fakeDocker{containers: []domain.ContainerSample{{HostID: "x", ContainerRef: "y"}}},
-		false, time.Hour, api, testLogger())
+		false, time.Hour, nil, 0, api, testLogger())
 	if err := c.RunOnce(context.Background()); err != nil {
 		t.Fatalf("RunOnce: %v", err)
 	}
@@ -165,3 +175,75 @@ func TestRunOnceDisabledDockerSendsNothing(t *testing.T) {
 }
 
 func ptrT(v float64) *float64 { return &v }
+
+// --- FIM tests ------------------------------------------------------------
+
+type fakeFim struct {
+	events []domain.FimEvent
+	err    error
+	calls  int
+}
+
+func (f *fakeFim) CollectChanges(context.Context) ([]domain.FimEvent, error) {
+	f.calls++
+	return f.events, f.err
+}
+
+func TestRunOnceIngestsFimEventsFirstCycleOnly(t *testing.T) {
+	sys := &fakeSystem{hst: domain.HostSample{RecordedAt: time.Now().UTC()}}
+	api := &fakeAPI{}
+	fim := &fakeFim{events: []domain.FimEvent{
+		{Path: "/etc/passwd", EventType: domain.FimEventModified, DetectionSource: domain.FimSourceScheduled,
+			NewChecksum: strings.Repeat("a", 64), DetectedAt: time.Now().UTC()},
+		{Path: strings.Repeat("x", 1001), EventType: domain.FimEventModified, NewChecksum: strings.Repeat("b", 64)}, // invalid → dibuang
+	}}
+	c := NewCollector(sys, nil, false, time.Hour, fim, time.Minute, api, testLogger())
+	if err := c.RunOnce(context.Background()); err != nil {
+		t.Fatalf("RunOnce: %v", err)
+	}
+	if len(api.secBatches) != 1 || len(api.secBatches[0].FimEvents) != 1 {
+		t.Fatalf("hanya event valid harus terkirim: %+v", api.secBatches)
+	}
+	if api.secBatches[0].FimEvents[0].Path != "/etc/passwd" {
+		t.Fatalf("event salah: %+v", api.secBatches[0].FimEvents[0])
+	}
+
+	// Scan kedua segera: interval 1 menit belum jatuh tempo → tidak ada batch baru.
+	if err := c.RunOnce(context.Background()); err != nil {
+		t.Fatalf("RunOnce ke-2: %v", err)
+	}
+	if len(api.secBatches) != 1 || fim.calls != 1 {
+		t.Fatalf("FIM harus di-skip sebelum interval: batches=%d calls=%d", len(api.secBatches), fim.calls)
+	}
+}
+
+func TestRunOnceFimTruncatesToContractLimit(t *testing.T) {
+	sys := &fakeSystem{hst: domain.HostSample{RecordedAt: time.Now().UTC()}}
+	api := &fakeAPI{}
+	events := make([]domain.FimEvent, maxFimEventsPerBatch+50)
+	for i := range events {
+		events[i] = domain.FimEvent{
+			Path: "/etc/f" + time.Duration(i).String(), EventType: domain.FimEventCreated,
+			NewChecksum: strings.Repeat("c", 64), DetectedAt: time.Now().UTC(),
+		}
+	}
+	c := NewCollector(sys, nil, false, time.Hour, &fakeFim{events: events}, time.Minute, api, testLogger())
+	if err := c.RunOnce(context.Background()); err != nil {
+		t.Fatalf("RunOnce: %v", err)
+	}
+	if len(api.secBatches) != 1 || len(api.secBatches[0].FimEvents) != maxFimEventsPerBatch {
+		t.Fatalf("batch FIM harus dipotong ke %d, dapat %d", maxFimEventsPerBatch, len(api.secBatches[0].FimEvents))
+	}
+}
+
+func TestRunOnceFimErrorNonFatal(t *testing.T) {
+	sys := &fakeSystem{hst: domain.HostSample{RecordedAt: time.Now().UTC()}}
+	api := &fakeAPI{}
+	c := NewCollector(sys, nil, false, time.Hour, &fakeFim{err: errors.New("baseline rusak")}, time.Minute, api, testLogger())
+	if err := c.RunOnce(context.Background()); err == nil {
+		t.Fatal("error FIM harus dilaporkan")
+	}
+	if len(api.batches) != 1 {
+		t.Fatalf("metrics tetap harus terkirim: %d", len(api.batches))
+	}
+}

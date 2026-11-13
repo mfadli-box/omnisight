@@ -18,4 +18,6 @@ var (
 	ErrNotEnrolled = errors.New("agent belum ter-enroll")
 	// ErrUnavailable — sumber data lokal (mis. Docker daemon) tidak tersedia.
 	ErrUnavailable = errors.New("sumber data lokal tidak tersedia")
+	// ErrInvalidEvent — payload FIM melanggar invariant kontrak W3.
+	ErrInvalidEvent = errors.New("event FIM tidak valid")
 )

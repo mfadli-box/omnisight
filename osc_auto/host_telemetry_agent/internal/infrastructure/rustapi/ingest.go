@@ -84,6 +84,22 @@ func (c *Client) IngestMetrics(ctx context.Context, batch domain.MetricsBatch) e
 	return err
 }
 
+// IngestSecurity mengirim batch SecOps (FIM) —
+// POST /api/v1/agents/security/ingest (HMAC; kontrak w3.openapi.yaml,
+// respons 202 {"status":"accepted"}).
+func (c *Client) IngestSecurity(ctx context.Context, batch domain.SecurityBatch) error {
+	body, err := json.Marshal(batch)
+	if err != nil {
+		return fmt.Errorf("serialisasi payload security: %w", err)
+	}
+	data, err := c.doRequest(ctx, httpMethodPost, apiPrefix+"/agents/security/ingest", body, true)
+	if err != nil {
+		return err
+	}
+	_, err = decodeEnvelope(data, "accepted")
+	return err
+}
+
 // Konstanta method — menghindari string sihir tersebar.
 const (
 	httpMethodPost = "POST"

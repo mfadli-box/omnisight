@@ -8,6 +8,9 @@ pub mod files;
 pub mod identity;
 pub mod itam;
 pub mod netbox;
+pub mod notifications;
+pub mod pam;
+pub mod secops;
 pub mod studio;
 pub mod telemetry;
 pub mod uptime;
@@ -30,6 +33,7 @@ pub(crate) enum RefTable {
     UptimeMonitor,
     ComposeStack,
     NginxVhost,
+    PamPolicy,
 }
 
 /// `true` bila baris ada pada company tsb (dan belum di-soft-delete).
@@ -63,6 +67,9 @@ pub(crate) async fn ref_in_company(
         }
         RefTable::NginxVhost => {
             "SELECT 1 FROM nginx_virtual_hosts WHERE id = $2 AND company_id = $1 AND deleted_at IS NULL"
+        }
+        RefTable::PamPolicy => {
+            "SELECT 1 FROM pam_access_policies WHERE id = $2 AND company_id = $1 AND deleted_at IS NULL"
         }
     };
     let found = sqlx::query(sql)

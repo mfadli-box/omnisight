@@ -114,4 +114,5 @@ type RustAPIClient interface {
 	Enroll(ctx context.Context, req EnrollRequest) (Credentials, error)
 	IngestInventory(ctx context.Context, inv Inventory) error
 	IngestMetrics(ctx context.Context, batch MetricsBatch) error
+	IngestSecurity(ctx context.Context, batch SecurityBatch) error
 }

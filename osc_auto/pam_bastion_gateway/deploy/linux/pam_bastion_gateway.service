@@ -1,0 +1,60 @@
+# =============================================================================
+# pam_bastion_gateway — systemd unit (omnisight W3 / SESI 4.2)
+#
+# Pemasangan:
+#   sudo install -m 0755 bin/pam_bastion_gateway /usr/local/bin/
+#   sudo install -m 0644 deploy/linux/pam_bastion_gateway.service /etc/systemd/system/
+#   sudo mkdir -p /etc/pam_bastion_gateway && sudo install -m 0600 \
+#        configs/pam_bastion_gateway.env.example /etc/pam_bastion_gateway/pam_bastion_gateway.env
+#   # enroll sekali (token dari admin osc_rest):
+#   sudo -u omnisight /usr/local/bin/pam_bastion_gateway --enroll <TOKEN> \
+#        --asset-model <UUID> --status-label <UUID>
+#   sudo systemctl daemon-reload && sudo systemctl enable --now pam_bastion_gateway
+# =============================================================================
+
+[Unit]
+Description=omnisight pam_bastion_gateway - WebSocket-to-SSH bastion proxy (PAM W3)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# User dinamis non-root (UID unik per-service, dibuat systemd).
+DynamicUser=yes
+# State kredensial (hmac_secret) membutuhkan StateDirectory milik service.
+StateDirectory=pam_bastion_gateway
+StateDirectoryMode=0700
+EnvironmentFile=-/etc/pam_bastion_gateway/pam_bastion_gateway.env
+ExecStart=/usr/local/bin/pam_bastion_gateway
+Restart=on-failure
+RestartSec=5s
+
+# --- Hardening (least privilege) ---------------------------------------------
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+# AF_INET/AF_INET6 untuk WS + SSH; AF_UNIX tidak dibutuhkan gateway bastion.
+RestrictAddressFamilies=AF_INET AF_INET6
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+# --- Logging -------------------------------------------------------------------
+# Agent menulis log JSON terstruktur ke stdout; journald yang mengumpulkan.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=pam_bastion_gateway
+
+[Install]
+WantedBy=multi-user.target

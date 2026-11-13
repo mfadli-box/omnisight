@@ -8,5 +8,8 @@ pub mod itam;
 pub mod me;
 pub mod mfa;
 pub mod net;
+pub mod notifications;
+pub mod pam;
+pub mod secops;
 pub mod studio;
 pub mod uptime;

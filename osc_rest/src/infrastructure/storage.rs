@@ -54,9 +54,22 @@ impl RustfsClient {
         bytes: Vec<u8>,
         content_type: &str,
     ) -> Result<(), DomainError> {
+        self.put_object_in(&self.bucket, key, bytes, content_type)
+            .await
+    }
+
+    /// `PutObject` ke bucket eksplisit — pemisahan bucket privat
+    /// (mis. rekaman PAM di `RUSTFS_BUCKET_PAM`, policy akses terpisah).
+    pub async fn put_object_in(
+        &self,
+        bucket: &str,
+        key: &str,
+        bytes: Vec<u8>,
+        content_type: &str,
+    ) -> Result<(), DomainError> {
         self.client
             .put_object()
-            .bucket(self.bucket.clone())
+            .bucket(bucket)
             .key(key)
             .content_type(content_type)
             .body(ByteStream::from(bytes))
@@ -93,11 +106,21 @@ impl RustfsClient {
     /// Presigned GET URL berumur pendek (default 5 menit) —
     /// objek privat tidak pernah diekspos publik permanen.
     pub async fn presign_get(&self, key: &str, ttl: Duration) -> Result<String, DomainError> {
+        self.presign_get_in(&self.bucket, key, ttl).await
+    }
+
+    /// Presigned GET pada bucket eksplisit (mis. bucket rekaman PAM).
+    pub async fn presign_get_in(
+        &self,
+        bucket: &str,
+        key: &str,
+        ttl: Duration,
+    ) -> Result<String, DomainError> {
         let presigning = PresigningConfig::expires_in(ttl)
             .map_err(|e| DomainError::Unavailable(format!("presign config gagal: {e}")))?;
         self.client
             .get_object()
-            .bucket(self.bucket.clone())
+            .bucket(bucket)
             .key(key)
             .presigned(presigning)
             .await
@@ -108,9 +131,14 @@ impl RustfsClient {
     /// `HeadBucket` — verifikasi bucket spesifik ada & dapat diakses.
     /// Dipakai diagnostik startup dan pipeline excel di fase berikutnya.
     pub async fn head_bucket(&self) -> Result<(), DomainError> {
+        self.head_bucket_named(&self.bucket).await
+    }
+
+    /// `HeadBucket` untuk nama bucket eksplisit (diagnostik bucket PAM).
+    pub async fn head_bucket_named(&self, bucket: &str) -> Result<(), DomainError> {
         self.client
             .head_bucket()
-            .bucket(self.bucket.clone())
+            .bucket(bucket)
             .send()
             .await
             .map(|_| ())

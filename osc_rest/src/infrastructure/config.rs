@@ -23,6 +23,28 @@ pub struct AppConfig {
     pub hris_allowlist_hosts: String,
     /// Masa berlaku access token (jam).
     pub access_token_hours: i64,
+
+    // --- Wave 3: SecOps & PAM ---
+    /// Bucket privat rekaman sesi PAM — env `RUSTFS_BUCKET_PAM`.
+    pub rustfs_bucket_pam: String,
+    /// TTL ephemeral WS ticket PAM (detik; clamp 30–600) —
+    /// env `PAM_TICKET_TTL_SECONDS`.
+    pub pam_ticket_ttl_seconds: i64,
+    /// Batas ukuran rekaman sesi PAM per upload (byte) —
+    /// env `PAM_RECORDING_MAX_MB` (default 100 MB).
+    pub pam_recording_max_bytes: usize,
+    /// Retensi snapshot metrik tier 1 menit (hari, clamp 30–90) —
+    /// env `RETENTION_METRIC_DAYS`.
+    pub retention_metric_days: i32,
+    /// Retensi snapshot metrik tier 10 menit (hari) — env `RETENTION_METRIC_TIER10_DAYS`.
+    pub retention_metric_tier10_days: i32,
+    /// Retensi raw heartbeat uptime (hari) — env `RETENTION_HEARTBEAT_DAYS`.
+    pub retention_heartbeat_days: i32,
+    /// Retensi event SecOps (FIM/alert/CVE/compliance, hari) — env `RETENTION_SECOPS_DAYS`.
+    pub retention_secops_days: i32,
+    /// CSV `agent_id` yang boleh memicu purge retensi (deny-by-default) —
+    /// env `RETENTION_PURGE_AGENT_IDS`.
+    pub retention_purge_agent_ids: String,
 }
 
 impl AppConfig {
@@ -54,6 +76,32 @@ impl AppConfig {
             ),
             hris_allowlist_hosts: env_or("HRIS_ALLOWLIST_HOSTS", ""),
             access_token_hours: env_or("ACCESS_TOKEN_HOURS", "12").parse().unwrap_or(12),
+            rustfs_bucket_pam: env_or("RUSTFS_BUCKET_PAM", "osc-pam-recordings"),
+            pam_ticket_ttl_seconds: env_or("PAM_TICKET_TTL_SECONDS", "120")
+                .parse()
+                .map(|v: i64| v.clamp(30, 600))
+                .unwrap_or(120),
+            pam_recording_max_bytes: env_or("PAM_RECORDING_MAX_MB", "100")
+                .parse()
+                .map(|mb: usize| mb.clamp(1, 512) * 1024 * 1024)
+                .unwrap_or(100 * 1024 * 1024),
+            retention_metric_days: env_or("RETENTION_METRIC_DAYS", "30")
+                .parse()
+                .map(|v: i32| v.clamp(30, 90))
+                .unwrap_or(30),
+            retention_metric_tier10_days: env_or("RETENTION_METRIC_TIER10_DAYS", "90")
+                .parse()
+                .map(|v: i32| v.clamp(90, 365))
+                .unwrap_or(90),
+            retention_heartbeat_days: env_or("RETENTION_HEARTBEAT_DAYS", "30")
+                .parse()
+                .map(|v: i32| v.clamp(7, 90))
+                .unwrap_or(30),
+            retention_secops_days: env_or("RETENTION_SECOPS_DAYS", "365")
+                .parse()
+                .map(|v: i32| v.clamp(30, 1095))
+                .unwrap_or(365),
+            retention_purge_agent_ids: env_or("RETENTION_PURGE_AGENT_IDS", ""),
         }
     }
 }

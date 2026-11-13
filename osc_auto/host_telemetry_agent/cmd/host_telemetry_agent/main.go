@@ -22,6 +22,7 @@ import (
 	"log/slog"
 	"os"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/mfadli-box/omnisight/osc_auto/host_telemetry_agent/internal/delivery"
@@ -40,6 +41,9 @@ type config struct {
 	baseURL        string
 	interval       time.Duration
 	inventoryEvery time.Duration
+	fimEnabled     bool
+	fimPaths       []string
+	fimEvery       time.Duration
 	dockerEnabled  bool
 	dockerSocket   string
 	dockerHostID   string
@@ -56,6 +60,7 @@ func loadConfig() (config, error) {
 		dockerHostID:  os.Getenv("HOST_TELEMETRY_DOCKER_HOST_ID"),
 		statePath:     os.Getenv("HOST_TELEMETRY_STATE_PATH"),
 		stateKeyHex:   os.Getenv("HOST_TELEMETRY_STATE_KEY_HEX"),
+		fimEnabled:    envBool("HOST_TELEMETRY_FIM_ENABLED", true),
 	}
 
 	var err error
@@ -70,6 +75,15 @@ func loadConfig() (config, error) {
 	}
 	if cfg.inventoryEvery < time.Minute || cfg.inventoryEvery > 24*time.Hour {
 		return cfg, fmt.Errorf("HOST_TELEMETRY_INVENTORY_INTERVAL di luar rentang 1m..24h: %s", cfg.inventoryEvery)
+	}
+	if cfg.fimEvery, err = parseDurationEnv("HOST_TELEMETRY_FIM_INTERVAL", "15m"); err != nil {
+		return cfg, err
+	}
+	if cfg.fimEvery < time.Minute || cfg.fimEvery > 24*time.Hour {
+		return cfg, fmt.Errorf("HOST_TELEMETRY_FIM_INTERVAL di luar rentang 1m..24h: %s", cfg.fimEvery)
+	}
+	if raw := os.Getenv("HOST_TELEMETRY_FIM_PATHS"); raw != "" {
+		cfg.fimPaths = splitCSV(raw)
 	}
 
 	switch envOr("HOST_TELEMETRY_LOG_LEVEL", "info") {
@@ -148,8 +162,14 @@ func main() {
 		}
 	}
 
+	// FIM ringan (W3): scan checksum+permission SCHEDULED → ingest SecOps.
+	var fimCollector domain.FimCollector
+	if cfg.fimEnabled {
+		fimCollector = platform.NewFimScanner(cfg.fimPaths, store, logger)
+	}
+
 	collector := usecase.NewCollector(sysCollector, dockerCollector, dockerEnabled,
-		cfg.inventoryEvery, client, logger)
+		cfg.inventoryEvery, fimCollector, cfg.fimEvery, client, logger)
 
 	if *once {
 		if err := collector.RunOnce(context.Background()); err != nil {
@@ -252,4 +272,16 @@ func parseDurationEnv(key, def string) (time.Duration, error) {
 		return 0, fmt.Errorf("%s tidak valid: %w", key, err)
 	}
 	return d, nil
+}
+
+// splitCSV memecah string CSV menjadi slice (dipakai untuk path FIM).
+func splitCSV(raw string) []string {
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
