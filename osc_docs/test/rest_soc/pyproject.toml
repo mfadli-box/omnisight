@@ -36,4 +36,5 @@ markers = [
     "file_upload_abuse: penyalahgunaan upload Excel/RustFS",
     "rate_limit: verifikasi rate limiting tower-governor",
     "wave1: audit penetrasi Wave 1 (MFA bypass, TOTP replay, IDOR switcher, SQLi AST, Excel formula)",
+    "wave2: audit penetrasi Wave 2 (replay enrollment token, forgery HMAC agent, traversal compose, command injection nginx)",
 ]

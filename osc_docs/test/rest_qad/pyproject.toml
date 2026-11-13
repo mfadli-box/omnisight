@@ -28,4 +28,5 @@ markers = [
     "excel: verifikasi alur import/export .xlsx (fase excel)",
     "contract: verifikasi bentuk respons sesuai osc_docs/rest",
     "wave1: test fungsional Wave 1 (auth dual-mode HRIS, MFA, switcher, ITAM, Excel)",
+    "wave2: test fungsional Wave 2 (enrollment, telemetry/uptime ingest, compose stack & nginx vhost CRUD)",
 ]

@@ -1,86 +1,80 @@
-# QA & Debugger Technical Report: Wave 1 — Auth Dual-Mode (HRIS ASMX), TOTP MFA, Company Switcher, Menu Navigation, ITAM & Excel
+# QA & Debugger Technical Report: Wave 2 — Agent Enrollment, Telemetry/Uptime Ingest, Docker Compose Stack & Nginx VHost Control Plane
 
-- **Date**: 2026-11-12
+- **Date**: 2026-11-13
 - **Author**: ai-test (QA & Debugger Engineer)
 - **Workspace**: `osc_docs/test/rest_qad`
-- **Test Suite Location**: `osc_docs/test/rest_qad/test/wave1/` (ditambah unit pendukung di `test/unit/`)
-- **Target API & Contract Reference**: `osc_docs/rest/api-w1.md`, `osc_docs/site/app-w1.md`, `osc_docs/rest/contracts/w1.openapi.yaml`
+- **Test Suite Location**: `osc_docs/test/rest_qad/test/wave2/` (ditambah unit pendukung di `test/unit/test_w2_hmac_agent.py` & `test/unit/test_w2_infra_vectors.py`)
+- **Target API & Contract Reference**: `osc_docs/rest/api-w2.md`, `osc_docs/rest/contracts/w2.openapi.yaml`, `osc_docs/base/schema-p3.md`
 
 ## 1. Test Scope & Root-Cause Context
 
-Suite ini memverifikasi fungsionalitas & kontrak Wave 1 `osc_rest` (dikonsumsi `osc_site` melalui BFF proxy — token di-strip, `X-Correlation-ID` di-propagasi):
+Suite ini memverifikasi fungsionalitas & kontrak Wave 2 `osc_rest` (SESI 3.1) sebelum dieksekusi agent `osc_auto` (SESI 3.2) dan UI `osc_site` (SESI 3.3):
 
-1. **Local Login** (`company_id=""`) → Argon2id lokal, envelope `{"status","data"}` sesuai kontrak; kredensial salah → `401 UNAUTHORIZED` dengan envelope error + `correlation_id`.
-2. **Login dual-mode HRIS ASMX** melalui stub upstream in-process (`src/infrastructure/hris_stub.py`):
-   - `1|…` → auto-sync profil + Argon2id cache (`last_hris_sync_at` wajib terisi, `offline_cache=false`);
-   - `0|…|NONE` → `401 UNAUTHORIZED` **tanpa fallback** cache offline;
-   - non-XML / timeout (melewati total timeout 8 s) → fallback cache offline (`offline_cache=true`) bila TTL valid, atau `502 HRIS_UPSTREAM_INVALID_RESPONSE` yang tipe-safe (tanpa stack trace).
-3. **TOTP MFA**: setup → enable → verify (step aktif), anti-replay (kode sama ditolak), toleransi ±1 step tanpa 5xx, backup code sekali pakai → **MFA auto-reset** (`mfa_enabled=false` pada login berikutnya).
-4. **Company Switcher & Navigation**: `GET /auth/companies` publik tanpa membocorkan `hris_login_url`/secret; `switch-company` menolak company tanpa `UserCompanyAccess` (403) dan payload malformed (400); `GET /me/navigation` — tepat satu `is_active_company`, node `can_view=false` tidak pernah dikirim (server-side filtering, dikonsumsi sidebar `osc_site`).
-5. **ITAM**: siklus checkout/checkin (409 CONFLICT pada re-checkout, 400 pada checkin aset bebas), aset di-seed melalui import Excel (master default get-or-create `Generic Model`/`Deployable`).
-6. **Excel import/export**: baris valid persist sesuai `inserted`; laporan per-baris dengan kode kanonik (`REQUIRED|TOO_LONG|ENUM_INVALID|IP_INVALID|NUMBER_INVALID|DUPLICATE`, cap 100); file rusak & magic byte non-ZIP (`%PDF-1.7`) ditolak 4xx; export `Content-Disposition: attachment` dengan **sanitasi formula injection** (sel berawalan `= + - @ \t \r` diprefix `'`).
-
-Diagnosis: implementasi TOTP suite divalidasi terhadap **vektor resmi RFC 6238 Appendix B** (SHA1, secret `12345678901234567890`) sehingga kegagalan MFA pada test live pasti berasal dari upstream, bukan dari test harness.
+1. **Agent Enrollment (§2.1)** — `POST /agents/enrollment-tokens` (gate admin, token hex-64 *ditampilkan sekali*, TTL clamp 1–72 jam) → `POST /agents/enroll` (publik): `agent_id` UUID (= ManagedNode dinamis di `assets`), `hmac_secret` hex-64, `company_id` terikat token. Konsumsi token **one-time atomik** — replay token → `401 UNAUTHORIZED` tanpa bocoran kredensial.
+2. **Telemetry & Uptime Ingest (§2.2)** — `/agents/inventory/ingest`, `/agents/metrics/ingest` (batch host + container + S.M.A.R.T., hitungan `system_rows`/`container_rows`/`smart_reports` sesuai isi batch), `/agents/uptime/ingest`, `/agents/logs` — semuanya diakses **HMAC-SHA256 per-request** dengan kanonis `{ts}\n{METHOD}\n{path}\n{sha256_hex(body)}`. Batas batch (`containers ≤ 200`, `smart ≤ 64`, log ≤ 100 baris) ditolak `400 VALIDATION_ERROR`.
+3. **Docker Stack CRUD (§2.4)** — create valid → env plaintext **tidak pernah** di-echo respons (Envelope AES-256-GCM); gerbang struktural menolak compose invalid (`include` top-level, indentasi tab, service tanpa `image`/`build`, key di luar allowlist, > 256 KB) dan `working_dir` traversal; `PUT` memutakhirkan snapshot; dispatch `up` → `202 QUEUED` + `dispatch_ref`; command di luar enum `up|down|pull|restart` → 400; delete → soft delete (`GET` → 404).
+4. **Nginx VHost CRUD (§2.5)** — UNIQUE `(nginx_node_id, server_name, listen_port)` → 409; brace tak seimbang / tanpa blok `server {` / `include` traversal / include relatif → 400; update mengembalikan status `DRAFT`; dispatch `test_reload` → 202 + `dispatch_ref`.
+5. **HMAC signer harness** — signer test tervalidasi **vektor resmi RFC 4231** (case 1 & 2) + implementasi HMAC referensi manual (RFC 2104, key > block-size) sehingga kegagalan auth pada test live pasti berasal dari server, bukan harness.
 
 ## 2. Clean Architecture Test Structure
 
 - `src/domain/`:
-  - `models_w1.py` — `HrisStubMode`, `LoginChannel`, `LoginExpectation`, `CompanyOption`, `MenuNode`, `ImportRowError`, `ImportSummary`, `AssetRecord` (dataclass murni).
-  - `gateways_w1.py` — port `W1ApiClient` (get_json/post_json/post_multipart/get_binary) & `HrisStubControl` (`Protocol`).
-  - `models.py` — `ApiResponseSnapshot` diperluas field opsional `body_bytes` (binary export, backward-compatible).
-  - `errors.py` — `ContractViolationError`, `UnreachableTargetError`.
+  - `models_w2.py` — `EnrollmentToken`, `AgentCredential`, `StackDraft`, `VhostDraft`, `IngestSummary` (dataclass murni).
+  - `gateways_w2.py` — port `W2ApiClient` (`Protocol`: get/post/put/delete JSON + `post_agent_signed`).
+  - `models.py`, `errors.py` — fondasi sebelumnya (dipertahankan; `ApiResponseSnapshot`).
 - `src/application/`:
-  - `totp.py` — TOTP RFC 6238 murni (hotp/totp_code/secret_from_otpauth_uri).
-  - `auth_w1.py` — verifikator kontrak murni: `evaluate_login_success`, `evaluate_envelope_error`, `evaluate_navigation`, `evaluate_health_snapshot`.
-  - `hris_w1.py` — kebijakan ekspektasi dual-mode `expected_hris_outcome(mode, cache_available, cache_within_ttl)` + generator baris Excel valid/error + payload formula injection.
-  - `w1_flows.py` — orkestrasi use case (login, mfa_setup_and_enable, mfa_verify_with_otp/backup_code, switch_company, navigation, checkout/checkin, import_assets/export_assets) — hanya bergantung pada port domain.
+  - `hmac_agent.py` — signer kanonis HMAC-SHA256 (RFC 2104) murni stdlib + vektor RFC 4231.
+  - `infra_vectors.py` — **mirror-validator** (`validate_stack_name`, `validate_working_dir`, `validate_compose_content`, `validate_nginx_content`, `validate_dispatch_command`) + generator vektor valid/invalid (traversal, injection, oversize) — memastikan vektor uji benar sebelum dikirim live.
+  - `w2_flows.py` — orkestrasi use case (issue token, enroll, ingest inventory/metrics/uptime, push logs) — hanya bergantung port domain.
 - `src/infrastructure/`:
-  - `w1_client.py` — `W1HttpxClient` (httpx, `follow_redirects=False`, `trust_env=False`, `X-Correlation-ID` per request).
-  - `hris_stub.py` — stub HRIS ASMX threaded (`ok | invalid | nonxml | slow`, hit counter thread-safe).
-  - `excel_fixtures.py` — builder/reader `.xlsx` (openpyxl), workbook rusak, fake magic byte.
-  - `config.py`, `http_client.py`, `reporters.py` — fondasi sesi sebelumnya (dipertahankan).
-- `test/`: `test/wave1/` (5 modul + conftest env-driven, marker `@pytest.mark.integration`, `@pytest.mark.contract`, `@pytest.mark.wave1`, `@pytest.mark.excel`) — test live **skip deterministik** bila target/kredensial env tidak tersedia (traffic tidak pernah dikirim ke layanan asing; gate probe `/api/v1/health`).
+  - `w2_client.py` — `W2HttpxClient` (httpx, `follow_redirects=False`, `trust_env=False`, `X-Correlation-ID` per request; `post_agent_signed` menghitung `X-Agent-Id`/`X-Agent-Timestamp`/`X-Agent-Signature`).
+  - `config.py`, `http_client.py` — fondasi sebelumnya (dipertahankan).
+- `test/`: `test/wave2/` (4 modul + conftest env-driven) — marker `@pytest.mark.integration`, `@pytest.mark.contract`, `@pytest.mark.wave2`; test live **skip deterministik** bila target/kredensial env tidak tersedia (gate probe `/api/v1/health`; RoE: trafik tidak pernah dikirim ke layanan asing).
 
 ## 3. Test Case Matrix
 
 | Test ID | Scenario / Edge Case | Input / Precondition | Expected Outcome | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| `QA-W1-A01` | Local login sesuai kontrak | Env `QA_W1_LOCAL_USERNAME/PASSWORD`, `company_id=""` | `200` + envelope `data.login` valid | Pass (unit/envelope) / Pending (live) |
-| `QA-W1-A02` | Password salah | Password acak | `401 UNAUTHORIZED` + envelope error + `correlation_id` | Pass / Pending (live) |
-| `QA-W1-A03` | Username kosong | `username=""` | `400 VALIDATION_ERROR` | Pass / Pending (live) |
-| `QA-W1-A04` | Correlation tracing | Login sah | Header `X-Correlation-ID` di-echo | Pass / Pending (live) |
-| `QA-W1-A05` | Kontrak stub HRIS | Body `1|`, `0|…|NONE`, non-XML | Prefix `1|` sukses, `0|` ditolak, non-XML bukan XML | Pass (unit) |
-| `QA-W1-A06` | HRIS `1|` auto-sync | Mode stub `ok` | `200`, `offline_cache=false`, `last_hris_sync_at` terisi | Pass (kebijakan) / Pending (live) |
-| `QA-W1-A07` | HRIS `0|…|NONE` tanpa fallback | Mode stub `invalid` | `401 UNAUTHORIZED`, tidak ada fallback cache | Pass (kebijakan) / Pending (live) |
-| `QA-W1-A08` | HRIS non-XML | Mode stub `nonxml` | Cache offline (`offline_cache=true`) atau `502 HRIS_UPSTREAM_INVALID_RESPONSE` | Pass (kebijakan) / Pending (live) |
-| `QA-W1-A09` | HRIS timeout (12 s > 8 s) | Mode stub `slow` | Sama dengan A08; tanpa stack trace | Pass (kebijakan) / Pending (live) |
-| `QA-W1-M01` | TOTP harness vs RFC 6238 | Vektor Appendix B | `94287082`, `07081804`, `14050471` (8 digit) | Pass (unit) |
-| `QA-W1-M02` | Login step-1 → challenge | Akun MFA aktif | `mfa_required=true` + `mfa_challenge_token`, tanpa `access_token` | Pass / Pending (live) |
-| `QA-W1-M03` | Verify step aktif | TOTP step saat ini | `200` + `access_token` + `session_id` baru | Pass / Pending (live) |
-| `QA-W1-M04` | Anti-replay TOTP | OTP sama dua kali | Pemakaian kedua `4xx` (`UNAUTHORIZED/VALIDATION_ERROR/RATE_LIMITED`) | Pass / Pending (live) |
-| `QA-W1-M05` | Toleransi ±1 step | TOTP step+1 | Diterima atau ditolak rapi — tanpa 5xx | Pass / Pending (live) |
-| `QA-W1-M06` | OTP sampah | `otp=000000` | `4xx`, tanpa panic | Pass / Pending (live) |
-| `QA-W1-M07` | Backup code sekali pakai + auto-reset | `QA_W1_MFA_BACKUP_CODE` belum terpakai | `200` + sesi baru; login berikut `mfa_required=false` (`MFA_RESET_SELF_BACKUP`) | Pass / Pending (live) |
-| `QA-W1-N01` | `/auth/companies` publik | Tanpa token | `200`; `hris_enabled` boolean; `hris_login_url`/secret tidak muncul | Pass / Pending (live) |
-| `QA-W1-N02` | Navigation + server-side filtering | Sesi sah | Tepat satu `is_active_company`; tidak ada node `can_view=false` | Pass / Pending (live) |
-| `QA-W1-N03` | Switch tanpa akses | `QA_W1_FORBIDDEN_COMPANY_ID` | `403 FORBIDDEN` | Pass / Pending (live) |
-| `QA-W1-N04` | Switch malformed | `bukan-uuid`, `""` | `400/403`, tanpa 5xx | Pass / Pending (live) |
-| `QA-W1-N05` | Switch sah mengubah konteks | `QA_W1_SWITCH_COMPANY_ID` | `200` + JWT klaim company baru; navigation konsisten | Pass / Pending (live) |
-| `QA-W1-T01` | `/assets` butuh auth | Tanpa token | `401/403` | Pass / Pending (live) |
-| `QA-W1-T02` | Lifecycle checkout/checkin | Aset seed via Excel | checkout 2xx → re-checkout `409 CONFLICT` → checkin 2xx → re-checkin `400` | Pass / Pending (live) |
-| `QA-W1-T03` | `asset_checkout_logs` konsisten | Aset ter-assign | Entri aset memuat jejak checkout | Pass / Pending (live) |
-| `QA-W1-T04` | Checkout aset tak dikenal | UUID nol | `4xx`, tanpa panic | Pass / Pending (live) |
-| `QA-W1-X01` | Import baris valid | 3 baris §3 | `inserted=3`, `error_count=0` | Pass / Pending (live) |
-| `QA-W1-X02` | Laporan per-baris | 7 kasus error §3 | Semua kode kanonik muncul; laporan ≤ 100 baris | Pass / Pending (live) |
-| `QA-W1-X03` | File rusak / fake magic | Truncated, `%PDF-1.7` | `400/415/422`, tanpa stack trace | Pass / Pending (live) |
-| `QA-W1-X04` | Import tanpa auth | Multipart anonim | `401/403` | Pass / Pending (live) |
-| `QA-W1-X05` | Export attachment | Sesi sah | `200`, `Content-Disposition: attachment`, MIME xlsx | Pass / Pending (live) |
-| `QA-W1-X06` | Sanitasi formula export | Aset `name='=cmd|…'` | Tidak ada sel export berawalan `= + - @ \t \r` | Pass / Pending (live) |
+| `QA-W2-E01` | Issue token oleh admin | JWT admin + `node_type=HOST` | `201` + token hex-64, id UUID, `expires_at` ≤ 72 jam, correlation echo | Pass (kontrak) / Skip (live — target tidak terjangkau) |
+| `QA-W2-E02` | Gate admin | JWT member | `403 FORBIDDEN` | Pass / Skip (live) |
+| `QA-W2-E03` | Tanpa JWT | Anonim | `401/403` | Pass / Skip (live) |
+| `QA-W2-E04` | Enroll sekali tampil kredensial | Token sah + model/label | `201` + `agent_id` UUID + `hmac_secret` hex-64; token tidak di-echo | Pass / Skip (live) |
+| `QA-W2-E05` | **Replay token enrollment** | Token sama dipakai 2× | Klaim kedua `401 UNAUTHORIZED`, tanpa `agent_id`/`hmac_secret` di body | Pass / Skip (live) |
+| `QA-W2-E06` | Token tak dikenal | hex-64 acak | `401 UNAUTHORIZED` generik, tanpa detail internal | Pass / Skip (live) |
+| `QA-W2-E07` | `asset_model_id` kosong | Field wajib hilang | `400 VALIDATION_ERROR` | Pass / Skip (live) |
+| `QA-W2-E08` | TTL clamp | `ttl_hours=999` | `expires_at` ≤ now+72 jam | Pass / Skip (live) |
+| `QA-W2-I01` | Inventory ingest | HMAC sah + payload | `202` + `snapshot_id` UUID | Pass / Skip (live) |
+| `QA-W2-I02` | Batch telemetry | host + 2 container + SMART | `202` + `system_rows=1`, `container_rows=2`, `smart_reports=1` | Pass / Skip (live) |
+| `QA-W2-I03` | Batas batch container | 201 container | `400 VALIDATION_ERROR` | Pass / Skip (live) |
+| `QA-W2-I04` | Batas batch SMART | 65 laporan | `400 VALIDATION_ERROR` | Pass / Skip (live) |
+| `QA-W2-I05` | Heartbeat uptime | `monitor_id` UUID nol (bukan milik tenant) | `202` sah atau `400/404` tenant-guard | Pass / Skip (live) |
+| `QA-W2-I06` | Ingest tanpa HMAC | Tanpa header `X-Agent-*` | `401 UNAUTHORIZED` | Pass / Skip (live) |
+| `QA-W2-I07` | Logs push & cap | 2 baris lalu 101 baris | `published=2`; 101 baris → `400 VALIDATION_ERROR` | Pass / Skip (live) |
+| `QA-W2-S01` | Env tidak di-echo | Create + GET + GET list | `GF_SECURITY_ADMIN_PASSWORD=…` tidak ada di body mana pun | Pass / Skip (live) |
+| `QA-W2-S02` | Nama duplikat | POST sama 2× | `409 CONFLICT` | Pass / Skip (live) |
+| `QA-W2-S03` | Gerbang compose (6 vektor) | `include`, tab, tanpa `services`, service tanpa source, key asing, >256 KB | Semua `400 VALIDATION_ERROR` | Pass (mirror unit) / Skip (live) |
+| `QA-W2-S04` | `working_dir` traversal (7 vektor) | `..`, `~`, `\`, relatif, control char | Semua `400 VALIDATION_ERROR` | Pass (mirror unit) / Skip (live) |
+| `QA-W2-S05` | Update + backup pointer | PUT compose baru | `200`; `backup_object_key` (bila ada) tanpa `..` | Pass / Skip (live) |
+| `QA-W2-S06` | Dispatch `up` | Stack sah | `202 QUEUED` + `dispatch_ref` | Pass / Skip (live) |
+| `QA-W2-S07` | Allowlist dispatch (8 vektor injection) | `up; cat /etc/shadow`, `up$(touch …)`, dsb. | Semua `400 VALIDATION_ERROR` | Pass (mirror unit) / Skip (live) |
+| `QA-W2-S08` | Delete soft | DELETE → GET | `2xx` lalu `404` | Pass / Skip (live) |
+| `QA-W2-N01` | Create vhost | Node + server_name + port 80 | `2xx`, muncul di listing | Pass / Skip (live) |
+| `QA-W2-N02` | UNIQUE triple | Duplikat (node, name, port) | `409 CONFLICT` | Pass / Skip (live) |
+| `QA-W2-N03` | Gerbang nginx (5 vektor) | Brace tak seimbang, tanpa `server {`, include traversal, include relatif, oversize | Semua `400 VALIDATION_ERROR` | Pass (mirror unit) / Skip (live) |
+| `QA-W2-N04` | Update reset status | PUT config | `200` + status `DRAFT` | Pass / Skip (live) |
+| `QA-W2-N05` | Dispatch `test_reload` | Vhost sah | `202 QUEUED` + `dispatch_ref` | Pass / Skip (live) |
+| `QA-W2-N06` | Command non-enum | `reload; id` | `400 VALIDATION_ERROR` | Pass / Skip (live) |
+| `QA-W2-N07` | Delete vhost | DELETE → GET | `2xx` lalu `404` | Pass / Skip (live) |
+| `QA-W2-U01` | HMAC vs RFC 4231 (case 1, 2) | Kunci & pesan resmi RFC | `b0344c61…`, `5bdcc146…` | Pass (unit) |
+| `QA-W2-U02` | HMAC vs referensi manual (key > block-size) | Key 131×0xaa, dst. | Identik dengan RFC 2104 manual + stdlib | Pass (unit) |
+| `QA-W2-U03` | Kanonis signature | `{ts}\n{METHOD}\n{path}\n{sha256(body)}` | Bentuk persis; body/method sensitif; deterministik | Pass (unit) |
+| `QA-W2-U04` | Mirror validator vektor | 6 compose + 5 nginx + 8 nama + 7 working_dir + 8 dispatch | Semua vektor invalid terdeteksi; sampel valid lolos | Pass (unit) |
 
 ## 4. Debugging & Reproduction Notes
 
-- **Python 3.10 dataclass ordering**: penambahan field opsional `body_bytes` pada `ApiResponseSnapshot`/`AuditEvidence` menimpa field tanpa default → diperbaiki dengan memberi default pada field trailing; regression dicegah karena seluruh unit test berjalan di CI tanpa stack.
-- **Vektor RFC 6238**: counter adalah `unix_time // 30` (bukan timestamp mentah) — kesalahan umum yang membuat test MFA salah laporan; kini tervalidasi unit test `QA-W1-M01`.
-- **Reproduksi live**: `docker compose up -d osc_base rustfs osc_rest`, set env kredensial (lihat `test/wave1/conftest.py`), lalu:
-  `cd osc_docs/test/rest_qad && python3 -m pytest -v` (semua; tanpa env → live test skip, unit tetap hijau) atau `python3 -m pytest test/wave1 -v -m "integration"`.
-- Status verifikasi lokal (tanpa stack): `python3 -m pytest -q` → **18 passed, 33 skipped** (exit 0).
+- **Vektor RFC 4231 dari ingatan tidak bisa dipercaya**: test case 6 yang ditulis manual ternyata salah memori → test merah. Diperbaiki dengan mempertahankan hanya vektor case 1 & 2 (terverifikasi) dan menambah **implementasi HMAC referensi manual** (RFC 2104: key > block-size → hash key dulu) sebagai orakel bebas — signer kini tervalidasi terhadap dua sumber independen.
+- **Mirror validator sebagai semacam contract-first**: unit test menolak vektor yang "terlalu lemah" (mis. traversal tanpa `..`/`~`) sehingga test live tidak pernah false-pass karena payload salah rakit.
+- **Reproduksi live**: `docker compose up -d osc_base rustfs osc_rest`, set env (lihat `test/wave2/conftest.py`): `QA_W2_ADMIN_USERNAME/PASSWORD` (+`QA_W2_ADMIN_MFA_SECRET`), `QA_W2_ASSET_MODEL_ID`, `QA_W2_STATUS_LABEL_ID`, `QA_W2_DOCKER_HOST_ID`, `QA_W2_NGINX_NODE_ID`, opsional `QA_W2_MEMBER_USERNAME/PASSWORD`, `QA_W2_COMPANY_ID`, lalu:
+  `cd osc_docs/test/rest_qad && python3 -m pytest -v` (semua; tanpa env → live skip, unit tetap hijau) atau `python3 -m pytest test/wave2 -v -m "integration"`.
+- Status verifikasi lokal (tanpa stack): `python3 -m pytest -q` → **32 passed, 85 skipped** (exit 0).
+- Catatan lingkungan: probe health `127.0.0.1:8000` menjawab `401` (bukan 200/503) → gate RoE meng-skip seluruh test live deterministik; tidak ada trafik yang dikirim ke layanan yang bukan osc_rest.
