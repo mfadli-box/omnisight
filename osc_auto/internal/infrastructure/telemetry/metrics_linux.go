@@ -6,7 +6,6 @@ import (
 	"bufio"
 	"errors"
 	"os"
-	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -52,7 +51,8 @@ func cpuTimes() (uint64, uint64, error) {
 		return 0, 0, errors.New("cpu counters malformed")
 	}
 	var total, idle uint64
-	for index, value := range fields[1:] {
+	// guest and guest_nice are already accounted for in user and nice.
+	for index, value := range fields[1:min(len(fields), 9)] {
 		ticks, err := strconv.ParseUint(value, 10, 64)
 		if err != nil {
 			return 0, 0, errors.New("cpu counters malformed")
@@ -128,5 +128,3 @@ func uptime() (uint64, error) {
 	}
 	return uint64(seconds), nil
 }
-
-var _ = runtime.GOOS

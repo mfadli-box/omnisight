@@ -91,6 +91,7 @@ services:
     environment:
       DATABASE_URL: postgres://omnisight_app:${POSTGRES_APP_PASSWORD:?Set POSTGRES_APP_PASSWORD}@osc_base:5432/${POSTGRES_DB:-omnisight}
       CACHE_URL: redis://osc_temp:6379
+      AGENT_HEARTBEAT_SECRETS: ${AGENT_HEARTBEAT_SECRETS:-}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET to at least 32 random bytes}
       MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:?Set MFA_ENCRYPTION_KEY to base64 for exactly 32 random bytes}
       HRIS_ALLOWED_HOSTS: ${HRIS_ALLOWED_HOSTS:-hris.intranet.local}

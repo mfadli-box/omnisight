@@ -58,14 +58,25 @@ func NewJobExecutor(runner domain.JobRunner, allowedServices []string) *JobExecu
 }
 
 func (e *JobExecutor) Execute(ctx context.Context, job domain.Job) (string, error) {
+	return e.execute(ctx, job, true)
+}
+
+func (e *JobExecutor) ExecuteDiagnostic(ctx context.Context, job domain.Job) (string, error) {
+	return e.execute(ctx, job, false)
+}
+
+func (e *JobExecutor) execute(ctx context.Context, job domain.Job, legacy bool) (string, error) {
+	if !legacy && (job.Command == "system.health" || job.Command == "service.status") {
+		return "", errors.New("command is not in the local allowlist")
+	}
 	switch job.Command {
-	case "system.health":
+	case "system.health", "uptime", "df", "docker ps":
 		if len(job.Args) != 0 {
-			return "", errors.New("system.health does not accept arguments")
+			return "", errors.New("command does not accept arguments")
 		}
-	case "service.status":
+	case "service.status", "systemctl status":
 		if len(job.Args) != 1 || job.Args["service"] == "" {
-			return "", errors.New("service.status requires one service name")
+			return "", errors.New("service status requires one service name")
 		}
 		if _, allowed := e.services[job.Args["service"]]; !allowed {
 			return "", errors.New("service is not in the local allowlist")
@@ -74,8 +85,7 @@ func (e *JobExecutor) Execute(ctx context.Context, job domain.Job) (string, erro
 		return "", errors.New("command is not in the local allowlist")
 	}
 	output, err := e.runner.Run(ctx, job.Command, job.Args)
-	if len(output) > domain.MaxJobBytes {
-		output = output[:domain.MaxJobBytes]
-	}
-	return output, err
+	result := domain.JobResult{Output: output}
+	result.BoundOutput()
+	return result.Output, err
 }

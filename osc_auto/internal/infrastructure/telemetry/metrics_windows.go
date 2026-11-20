@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"syscall"
 	"time"
 	"unsafe"
@@ -84,14 +83,14 @@ func disk() (uint64, uint64, error) {
 	if err != nil {
 		return 0, 0, err
 	}
-	var available, total, free uint64
-	if err := windows.GetDiskFreeSpaceEx(path, &available, &total, &free); err != nil {
+	var available, total uint64
+	if err := windows.GetDiskFreeSpaceEx(path, &available, &total, nil); err != nil {
 		return 0, 0, err
 	}
-	if free > total {
+	if available > total {
 		return 0, 0, errors.New("Windows disk counters invalid")
 	}
-	return total, total - free, nil
+	return total, total - available, nil
 }
 
 func uptime() (uint64, error) { return uint64(windows.DurationSinceBoot() / time.Second), nil }
@@ -99,5 +98,3 @@ func uptime() (uint64, error) { return uint64(windows.DurationSinceBoot() / time
 func filetimeTicks(value windows.Filetime) uint64 {
 	return uint64(value.HighDateTime)<<32 | uint64(value.LowDateTime)
 }
-
-var _ = strings.TrimSpace

@@ -7,14 +7,17 @@ use base64::{
 use osc_rest::{
     application::{
         auth::AuthService,
-        ports::{AuthRepository, CachePort, HrisPort, MailPort},
+        ports::{AuthRepository, HrisPort, MailPort},
         token::TokenService,
     },
     infrastructure::{
         email::HttpEmailNotifier, hris::HrisClient, postgres::PgAuthRepository,
         redis_cache::RedisCache,
     },
-    presentation::auth_http::{AppState, router},
+    presentation::{
+        auth_http::{AppState, router},
+        heartbeat_http,
+    },
 };
 use tracing_subscriber::{EnvFilter, filter::filter_fn, prelude::*};
 
@@ -51,7 +54,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pg = PgAuthRepository::connect(&database_url).await?;
     let tenant_pool = PgAuthRepository::connect(&database_url).await?.pool();
     let repository: Arc<dyn AuthRepository> = Arc::new(pg);
-    let cache: Arc<dyn CachePort> = Arc::new(RedisCache::new(&cache_url)?);
+    let cache = Arc::new(RedisCache::new(&cache_url)?);
+    let heartbeat_secrets = match std::env::var("AGENT_HEARTBEAT_SECRETS") {
+        Ok(value) => value,
+        Err(std::env::VarError::NotPresent) => String::new(),
+        Err(err) => return Err(err.into()),
+    };
+    let heartbeat_router = heartbeat_http::router(cache.clone(), &heartbeat_secrets)?;
     let hris: Arc<dyn HrisPort> = Arc::new(HrisClient::new(hris_allowed_hosts)?);
     let mailer: Option<Arc<dyn MailPort>> =
         HttpEmailNotifier::from_env().map(|client| Arc::new(client) as Arc<dyn MailPort>);
@@ -71,7 +80,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tenant_pool,
         storage: Arc::new(storage),
     });
-    let app = router(app_state);
+    let app = router(app_state).merge(heartbeat_router);
 
     let address: SocketAddr = std::env::var("BIND_ADDR")
         .unwrap_or_else(|_| "0.0.0.0:8080".to_owned())

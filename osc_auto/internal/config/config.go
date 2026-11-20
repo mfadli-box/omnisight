@@ -60,12 +60,8 @@ func Load(path string) (Config, []byte, error) {
 }
 
 func (c Config) Validate() error {
-	parsed, err := url.ParseRequestURI(c.APIURL)
-	if err != nil || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
-		return errors.New("api_url must be an absolute HTTPS URL without user info, query, or fragment")
-	}
-	if parsed.Scheme != "https" && !(parsed.Scheme == "http" && isLoopback(parsed.Hostname())) {
-		return errors.New("api_url requires HTTPS except for loopback development")
+	if err := validateURL(c.APIURL, "api_url"); err != nil {
+		return err
 	}
 	if !identifier.MatchString(c.NodeID) || len(c.NodeToken) < 32 || len(c.NodeToken) > 512 {
 		return errors.New("node_id or node_token is invalid")
@@ -73,11 +69,29 @@ func (c Config) Validate() error {
 	if c.IntervalSeconds < 10 || c.IntervalSeconds > 600 {
 		return errors.New("interval_seconds must be between 10 and 600")
 	}
-	if c.StateDir == "" || len(c.AllowedServices) > 32 {
-		return errors.New("state_dir or allowed_services is invalid")
+	if c.StateDir == "" {
+		return errors.New("state_dir is required")
+	}
+	return validateServices(c.AllowedServices)
+}
+
+func validateURL(value, name string) error {
+	parsed, err := url.ParseRequestURI(value)
+	if err != nil || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "" || strings.Contains(value, "#") {
+		return fmt.Errorf("%s must be an absolute HTTPS URL without user info, query, or fragment", name)
+	}
+	if parsed.Scheme != "https" && !(parsed.Scheme == "http" && isLoopback(parsed.Hostname())) {
+		return fmt.Errorf("%s requires HTTPS except for loopback development", name)
+	}
+	return nil
+}
+
+func validateServices(services []string) error {
+	if len(services) > 32 {
+		return errors.New("allowed_services must contain at most 32 entries")
 	}
 	seen := map[string]struct{}{}
-	for _, service := range c.AllowedServices {
+	for _, service := range services {
 		if !identifier.MatchString(service) {
 			return fmt.Errorf("allowed service name %q is invalid", service)
 		}

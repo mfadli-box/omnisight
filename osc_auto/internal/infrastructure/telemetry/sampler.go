@@ -31,7 +31,7 @@ func (s *Sampler) Sample(ctx context.Context) (domain.Telemetry, error) {
 	if err != nil {
 		return domain.Telemetry{}, err
 	}
-	idle, total, err := cpuTimes()
+	usage, err := s.cpuUsage(ctx)
 	if err != nil {
 		return domain.Telemetry{}, err
 	}
@@ -47,26 +47,44 @@ func (s *Sampler) Sample(ctx context.Context) (domain.Telemetry, error) {
 	if err != nil {
 		return domain.Telemetry{}, err
 	}
-	s.mu.Lock()
-	usage := 0.0
-	if s.hasPrevious && total > s.previous.total && idle >= s.previous.idle {
-		deltaTotal, deltaIdle := total-s.previous.total, idle-s.previous.idle
-		if deltaTotal > 0 {
-			usage = 100 * float64(deltaTotal-deltaIdle) / float64(deltaTotal)
-		}
-	}
-	s.previous, s.hasPrevious = cpuReading{idle: idle, total: total}, true
-	s.mu.Unlock()
-	if usage < 0 {
-		usage = 0
-	}
-	if usage > 100 {
-		usage = 100
-	}
 	return domain.Telemetry{
 		CollectedAt: time.Now().UTC(), Hostname: host, OS: runtime.GOOS, OSVersion: osVersion,
 		Architecture: runtime.GOARCH, CPUPercent: usage, CPUCount: runtime.NumCPU(),
 		MemoryTotal: memTotal, MemoryUsed: memUsed, DiskTotal: diskTotal, DiskUsed: diskUsed,
 		UptimeSeconds: uptime,
 	}, nil
+}
+
+func (s *Sampler) cpuUsage(ctx context.Context) (float64, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	idle, total, err := cpuTimes()
+	if err != nil {
+		return 0, err
+	}
+	if !s.hasPrevious {
+		timer := time.NewTimer(100 * time.Millisecond)
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		case <-timer.C:
+		}
+		s.previous = cpuReading{idle: idle, total: total}
+		idle, total, err = cpuTimes()
+		if err != nil {
+			return 0, err
+		}
+	}
+	previous := s.previous
+	s.previous, s.hasPrevious = cpuReading{idle: idle, total: total}, true
+	if total <= previous.total || idle < previous.idle {
+		return 0, nil
+	}
+	deltaTotal, deltaIdle := total-previous.total, idle-previous.idle
+	if deltaIdle > deltaTotal {
+		return 0, nil
+	}
+	return 100 * float64(deltaTotal-deltaIdle) / float64(deltaTotal), nil
 }

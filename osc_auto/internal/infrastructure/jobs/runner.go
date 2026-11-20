@@ -1,9 +1,11 @@
 package jobs
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -33,6 +35,8 @@ func (r *Runner) Run(ctx context.Context, command string, args map[string]string
 		}{sample.OS, sample.OSVersion, sample.CPUPercent, sample.MemoryUsed, sample.MemoryTotal, sample.DiskUsed, sample.DiskTotal, sample.UptimeSeconds, sample.CollectedAt}
 		data, err := json.Marshal(summary)
 		return string(data), err
+	case "uptime", "df", "docker ps", "systemctl status":
+		return r.diagnostic(ctx, command, args["service"])
 	case "service.status":
 		return serviceStatus(ctx, args["service"])
 	default:
@@ -40,9 +44,26 @@ func (r *Runner) Run(ctx context.Context, command string, args map[string]string
 	}
 }
 func bounded(s string) string {
-	s = strings.ToValidUTF8(s, "�")
 	if len(s) > domain.MaxOutputByte {
-		return s[:domain.MaxOutputByte]
+		s = s[:domain.MaxOutputByte]
 	}
-	return s
+	return strings.ToValidUTF8(s, "")
+}
+
+type commandOutput struct{ buffer bytes.Buffer }
+
+func (b *commandOutput) Write(p []byte) (int, error) {
+	remaining := domain.MaxOutputByte - b.buffer.Len()
+	_, _ = b.buffer.Write(p[:min(len(p), remaining)])
+	return len(p), nil
+}
+
+func runCommand(ctx context.Context, env []string, path string, args ...string) (string, error) {
+	cmd := exec.CommandContext(ctx, path, args...)
+	cmd.Env = env
+	cmd.WaitDelay = time.Second
+	output := &commandOutput{}
+	cmd.Stdout, cmd.Stderr = output, output
+	err := cmd.Run()
+	return bounded(strings.TrimSpace(output.buffer.String())), err
 }

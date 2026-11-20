@@ -6,19 +6,31 @@ import (
 	"context"
 	"errors"
 	"os/exec"
-	"strings"
+	"path/filepath"
+
+	"golang.org/x/sys/windows"
 )
 
 func serviceStatus(ctx context.Context, name string) (string, error) {
-	cmd := exec.CommandContext(ctx, `C:\Windows\System32\sc.exe`, "query", name)
-	data, err := cmd.Output()
-	output := strings.TrimSpace(string(data))
+	output, err := queryService(ctx, name)
+	if ctx.Err() != nil {
+		return output, ctx.Err()
+	}
 	if err != nil {
 		var exit *exec.ExitError
 		if errors.As(err, &exit) {
-			return bounded(output), nil
+			return output, nil
 		}
-		return bounded(output), err
+		return output, err
 	}
-	return bounded(output), nil
+	return output, nil
+}
+
+func queryService(ctx context.Context, name string) (string, error) {
+	systemDir, err := windows.GetSystemDirectory()
+	if err != nil {
+		return "", err
+	}
+	env := []string{"SystemRoot=" + filepath.Dir(systemDir)}
+	return runCommand(ctx, env, filepath.Join(systemDir, "sc.exe"), "query", name)
 }

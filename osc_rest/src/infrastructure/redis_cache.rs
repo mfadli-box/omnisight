@@ -31,6 +31,31 @@ impl RedisCache {
             .await
             .map_err(|_| AuthError::DependencyUnavailable)
     }
+    pub async fn record_agent_heartbeat(
+        &self,
+        node_id: &str,
+        timestamp: i64,
+        payload: &str,
+    ) -> Result<bool, AuthError> {
+        let accepted: i64 = Script::new(
+            r#"
+            local previous = redis.call('GET', KEYS[1])
+            if previous and cjson.decode(previous).timestamp >= tonumber(ARGV[1]) then
+                return 0
+            end
+            redis.call('SET', KEYS[1], ARGV[2], 'EX', 900)
+            return 1
+            "#,
+        )
+        .key(format!("osc:agent:heartbeat:{node_id}"))
+        .arg(timestamp)
+        .arg(payload)
+        .invoke_async(&mut self.connection().await?)
+        .await
+        .map_err(|_| AuthError::DependencyUnavailable)?;
+        Ok(accepted == 1)
+    }
+
     async fn reserve_attempt(&self, key: String, limit: i64, ttl: i64) -> Result<bool, AuthError> {
         let count: i64 = Script::new(
             "local n=tonumber(redis.call('GET',KEYS[1]) or '0')
