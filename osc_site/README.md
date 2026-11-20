@@ -1,25 +1,31 @@
 # osc_site
 
-OmniSight adalah workspace Next.js App Router yang responsif. Komponen di `src/components/ui` mengikuti pola komposisi Radix dan Tailwind seperti shadcn/ui; token global memakai Tailwind CSS v4.
+Workspace OmniSight memakai Next.js 16 App Router, TypeScript, Tailwind CSS v4, dan komponen shadcn/ui berbasis Radix.
 
-## Konfigurasi
+## Menjalankan
 
-- `BACKEND_URL`: URL privat sisi server untuk `osc_rest`, misalnya `http://osc_rest:8080`. Jangan pernah mengeksposnya sebagai nilai `NEXT_PUBLIC_*`.
-- `APP_ORIGIN`: origin publik persis yang dipakai pemeriksaan same-origin BFF, misalnya `https://ops.example.internal`. Atur ke origin yang terlihat browser di balik reverse proxy.
+Atur `INTERNAL_API_URL` ke URL privat `osc_rest`, misalnya `http://osc_rest:8080` di Compose. Atur `APP_ORIGIN` ke origin yang terlihat browser, termasuk skema dan port. Default Compose adalah `http://localhost:36665`. Gunakan HTTPS di luar loopback. Jalankan versi `osc_rest` dari checkout yang sama agar direktori konteks dan metrik OP02 tersedia.
 
-Login dan context switcher menyediakan dua perusahaan contoh dari `osc_base/seeds/001_initial_seed.sql`, serta field UUID untuk perusahaan yang diberikan administrator. ID regional juga dapat dimasukkan manual. Backend tetap bertanggung jawab memvalidasi seluruh akses perusahaan dan regional.
+Untuk pengembangan di luar Docker dengan Node.js 22, jalankan `npm ci` lalu `npm run dev` dari direktori ini. Untuk membangun image dari root repo, jalankan `docker build -t osc_site ./osc_site`. Image menjalankan server standalone sebagai pengguna `node` pada port 3000.
 
-## Batas sesi dan API
+## Alur akses
 
-BFF menyimpan token akses dan tantangan MFA berumur pendek dalam cookie `Secure; HttpOnly; SameSite=Strict`. Komponen browser yang terautentikasi memanggil route handler lokal; hanya handler tersebut yang meneruskan token cookie ke `osc_rest`. JWT tidak pernah dikembalikan di respons JSON atau disimpan dalam penyimpanan browser. Rute yang mengubah state memeriksa header `Origin` terhadap `APP_ORIGIN`.
+- Login mengambil pilihan company aktif dari `/baas/v1/public/companies` dan selalu menawarkan Local Account. Akun dengan MFA dapat masuk dengan OTP enam digit atau memakai backup code dari formulir pemulihan.
+- BFF menyimpan JWT sesi dan challenge dalam cookie beratribut `HttpOnly`, `Secure`, dan `SameSite=Strict`. Handler mutasi memvalidasi origin. Proxy meneruskan Bearer token dari cookie ke `osc_rest` untuk rute yang diizinkan. Logout menghapus cookie sesi browser.
+- AppShell memakai `/baas/v1/me/navigation` untuk menu dan `/baas/v1/me/contexts` untuk daftar company serta area berdasarkan grant. REST memvalidasi setiap akses dan perpindahan konteks.
 
-UI memuat navigasi dari `/api/me/navigation`, yang meneruskan daftar efektif `can_view` dari backend. Proxy API untuk PAM authorize, transfer lampiran SOP, dan ekspor laporan juga menjaga access token di sisi server serta membatasi metode, identifier, MIME, dan tabel laporan yang diterima.
+## Modul
 
-## Batas backend saat ini
+| Modul | Fitur |
+| --- | --- |
+| CT01 | Inventaris node dalam konteks aktif dan filter status per halaman |
+| OP01 | Target PAM dan otorisasi sesi dengan OTP step-up |
+| OP02 | Inventaris agen dan metrik heartbeat dari Valkey. Gunakan UUID baris node sebagai `node_id` saat provisioning agen. Sampel tersedia selama 15 menit. |
+| KB01 | Buat, ubah, dan arsipkan SOP serta unggah dan unduh lampiran privat |
+| RP01, RP02 | Ekspor XLSX dan PDF, beserta unduhan ulang dari arsip privat |
+| SA01 | Kelola company, area, dan store |
+| SA02 | Kelola akun lokal, cabut akses, dan reset MFA pengguna |
+| SA03 | Buat role, kelola privilege menu, dan lihat log audit |
+| SA04 | Kelola provider Local Account atau HRIS ASMX dan TTL cache |
 
-- CT01 dan OP02 saat ini menampilkan telemetri contoh karena endpoint baca terkait belum tersedia di `osc_rest`.
-- Pengeditan Markdown SOP adalah pratinjau lokal; layanan REST saat ini menyediakan transfer lampiran, tetapi belum menyediakan CRUD dokumen atau rute approval.
-- SA01–SA04 menampilkan formulir modul, tetapi penulisan dinonaktifkan sampai endpoint administrasi terkait tersedia.
-- Menu konteks perusahaan berisi opsi contoh dari seed dan input UUID manual karena REST belum menyediakan endpoint direktori company/area yang dibatasi grant pengguna.
-
-UI tidak pernah menganggap navigasi tersembunyi sebagai otorisasi. Pemeriksaan rute backend dan RLS tetap menjadi sumber keputusan otoritatif.
+API antrean scheduler belum tersedia. Mutasi SA03 dan SA04 memerlukan sesi dengan MFA terbaru.

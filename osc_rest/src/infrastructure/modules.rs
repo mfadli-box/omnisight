@@ -123,6 +123,15 @@ impl Resource {
     }
 }
 
+pub async fn agent_status(
+    db: &mut PgConnection,
+    claims: &SessionClaims,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<Value>, AuthError> {
+    read_for_menu(db, claims, Resource::Nodes, None, (limit, offset), "OP02").await
+}
+
 pub async fn read(
     db: &mut PgConnection,
     claims: &SessionClaims,
@@ -130,6 +139,17 @@ pub async fn read(
     id: Option<Uuid>,
     limit: i64,
     offset: i64,
+) -> Result<Vec<Value>, AuthError> {
+    read_for_menu(db, claims, resource, id, (limit, offset), resource.menu()).await
+}
+
+async fn read_for_menu(
+    db: &mut PgConnection,
+    claims: &SessionClaims,
+    resource: Resource,
+    id: Option<Uuid>,
+    (limit, offset): (i64, i64),
+    menu: &str,
 ) -> Result<Vec<Value>, AuthError> {
     let tenant = resource.company_column();
     let area = resource.area_column();
@@ -149,7 +169,7 @@ pub async fn read(
         .bind(claims.sub)
         .bind(company(claims)?)
         .bind(&claims.allowed_area_ids)
-        .bind(resource.menu())
+        .bind(menu)
         .bind(id)
         .bind(limit)
         .bind(offset)

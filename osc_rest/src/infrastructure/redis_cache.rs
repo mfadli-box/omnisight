@@ -56,6 +56,24 @@ impl RedisCache {
         Ok(accepted == 1)
     }
 
+    pub async fn agent_heartbeats(
+        &self,
+        node_ids: &[Uuid],
+    ) -> Result<Vec<Option<String>>, AuthError> {
+        if node_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let keys: Vec<String> = node_ids
+            .iter()
+            .map(|id| format!("osc:agent:heartbeat:{id}"))
+            .collect();
+        self.connection()
+            .await?
+            .mget(keys)
+            .await
+            .map_err(|_| AuthError::DependencyUnavailable)
+    }
+
     async fn reserve_attempt(&self, key: String, limit: i64, ttl: i64) -> Result<bool, AuthError> {
         let count: i64 = Script::new(
             "local n=tonumber(redis.call('GET',KEYS[1]) or '0')

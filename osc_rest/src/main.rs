@@ -67,7 +67,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tokens = Arc::new(TokenService::new(jwt_secret)?);
     let auth = Arc::new(AuthService::new(
         repository,
-        cache,
+        cache.clone(),
         hris,
         mailer,
         tokens.clone(),
@@ -78,6 +78,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         auth,
         tokens,
         tenant_pool,
+        cache,
         storage: Arc::new(storage),
     });
     let app = router(app_state).merge(heartbeat_router);

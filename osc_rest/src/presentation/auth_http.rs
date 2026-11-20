@@ -27,6 +27,7 @@ pub struct AppState {
     pub auth: Arc<AuthService>,
     pub tokens: Arc<TokenService>,
     pub tenant_pool: PgPool,
+    pub cache: Arc<crate::infrastructure::redis_cache::RedisCache>,
     pub storage: Arc<crate::infrastructure::storage::RustFsStorage>,
 }
 
@@ -102,6 +103,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/baas/v1/users/{user_id}/mfa/reset", post(admin_reset))
         .route("/baas/v1/auth/switch-company", post(switch_company))
         .route("/baas/v1/me/navigation", get(navigation))
+        .route("/baas/v1/me/contexts", get(contexts))
         .route("/baas/v1/pam/sessions/authorize", post(pam_authorize))
         .route(
             "/baas/v1/sop-documents/{document_id}/attachment",
@@ -384,6 +386,42 @@ async fn switch_company(
         "access_token": token, "expires_in": expires_in, "company_id": principal.company_id,
         "area_id": principal.area_id, "allowed_area_ids": principal.allowed_area_ids
     })))
+}
+
+async fn contexts(
+    Extension(tenant): Extension<TenantTransaction>,
+) -> Result<impl IntoResponse, ApiError> {
+    let mut guard = tenant.transaction.lock().await;
+    let tx = guard.as_mut().ok_or(AuthError::Internal)?;
+    let entries = sqlx::query_scalar::<_, serde_json::Value>(
+        "WITH grants AS (
+             SELECT g.company_id, bool_or(g.area_id IS NULL) AS company_wide,
+                    array_agg(g.area_id) AS area_ids
+             FROM public.osc_user_access g
+             JOIN public.osc_role r ON r.id=g.role_id AND r.company_id=g.company_id AND r.is_active
+             WHERE g.user_id=$1 AND g.is_active
+               AND (g.area_id IS NULL OR EXISTS (
+                    SELECT 1 FROM public.osc_area a
+                    WHERE a.id=g.area_id AND a.company_id=g.company_id AND a.is_active))
+             GROUP BY g.company_id
+         )
+         SELECT jsonb_build_object('id', c.id, 'name', c.name,
+                 'company_wide', g.company_wide,
+                 'areas', COALESCE((SELECT jsonb_agg(jsonb_build_object('id', a.id, 'name', a.name)
+                                   ORDER BY a.name, a.id)
+                                    FROM public.osc_area a
+                                    WHERE a.company_id=c.id AND a.is_active
+                                      AND (g.company_wide OR a.id=ANY(g.area_ids))),
+                                   '[]'::jsonb))
+         FROM grants g
+         JOIN public.osc_company c ON c.id=g.company_id AND c.is_active
+         ORDER BY c.name, c.id",
+    )
+    .bind(tenant.claims.sub)
+    .fetch_all(&mut **tx)
+    .await
+    .map_err(modules::database_error)?;
+    Ok(super::modules_http::envelope(entries))
 }
 
 async fn navigation(

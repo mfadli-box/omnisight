@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { assertSameOrigin, backendError, backendRequest, clearAuthCookies, jsonError } from "@/lib/server/backend";
+import { assertSameOrigin, backendError, backendRequest, clearAuthCookies, jsonError, readAuthInput } from "@/lib/server/backend";
 
 export async function POST(request: NextRequest) {
   if (!assertSameOrigin(request)) return jsonError(403, "CSRF_BLOCKED", "Permintaan tidak berasal dari origin yang sama.");
-  let input: Record<string, unknown>;
-  try { input = await request.json(); } catch { return jsonError(400, "INVALID_REQUEST", "Format permintaan tidak valid."); }
+  const input = await readAuthInput(request).catch(() => null);
+  if (!input) return jsonError(400, "INVALID_REQUEST", "Format permintaan tidak valid.");
   const token = typeof input.token === "string" ? input.token.trim() : "";
   if (token.length < 16 || token.length > 512) return jsonError(400, "INVALID_RESET_TOKEN", "Tautan pemulihan tidak valid.");
   try {

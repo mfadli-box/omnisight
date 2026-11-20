@@ -2,7 +2,7 @@
 
 ## 1. Cakupan dan topologi
 
-Runbook ini menjelaskan deployment stack Compose saat ini pada satu host atau pemisahan layanannya ke beberapa VM privat. Berkas Compose repositori adalah kerangka pengembangan/instalasi kecil pada satu host: menjalankan PostgreSQL (`osc_base`), Valkey (`osc_cache`), RustFS (`osc_storage`), Rust API (`osc_rest`), dan Next.js (`osc_site`). Compose belum mengonfigurasi TLS produksi, aturan firewall VM, replikasi PostgreSQL, autentikasi/HA Valkey, cluster RustFS, atau ingress produksi. Lengkapi kontrol tersebut pada platform tujuan sebelum membuka akses eksternal.
+Runbook ini menjelaskan deployment stack Compose saat ini pada satu host atau pemisahan layanannya ke beberapa VM privat. Berkas Compose repositori adalah kerangka pengembangan/instalasi kecil pada satu host: menjalankan PostgreSQL (`osc_base`), Valkey (`osc_temp`), RustFS (`osc_save`), Rust API (`osc_rest`), dan Next.js (`osc_site`). Compose belum mengonfigurasi TLS produksi, aturan firewall VM, replikasi PostgreSQL, autentikasi/HA Valkey, cluster RustFS, atau ingress produksi. Lengkapi kontrol tersebut pada platform tujuan sebelum membuka akses eksternal.
 
 Untuk deployment multi-VM, gunakan DNS dan subnet privat. Izinkan hanya aliran antar layanan berikut; larang akses publik ke layanan data:
 
@@ -35,11 +35,20 @@ Jangan buka PostgreSQL, Valkey, S3 RustFS, atau port konsol RustFS ke internet p
 Jalankan perintah dari direktori utama repositori pada host terlindungi. Buat berkas environment milik root di luar repositori atau ekspor variabel dari secret manager. Variabel Compose wajib mencakup `POSTGRES_PASSWORD`, `POSTGRES_APP_PASSWORD`, `JWT_SECRET`, `MFA_ENCRYPTION_KEY`, `RUSTFS_ACCESS_KEY`, dan `RUSTFS_SECRET_KEY`. Atur juga `APP_ORIGIN`, `PUBLIC_APP_URL`, `HRIS_ALLOWED_HOSTS`, bucket/region RustFS, dan integrasi reset email sesuai kebutuhan. Jangan commit nilainya.
 
 1. Tinjau berkas Compose, Dockerfile, tag image, path volume, healthcheck, dan port yang dipublikasikan. Konfigurasi saat ini hanya mempublikasikan port web; tempatkan di balik ingress TLS.
-2. Build dan jalankan: `docker compose build`, lalu `docker compose up -d`.
-3. Periksa kesehatan: `docker compose ps`; tinjau `docker compose logs --tail=100 osc_base osc_cache osc_storage osc_rest osc_site` untuk kegagalan startup. Jangan aktifkan log debug yang memuat kredensial.
-4. Terapkan migrasi SQL berurutan di `osc_base/migrations/` dengan role migrasi/admin, lalu jalankan `osc_base/seeds/001_initial_seed.sql` hanya pada basis data pengembangan/pengujian yang baru. Super Admin seed adalah placeholder nonaktif; buat hash password dan akses yang sebenarnya melalui alur bootstrap resmi sebelum aktivasi.
-5. Dengan akun uji, verifikasi `/health`, kesiapan database, konektivitas Valkey, readiness RustFS, login, MFA, perpindahan tenant, serta satu alur upload/download storage privat.
-6. Konfigurasikan TLS ingress dan uji keamanan cookie, batas ukuran request, pembatasan laju, penyamaran access log, serta isolasi jaringan.
+2. Jalankan PostgreSQL dan tunggu siap dengan `docker compose up -d --wait osc_base`. Pada instalasi baru, terapkan migrasi inti dan kebijakan RLS dengan role admin sebelum menyalakan REST.
+
+   ```sh
+   cat osc_base/migrations/001_init_core.sql osc_base/migrations/002_rls_policies.sql |
+     docker compose exec -T osc_base sh -c 'exec psql -X -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+   ```
+
+   Untuk upgrade, ikuti jalur migrasi yang sesuai dengan skema terpasang. [Catatan fondasi database](../../osc_base/notes/20261120-core-01-base.md)
+
+3. Bangun dan jalankan layanan lainnya dengan `docker compose up -d --build`.
+4. Periksa kesehatan: `docker compose ps`; tinjau `docker compose logs --tail=100 osc_base osc_temp osc_save osc_rest osc_site` untuk kegagalan startup. Jangan aktifkan log debug yang memuat kredensial.
+5. Provision company, role, dan administrator awal melalui alur bootstrap produksi. Gunakan `osc_base/seeds/001_seed_demo.sql` hanya untuk database pengembangan atau pengujian.
+6. Periksa bahwa `/baas/v1/public/companies` di REST dan `/api/proxy/public/companies` di BFF merespons HTTP 200. REST Compose memakai endpoint company sebagai healthcheck agar koneksi dan izin baca skema ikut diperiksa. Dengan akun uji, periksa login, MFA, perpindahan tenant, dan transfer objek privat.
+7. Konfigurasikan TLS ingress dan uji keamanan cookie, batas ukuran request, pembatasan laju, penyamaran access log, serta isolasi jaringan.
 
 Sebelum upgrade, ambil backup database dan object storage. Terapkan migrasi lanjutan yang sudah ditinjau, deploy image yang dipin, verifikasi kesehatan dan alur smoke test, lalu simpan image lama serta titik pemulihan terdokumentasi sampai masa observasi selesai. Jangan pulihkan snapshot database tanpa menyelaraskan objek RustFS dan state Valkey/sesi yang sesuai.
 
@@ -48,7 +57,7 @@ Sebelum upgrade, ambil backup database dan object storage. Terapkan migrasi lanj
 1. Siapkan satu atau beberapa VM untuk setiap peran: web/BFF, Rust API, PostgreSQL, Valkey, dan RustFS. Pin versi OS/runtime container; aktifkan firewall host, pembaruan keamanan, sinkronisasi waktu, audit log, enkripsi disk, dan pemantauan.
 2. Tempatkan PostgreSQL, Valkey, dan RustFS pada jaringan privat nonpublik dengan disk persisten terenkripsi. Atur autentikasi bawaan layanan, TLS, backup, pemantauan kesehatan, dan latihan pemulihan.
 3. Jalankan replika API di belakang load balancer privat. Suntikkan secret saat runtime. Terapkan migrasi sebagai tugas administrasi satu kali sebelum menambah replika API; jangan menjalankan migrasi skema pada startup setiap replika.
-4. Jalankan Next.js/BFF di balik ingress TLS publik. Atur `BACKEND_URL` ke endpoint API privat dan isi `APP_ORIGIN`/origin publik secara persis. Batasi CORS dan teruskan hanya header yang diharapkan.
+4. Jalankan Next.js/BFF di balik ingress TLS publik. Atur `INTERNAL_API_URL` ke endpoint API privat dan isi `APP_ORIGIN`/origin publik secara persis. Batasi CORS dan teruskan hanya header yang diharapkan.
 5. Batasi akses jaringan keluar API ke PostgreSQL, Valkey, RustFS, host HRIS yang disetujui, endpoint email, dan tujuan telemetri. Batasi HRIS secara terpisah pada lapisan jaringan.
 6. Validasi health/readiness dan TLS antar layanan dari setiap VM. Sebelum membuka trafik pengguna, uji login, challenge MFA, cakupan company/area, alur objek SOP, arsip laporan, dan kebijakan outage HRIS.
 7. Pantau kesehatan dependensi API, counter login/MFA gagal, status circuit HRIS, kejadian fallback offline-cache, umur heartbeat, antrean job, kegagalan objek, kapasitas disk, status replikasi/backup database, serta masa berlaku sertifikat.

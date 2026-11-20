@@ -109,7 +109,7 @@ services:
       osc_save: {condition: service_healthy}
     expose: ["8080"]
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health"]
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:8080/baas/v1/public/companies"]
       interval: 20s
       timeout: 5s
       retries: 3
@@ -125,8 +125,8 @@ services:
     ports:
       - "36665:3000"
     environment:
-      BACKEND_URL: http://osc_rest:8080
-      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:3000}
+      INTERNAL_API_URL: http://osc_rest:8080
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:36665}
     depends_on:
       osc_rest: {condition: service_healthy}
     healthcheck:

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::{
     Extension, Json, Router,
-    extract::{Path, Query},
+    extract::{Path, Query, State},
     http::StatusCode,
     routing::get,
 };
@@ -36,6 +36,7 @@ pub fn routes() -> Router<Arc<AppState>> {
         );
     }
     router
+        .route("/baas/v1/agents/status", get(agent_status))
         .route("/baas/v1/audit-logs", get(audit_logs))
         .route("/baas/v1/users", get(users).post(create_user))
         .route(
@@ -86,6 +87,37 @@ async fn list(
     Ok(envelope(
         modules::read(db, &tenant.claims, resource, None, limit, offset).await?,
     ))
+}
+
+async fn agent_status(
+    State(state): State<Arc<AppState>>,
+    Extension(tenant): Extension<TenantTransaction>,
+    Query(page): Query<Page>,
+) -> Result<Json<Value>, ApiError> {
+    let (limit, offset) = page.bounds()?;
+    let mut nodes = {
+        let mut guard = tenant.transaction.lock().await;
+        let db = guard.as_mut().ok_or(AuthError::Internal)?;
+        modules::agent_status(db, &tenant.claims, limit, offset).await?
+    };
+    let ids = nodes
+        .iter()
+        .map(|node| serde_json::from_value(node["id"].clone()))
+        .collect::<Result<Vec<Uuid>, _>>()
+        .map_err(|_| AuthError::Internal)?;
+    let heartbeats = state.cache.agent_heartbeats(&ids).await?;
+    for (node, heartbeat) in nodes.iter_mut().zip(heartbeats) {
+        let Some(heartbeat) = heartbeat else { continue };
+        let payload: Value = serde_json::from_str(&heartbeat).map_err(|_| AuthError::Internal)?;
+        let timestamp = payload["timestamp"]
+            .as_i64()
+            .and_then(|ts| chrono::DateTime::from_timestamp(ts, 0));
+        node["heartbeat_at"] = json!(timestamp);
+        for key in ["cpu_percent", "ram_percent", "disk_percent"] {
+            node[key] = json!(payload["metrics"][key].as_f64());
+        }
+    }
+    Ok(envelope(nodes))
 }
 
 async fn detail(
