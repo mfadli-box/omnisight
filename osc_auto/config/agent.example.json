@@ -1,0 +1,9 @@
+{
+  "api_url": "https://omnisight.example.internal",
+  "node_id": "replace-with-provisioned-node-id",
+  "node_token": "REPLACE_WITH_PER_NODE_BEARER_TOKEN_MINIMUM_32_CHARACTERS",
+  "job_hmac_key_base64": "REPLACE_WITH_BASE64_OF_32_RANDOM_BYTES",
+  "interval_seconds": 30,
+  "state_dir": "/var/lib/omnisight-agent",
+  "allowed_services": ["nginx", "postgresql"]
+}

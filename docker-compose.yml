@@ -1,0 +1,139 @@
+volumes:
+  xbase:
+    driver: local
+  xtemp:
+    driver: local
+  xsave:
+    driver: local
+
+networks:
+  blackbox:
+    name: blackbox
+    external: true
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  osc_base:
+    image: postgres:18-alpine
+    container_name: osc_base
+    logging: *default-logging
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-omnisight}
+      POSTGRES_USER: ${POSTGRES_USER:-osc}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in environment}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?Set POSTGRES_APP_PASSWORD for the non-superuser API role}
+    ports:
+      - "36661:5432"
+    volumes:
+      - xbase:/var/lib/postgresql
+      - ./osc_base/init/001_runtime_role.sh:/docker-entrypoint-initdb.d/001_runtime_role.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      blackbox:
+        ipv4_address: 172.99.66.1
+
+  osc_temp:
+    image: valkey/valkey:8-alpine
+    container_name: osc_temp
+    logging: *default-logging
+    ports:
+      - "36662:6379"
+    command: ["valkey-server", "--appendonly", "yes"]
+    volumes:
+      - xtemp:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      blackbox:
+        ipv4_address: 172.99.66.2
+
+  osc_save:
+    image: rustfs/rustfs:latest
+    container_name: osc_save
+    logging: *default-logging
+    ports:
+      - "36663:9000"
+    environment:
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:?Set RUSTFS_ACCESS_KEY in environment}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:?Set RUSTFS_SECRET_KEY in environment}
+    volumes:
+      - xsave:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9000/health/ready >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      blackbox:
+        ipv4_address: 172.99.66.3
+
+  osc_rest:
+    build: ./osc_rest
+    container_name: osc_rest
+    logging: *default-logging
+    ports:
+      - "36664:8080"
+    environment:
+      DATABASE_URL: postgres://omnisight_app:${POSTGRES_APP_PASSWORD:?Set POSTGRES_APP_PASSWORD}@osc_base:5432/${POSTGRES_DB:-omnisight}
+      CACHE_URL: redis://osc_temp:6379
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET to at least 32 random bytes}
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:?Set MFA_ENCRYPTION_KEY to base64 for exactly 32 random bytes}
+      HRIS_ALLOWED_HOSTS: ${HRIS_ALLOWED_HOSTS:-hris.intranet.local}
+      EMAIL_API_ENDPOINT: ${EMAIL_API_ENDPOINT:-}
+      EMAIL_API_TOKEN: ${EMAIL_API_TOKEN:-}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:3000}
+      RUSTFS_ENDPOINT: http://osc_save:9000
+      RUSTFS_BUCKET: ${RUSTFS_BUCKET:-omnisight}
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:?Set RUSTFS_ACCESS_KEY in environment}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:?Set RUSTFS_SECRET_KEY in environment}
+      RUSTFS_REGION: ${RUSTFS_REGION:-us-east-1}
+    depends_on:
+      osc_base: {condition: service_healthy}
+      osc_temp: {condition: service_healthy}
+      osc_save: {condition: service_healthy}
+    expose: ["8080"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      blackbox:
+        ipv4_address: 172.99.66.4
+
+  osc_site:
+    build: ./osc_site
+    container_name: osc_site
+    logging: *default-logging
+    ports:
+      - "36665:3000"
+    environment:
+      BACKEND_URL: http://osc_rest:8080
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:3000}
+    depends_on:
+      osc_rest: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      blackbox:
+        ipv4_address: 172.99.66.5

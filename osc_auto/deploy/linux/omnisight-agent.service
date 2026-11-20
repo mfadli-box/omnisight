@@ -1,0 +1,30 @@
+[Unit]
+Description=OmniSight Store Agent
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=omnisight-agent
+Group=omnisight-agent
+ExecStart=/usr/local/bin/omnisight-agent --config /etc/omnisight-agent/config.json
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=30s
+UMask=0077
+StateDirectory=omnisight-agent
+StateDirectoryMode=0700
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+[Install]
+WantedBy=multi-user.target

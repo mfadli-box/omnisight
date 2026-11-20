@@ -1,0 +1,27 @@
+# Tambahkan setelah docker-compose.dev.yml pada host dengan blackbox 172.99.0.0/16.
+services:
+  osc_base:
+    networks: !override
+      nonprod:
+        ipv4_address: 172.99.55.11
+  osc_temp:
+    networks: !override
+      nonprod:
+        ipv4_address: 172.99.55.12
+  osc_save:
+    networks: !override
+      nonprod:
+        ipv4_address: 172.99.55.13
+  osc_rest:
+    networks: !override
+      nonprod:
+        ipv4_address: 172.99.55.14
+  osc_site:
+    networks: !override
+      nonprod:
+        ipv4_address: 172.99.55.15
+
+networks: !override
+  nonprod:
+    name: blackbox
+    external: true

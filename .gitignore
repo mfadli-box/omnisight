@@ -1,0 +1,14 @@
+.env
+.next/
+.venv/
+.pytest_cache/
+__pycache__/
+bin/
+dist/
+target/
+node_modules/
+*.log
+.DS_Store
+old_data/
+omnisight.txt
+notes.txt

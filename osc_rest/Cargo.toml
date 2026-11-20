@@ -1,0 +1,37 @@
+[package]
+name = "osc_rest"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+aes-gcm = "0.11"
+aws-config = "1"
+aws-credential-types = "1"
+aws-sdk-s3 = "1"
+argon2 = { version = "0.6", features = ["getrandom"] }
+async-trait = "0.1"
+axum = { version = "0.8", features = ["macros"] }
+base64 = "0.22"
+chrono = { version = "0.4", features = ["serde"] }
+data-encoding = "2"
+dotenvy = "0.15"
+hmac = "0.12"
+getrandom = "0.3"
+http = "1"
+redis = { version = "1.8", features = ["aio", "tokio-comp", "script"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls", "stream"] }
+roxmltree = "0.21"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+sqlx = { version = "0.9", features = ["runtime-tokio", "tls-rustls-ring-webpki", "postgres", "uuid", "chrono", "json"] }
+subtle = "2"
+thiserror = "2"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "signal", "time"] }
+totp-rs = { version = "5.7", features = ["zeroize"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+url = "2"
+rust_xlsxwriter = "0.103"
+uuid = { version = "1", features = ["v4", "serde"] }
+

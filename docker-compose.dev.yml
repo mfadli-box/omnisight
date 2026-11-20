@@ -1,0 +1,25 @@
+# Pakai bersama docker-compose.yml untuk development, test, dan validation.
+services:
+  osc_base:
+    container_name: !reset null
+    networks: !override [nonprod]
+  osc_temp:
+    container_name: !reset null
+    networks: !override [nonprod]
+  osc_save:
+    container_name: !reset null
+    networks: !override [nonprod]
+  osc_rest:
+    container_name: !reset null
+    networks: !override [nonprod]
+  osc_site:
+    container_name: !reset null
+    networks: !override [nonprod]
+
+networks: !override
+  nonprod:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.99.55.0/24
+          gateway: 172.99.55.1
