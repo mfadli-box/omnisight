@@ -49,6 +49,12 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route("/baas/v1/stacks/{id}", get(detail))
         .route("/baas/v1/stacks/{id}/action", post(action))
         .route("/baas/v1/stacks/{id}/logs/{job_id}", get(stack_logs))
+        .route("/baas/v1/containers", get(super::containers_http::list))
+        .route(
+            "/baas/v1/containers/{id}/action",
+            post(super::containers_http::action),
+        )
+        .route("/baas/v1/security/sbom", get(super::containers_http::sbom))
         .route("/baas/v1/pam/terminal", post(terminal))
         .route("/baas/v1/pam/terminal/nodes", get(terminal_nodes))
         .route("/baas/v1/pam/terminal/{job_id}/logs", get(terminal_logs))
@@ -69,6 +75,10 @@ pub fn agent_routes(
     Ok(Router::new()
         .route(CLAIM, post(claim))
         .route(EVENT, post(agent_event))
+        .route(
+            "/baas/v1/agents/containers",
+            post(container_snapshot).layer(DefaultBodyLimit::max(1024 * 1024)),
+        )
         .layer(DefaultBodyLimit::max(32 * 1024))
         .with_state(Arc::new(AgentState {
             app,
@@ -293,6 +303,7 @@ async fn submit(
     let payload = ops::JobPayload {
         input: input.clone(),
         terminal_session: (action == TERMINAL).then(|| claims.clone()),
+        container_id: None,
     };
     let serialized = serde_json::to_vec(&payload).map_err(|_| AuthError::Internal)?;
     let cipher = crypto::encrypt_secret(&state.ops_key, &serialized)?;
@@ -529,7 +540,7 @@ async fn claim(
         }
         let name = match job.stack_id {
             Some(stack) => ops::stack(&mut db, stack).await?.stack_name,
-            None => None,
+            None => args.container_id.clone(),
         };
         let payload = json!({
             "id":job.id,"node_id":node,"nonce":input.nonce,"action":job.action,
@@ -547,6 +558,71 @@ async fn claim(
     };
     db.commit().await.map_err(database_error)?;
     Ok(response)
+}
+
+async fn container_snapshot(
+    State(state): State<Arc<AgentState>>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<StatusCode, ApiError> {
+    const PATH: &str = "/baas/v1/agents/containers";
+    let (node, scope, _) = state.authenticate(&headers, &body, PATH)?;
+    let (_, timestamp) = authenticate(
+        &headers,
+        &body,
+        &state.secrets,
+        Utc::now().timestamp(),
+        Some(PATH),
+    )
+    .ok_or(AuthError::InvalidCredentials)?;
+    let snapshot: super::containers_http::Snapshot =
+        serde_json::from_slice(&body).map_err(|_| AuthError::InvalidInput)?;
+    if !snapshot.valid() {
+        return Err(AuthError::InvalidInput.into());
+    }
+    let mut db = ops::agent_transaction(&state.app.tenant_pool, scope, node).await?;
+    super::containers_http::save_snapshot(&mut db, node, timestamp, &snapshot).await?;
+    db.commit().await.map_err(database_error)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+#[cfg(test)]
+mod container_limit_tests {
+    use super::*;
+    use axum::{body::Body, http::Request};
+    use tower::ServiceExt;
+
+    #[tokio::test]
+    async fn snapshot_route_has_larger_limit_than_other_agent_routes() {
+        async fn receive(_: Bytes) -> StatusCode {
+            StatusCode::NO_CONTENT
+        }
+        let app = Router::new()
+            .route(
+                "/snapshot",
+                post(receive).layer(DefaultBodyLimit::max(1024 * 1024)),
+            )
+            .route("/other", post(receive))
+            .layer(DefaultBodyLimit::max(32 * 1024));
+        let request = |path, size| Request::post(path).body(Body::from(vec![0; size])).unwrap();
+        let snapshot = app
+            .clone()
+            .oneshot(request("/snapshot", 64 * 1024))
+            .await
+            .unwrap();
+        assert_eq!(snapshot.status(), StatusCode::NO_CONTENT);
+        let other = app
+            .clone()
+            .oneshot(request("/other", 64 * 1024))
+            .await
+            .unwrap();
+        assert_eq!(other.status(), StatusCode::PAYLOAD_TOO_LARGE);
+        let oversized = app
+            .oneshot(request("/snapshot", 1024 * 1024 + 1))
+            .await
+            .unwrap();
+        assert_eq!(oversized.status(), StatusCode::PAYLOAD_TOO_LARGE);
+    }
 }
 
 async fn authorize_claimed_terminal(

@@ -7,11 +7,12 @@ import {
 } from "@/services/backend";
 
 const uuid = "[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}";
+const containerId = "[a-f0-9]{12,64}";
 const resources = "(?:nodes|pam/targets|sop-documents|companies|areas|stores|users)";
 const tables = `(?:${Object.keys(reportTables).join("|")})`;
 const jsonRoutes = {
-  GET: new RegExp(`^(?:public/companies|me/(?:navigation|contexts)|${resources}(?:/${uuid})?|nodes/${uuid}/metrics|agents/status|stacks(?:/${uuid})?|pam/terminal/nodes|roles|company-menus|audit-logs|companies/${uuid}/connector)$`),
-  POST: new RegExp(`^(?:${resources}|roles|stacks(?:/${uuid}/action)?|pam/terminal|pam/sessions/authorize|users/${uuid}/mfa/reset|reports/generate-pdf)$`),
+  GET: new RegExp(`^(?:public/companies|me/(?:navigation|contexts)|${resources}(?:/${uuid})?|nodes/${uuid}/metrics|agents/status|containers|security/sbom|stacks(?:/${uuid})?|pam/terminal/nodes|roles|company-menus|audit-logs|companies/${uuid}/connector)$`),
+  POST: new RegExp(`^(?:${resources}|roles|containers/${containerId}/action|stacks(?:/${uuid}/action)?|pam/terminal|pam/sessions/authorize|users/${uuid}/mfa/reset|reports/generate-pdf)$`),
   PATCH: new RegExp(`^(?:${resources}/${uuid}|companies/${uuid}/connector)$`),
   PUT: new RegExp(`^company-menus/${uuid}/[A-Z]{2}[0-9]{2}$`),
   DELETE: new RegExp(`^${resources}/${uuid}$`),

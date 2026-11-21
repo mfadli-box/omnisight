@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"unicode/utf8"
 
 	"omnisight/osc_auto/internal/domain"
+	"omnisight/osc_auto/internal/executor"
 )
 
 type OpsAPI interface {
@@ -24,6 +26,7 @@ type ComposeRunner interface {
 type OpsWorker struct {
 	API          OpsAPI
 	Compose      ComposeRunner
+	Docker       *executor.Docker
 	Executor     *JobExecutor
 	DockerStatus func(context.Context) (string, error)
 	Logger       *slog.Logger
@@ -74,6 +77,8 @@ func (w OpsWorker) execute(ctx context.Context, job *domain.OpsJob) error {
 		switch {
 		case job.Action == "terminal":
 			err = w.terminal(ctx, job.Input, emit)
+		case strings.HasPrefix(job.Action, "docker."):
+			err = w.docker(ctx, job, emit)
 		case w.Compose != nil:
 			err = w.Compose.Run(ctx, job.StackName, job.Action, job.Input, emit)
 		default:
@@ -117,4 +122,35 @@ func minTime(first, second time.Time) time.Time {
 		return first
 	}
 	return second
+}
+
+func (w OpsWorker) docker(ctx context.Context, job *domain.OpsJob, emit func(string) error) error {
+	if w.Docker == nil {
+		return errors.New("Docker operations are disabled on this node")
+	}
+	if job.Input.Compose != nil || job.Input.Env != nil || job.Input.Command != nil {
+		return errors.New("Docker job input is invalid")
+	}
+	var value any
+	var err error
+	switch job.Action {
+	case "docker.list":
+		value, err = w.Docker.List(ctx)
+	case "docker.inspect":
+		value, err = w.Docker.Inspect(ctx, job.StackName)
+	case "docker.sbom":
+		value, err = w.Docker.SBOM(ctx, job.StackName)
+	case "docker.start", "docker.stop", "docker.prune_containers", "docker.prune_images":
+		return w.Docker.Action(ctx, strings.TrimPrefix(job.Action, "docker."), job.StackName)
+	default:
+		return errors.New("Docker action is outside the local allowlist")
+	}
+	if err != nil {
+		return err
+	}
+	output, err := json.Marshal(value)
+	if err != nil {
+		return errors.New("Docker response invalid")
+	}
+	return emit(string(output))
 }

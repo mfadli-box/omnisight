@@ -87,13 +87,15 @@ func run(path, command, service string, logger *slog.Logger) int {
 			}
 		}
 		if cfg.OpsEnabled {
+			docker := executor.Docker{}
 			ops := application.OpsWorker{
-				API: client, Executor: diagnostics, DockerStatus: executor.DockerStatus, Logger: logger,
+				Docker: &docker,
+				API:    client, Executor: diagnostics, DockerStatus: executor.DockerStatus, Logger: logger,
 			}
 			if cfg.ComposeRoot != "" {
 				ops.Compose = executor.Compose{Root: cfg.ComposeRoot}
 			}
-			runner = workers{monitor: runner, ops: ops}
+			runner = workers{monitor: runner, ops: ops, containers: application.ContainerWorker{Docker: docker, Sender: client, Logger: logger}}
 		}
 	}
 	if command != "" {
@@ -131,16 +133,18 @@ func hasHeartbeatEnv() bool {
 }
 
 type workers struct {
-	monitor lifecycle.Runner
-	ops     lifecycle.Runner
+	monitor    lifecycle.Runner
+	ops        lifecycle.Runner
+	containers lifecycle.Runner
 }
 
 func (w workers) Run(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	result := make(chan error, 1)
+	result := make(chan error, 2)
 	go func() { result <- w.ops.Run(ctx); cancel() }()
+	go func() { result <- w.containers.Run(ctx); cancel() }()
 	err := w.monitor.Run(ctx)
 	cancel()
-	return errors.Join(err, <-result)
+	return errors.Join(err, <-result, <-result)
 }

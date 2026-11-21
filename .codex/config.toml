@@ -1,0 +1,28 @@
+# Default harian: cepat, akurat, dan hemat kuota ChatGPT
+model = "gpt-6.1-terra"
+model_reasoning_effort = "medium"
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+# Kompresi konteks otomatis agar prompt caching optimal
+model_auto_compact_token_limit = 120000
+
+# Profile khusus tugas ringan (notes/, SQL sederhana, dokumentasi)
+[profiles.fast]
+model = "gpt-6-luna"
+model_reasoning_effort = "low"
+
+# Profile khusus keamanan kritis, kriptografi & Rust core (DEEP 01-03, test_guard)
+[profiles.secops]
+model = "gpt-6.1-sol"
+model_reasoning_effort = "high"
+
+# Kecualikan direktori build besar dari pemindaian proyek
+[projects."."]
+ignore_paths = [
+  "osc_rest/target",
+  "osc_site/node_modules",
+  "osc_site/.next",
+  "dist",
+  "notes"
+]

@@ -39,6 +39,8 @@ pub struct JobPayload {
     pub input: Input,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub terminal_session: Option<SessionClaims>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub container_id: Option<String>,
 }
 
 pub async fn detail(db: &mut PgConnection, id: Uuid) -> Result<Value, AuthError> {
@@ -233,7 +235,7 @@ pub async fn claim(
     .map_err(database_error)?;
     sqlx::query_as(
         "UPDATE public.osc_ops_job SET status='running' WHERE node_id=$1 AND status='queued'
-         AND expires_at>clock_timestamp() AND ($2 OR action='terminal')
+         AND expires_at>clock_timestamp() AND ($2 OR action='terminal' OR action LIKE 'docker.%')
          RETURNING id,stack_id,actor_user_id,session_id,area_id,action,status,expires_at,payload_encrypted",
     ).bind(node).bind(compose).fetch_optional(db).await.map_err(database_error)
 }
@@ -362,6 +364,8 @@ pub async fn finish(
     .bind(id)
     .bind(if job.action == "terminal" {
         "WEB_TERMINAL_COMPLETED"
+    } else if job.action.starts_with("docker.") {
+        "CONTAINER_JOB_COMPLETED"
     } else {
         "COMPOSE_JOB_COMPLETED"
     })
@@ -398,10 +402,11 @@ pub async fn audit_request(
     .bind(target.company_id)
     .bind(target.area_id)
     .bind(claims.sub)
-    .bind(match (terminal, denied) {
-        (true, true) => "WEB_TERMINAL_DENIED",
-        (true, false) => "WEB_TERMINAL_QUEUED",
-        (false, _) => "COMPOSE_JOB_QUEUED",
+    .bind(match (terminal, denied, action.starts_with("docker.")) {
+        (true, true, _) => "WEB_TERMINAL_DENIED",
+        (true, false, _) => "WEB_TERMINAL_QUEUED",
+        (false, _, true) => "CONTAINER_JOB_QUEUED",
+        (false, _, false) => "COMPOSE_JOB_QUEUED",
     })
     .bind(target.node_id.to_string())
     .bind(id.to_string())
