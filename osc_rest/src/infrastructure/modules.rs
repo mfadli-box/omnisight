@@ -104,7 +104,10 @@ impl Resource {
 
     fn projection(self) -> &'static str {
         match self {
-            Self::Nodes => "to_jsonb(t) - ARRAY['agent_secret_hash','credential_ref']",
+            Self::Nodes => "(to_jsonb(t) - ARRAY['agent_secret_hash','credential_ref'])
+                || jsonb_build_object('status', CASE
+                    WHEN t.status='ONLINE' AND t.last_seen_at <= now() - interval '15 minutes'
+                    THEN 'STALE' ELSE t.status END)",
             Self::Targets => "to_jsonb(t) - 'credential_ref'",
             Self::Companies => {
                 "to_jsonb(t) - ARRAY['hris_login_url','ad_ldap_url','oidc_tenant_id']"
@@ -143,7 +146,7 @@ pub async fn read(
     read_for_menu(db, claims, resource, id, (limit, offset), resource.menu()).await
 }
 
-async fn read_for_menu(
+pub(super) async fn read_for_menu(
     db: &mut PgConnection,
     claims: &SessionClaims,
     resource: Resource,

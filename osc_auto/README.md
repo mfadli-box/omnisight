@@ -12,6 +12,7 @@ Salin `config/agent.example.yaml` ke `agent.yaml`, atau berikan lokasinya dengan
 | `node_id` | `NODE_ID` | ID yang terdaftar di hub. |
 | `agent_secret` | `AGENT_SECRET` | Rahasia acak per node, 32–512 byte. Jika memakai teks Base64, gunakan teks yang sama di kedua sisi. |
 | `poll_interval_sec` | `POLL_INTERVAL_SEC` | Jeda antar-pengiriman dalam detik, 1–600. Default 30. |
+| `telemetry_enabled` | `TELEMETRY_ENABLED` | Aktifkan telemetri historis bagi node dengan UUID kanonis. Default `false`. |
 | `allowed_services` | | Daftar nama layanan lokal yang dapat diperiksa. Default kosong. |
 
 Masukkan setiap pasangan ID dan rahasia ke objek JSON `AGENT_HEARTBEAT_SECRETS` pada `osc_rest`. Lindungi sumber konfigurasi agar hanya identitas layanan dan administrator yang dapat membacanya. Restart `osc_rest` setelah memperbarui pendaftaran. Jalankan satu agen per ID dan sinkronkan jam hub serta node.
@@ -24,6 +25,12 @@ Agen langsung mengirim `POST /baas/v1/agents/heartbeat` saat dimulai. JSON beris
 - `X-Signature` berisi hex huruf kecil dari HMAC-SHA256 atas `node_id + "\n" + timestamp + "\n" + body`. Gunakan byte JSON persis yang dikirim dan byte UTF-8 rahasia sesuai konfigurasi.
 - Hub mengembalikan `204` untuk heartbeat yang diterima. ID, tanda tangan, dan waktu diperiksa dengan toleransi 120 detik. Timestamp duplikat atau lebih lama untuk node yang sama ditolak dengan `409`.
 - Valkey menyimpan heartbeat terbaru selama 900 detik pada `osc:agent:heartbeat:<node_id>`. Agen menunggu interval berikutnya untuk mengirim sampel baru setelah kegagalan HTTP atau timeout 10 detik.
+
+## Telemetri historis
+
+Setel `telemetry_enabled: true` dan gunakan UUID huruf kecil dari `osc_agent_node.id`. Tambahkan UUID tersebut ke `AGENT_HEARTBEAT_SECRETS` dan provision cakupannya pada hub sesuai [catatan penerapan](../notes/20261121-01-beszel.md). Dalam mode ini agent mengirim `POST /baas/v1/agents/telemetry` dan hub memperbarui heartbeat yang dipakai OP02.
+
+Collector memakai counter host native. Data S.M.A.R.T. membutuhkan executable `smartctl` pada PATH layanan dan izin membaca perangkat. Statistik kontainer membutuhkan CLI Docker pada PATH dan akses ke socket Unix atau named pipe lokal. Windows memakai PowerShell dan CIM untuk counter tambahan. Load average Unix tidak tersedia pada Windows. Pengukuran opsional yang gagal muncul sebagai daftar kosong atau nilai kosong; metrik inti tetap dikirim.
 
 ## Diagnostik lokal
 
@@ -54,7 +61,7 @@ Installer menjalankan layanan sebagai `LocalService`, memasang konfigurasi denga
 
 ## Instalasi JSON sebelumnya
 
-`--config /path/config.json` memilih mode bearer sebelumnya. Mode ini membutuhkan backend yang menyediakan `/agent/v1/heartbeat`, `/agent/v1/jobs/claim`, dan `/agent/v1/jobs/{job_id}/result`. Job bertanda tangan tetap menggunakan HMAC, pemeriksaan audience dan masa berlaku, serta penyimpanan replay dan hasil yang persisten. Simpan direktori state saat upgrade atau rollback dan gunakan satu proses per node dan direktori state. Konfigurasi YAML menjalankan worker heartbeat. Diagnostik pada mode YAML tersedia melalui CLI.
+`--config /path/config.json` memilih mode bearer sebelumnya. Mode ini membutuhkan backend yang menyediakan `/agent/v1/heartbeat`, `/agent/v1/jobs/claim`, dan `/agent/v1/jobs/{job_id}/result`. Job bertanda tangan tetap menggunakan HMAC, pemeriksaan audience dan masa berlaku, serta penyimpanan replay dan hasil yang persisten. Simpan direktori state saat upgrade atau rollback dan gunakan satu proses per node dan direktori state. Konfigurasi YAML mendukung heartbeat dan telemetri historis. Diagnostik pada mode YAML tersedia melalui CLI.
 
 Mulai dari `config/agent.example.json` untuk mode bearer. Gunakan `Authorization: Bearer` per node, `X-Node-ID`, serta `Idempotency-Key` saat mengirim hasil. Konfigurasi memakai token bearer dan kunci job acak 32 byte yang berbeda dan disimpan sebagai Base64.
 

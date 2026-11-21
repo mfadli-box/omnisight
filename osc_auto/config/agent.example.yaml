@@ -2,4 +2,5 @@ hub_url: https://hub.example.com
 node_id: store-01
 agent_secret: ""
 poll_interval_sec: 30
+telemetry_enabled: false
 allowed_services: []

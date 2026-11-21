@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -16,12 +17,15 @@ import (
 
 const DefaultPath = "agent.yaml"
 
+var nodeUUID = regexp.MustCompile(`^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$`)
+
 type HeartbeatConfig struct {
-	HubURL          string   `yaml:"hub_url"`
-	NodeID          string   `yaml:"node_id"`
-	AgentSecret     string   `yaml:"agent_secret"`
-	PollIntervalSec int      `yaml:"poll_interval_sec"`
-	AllowedServices []string `yaml:"allowed_services"`
+	HubURL           string   `yaml:"hub_url"`
+	NodeID           string   `yaml:"node_id"`
+	AgentSecret      string   `yaml:"agent_secret"`
+	PollIntervalSec  int      `yaml:"poll_interval_sec"`
+	TelemetryEnabled bool     `yaml:"telemetry_enabled"`
+	AllowedServices  []string `yaml:"allowed_services"`
 }
 
 func LoadHeartbeat(path string) (HeartbeatConfig, error) {
@@ -59,6 +63,15 @@ func LoadHeartbeat(path string) (HeartbeatConfig, error) {
 		if err != nil {
 			return HeartbeatConfig{}, errors.New("POLL_INTERVAL_SEC must be an integer")
 		}
+	}
+	if value, ok := os.LookupEnv("TELEMETRY_ENABLED"); ok {
+		cfg.TelemetryEnabled, err = strconv.ParseBool(value)
+		if err != nil {
+			return HeartbeatConfig{}, errors.New("TELEMETRY_ENABLED must be a boolean")
+		}
+	}
+	if cfg.TelemetryEnabled && !nodeUUID.MatchString(cfg.NodeID) {
+		return HeartbeatConfig{}, errors.New("telemetry requires a canonical lowercase node UUID")
 	}
 	if err := validateURL(cfg.HubURL, "hub_url"); err != nil {
 		return HeartbeatConfig{}, err

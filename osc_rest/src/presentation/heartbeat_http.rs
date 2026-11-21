@@ -33,6 +33,14 @@ struct Heartbeat {
 }
 
 pub fn router(cache: Arc<RedisCache>, secrets_json: &str) -> Result<Router, &'static str> {
+    let secrets = parse_secrets(secrets_json)?;
+    Ok(Router::new()
+        .route("/baas/v1/agents/heartbeat", post(receive))
+        .layer(DefaultBodyLimit::max(4096))
+        .with_state(Arc::new(HeartbeatState { secrets, cache })))
+}
+
+pub(super) fn parse_secrets(secrets_json: &str) -> Result<HashMap<String, String>, &'static str> {
     let secrets = if secrets_json.is_empty() {
         HashMap::new()
     } else {
@@ -45,10 +53,7 @@ pub fn router(cache: Arc<RedisCache>, secrets_json: &str) -> Result<Router, &'st
     {
         return Err("AGENT_HEARTBEAT_SECRETS contains an invalid node ID or secret length");
     }
-    Ok(Router::new()
-        .route("/baas/v1/agents/heartbeat", post(receive))
-        .layer(DefaultBodyLimit::max(4096))
-        .with_state(Arc::new(HeartbeatState { secrets, cache })))
+    Ok(secrets)
 }
 
 fn valid_id(id: &str) -> bool {
@@ -59,11 +64,12 @@ fn valid_id(id: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || b"._:-".contains(&b))
 }
 
-fn authenticate<'a>(
+pub(super) fn authenticate<'a>(
     headers: &'a HeaderMap,
     body: &[u8],
     secrets: &HashMap<String, String>,
     now: i64,
+    signed_path: Option<&str>,
 ) -> Option<(&'a str, i64)> {
     let header = |name: &str| {
         let mut values = headers.get_all(name).iter();
@@ -84,6 +90,10 @@ fn authenticate<'a>(
         .decode_mut(header("x-signature")?.as_bytes(), &mut signature)
         .ok()?;
     let mut mac = Hmac::<Sha256>::new_from_slice(secrets.get(id)?.as_bytes()).ok()?;
+    if let Some(path) = signed_path {
+        mac.update(path.as_bytes());
+        mac.update(b"\n");
+    }
     mac.update(id.as_bytes());
     mac.update(b"\n");
     mac.update(timestamp.as_bytes());
@@ -98,9 +108,13 @@ async fn receive(
     headers: HeaderMap,
     body: Bytes,
 ) -> StatusCode {
-    let Some((id, timestamp)) =
-        authenticate(&headers, &body, &state.secrets, Utc::now().timestamp())
-    else {
+    let Some((id, timestamp)) = authenticate(
+        &headers,
+        &body,
+        &state.secrets,
+        Utc::now().timestamp(),
+        None,
+    ) else {
         return StatusCode::UNAUTHORIZED;
     };
     let Ok(metrics) = serde_json::from_slice::<Heartbeat>(&body) else {
@@ -126,5 +140,39 @@ async fn receive(
         Ok(true) => StatusCode::NO_CONTENT,
         Ok(false) => StatusCode::CONFLICT,
         Err(_) => StatusCode::SERVICE_UNAVAILABLE,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn telemetry_signature_binds_path_identity_timestamp_and_body() {
+        const ID: &str = "5b1cd41c-fc12-4d9a-add5-b77a12ce2434";
+        const PATH: &str = "/baas/v1/agents/telemetry";
+        const TIME: i64 = 1795222800;
+        let secrets = HashMap::from([(
+            ID.to_owned(),
+            "test-secret-for-agent-signing-only".to_owned(),
+        )]);
+        let mut headers = HeaderMap::new();
+        headers.insert("x-agent-id", ID.parse().unwrap());
+        headers.insert("x-timestamp", TIME.to_string().parse().unwrap());
+        headers.insert(
+            "x-signature",
+            "e7150d925355b854938e95a40f688cba4c0ff53678381f94c55132a4b63719d5"
+                .parse()
+                .unwrap(),
+        );
+        assert_eq!(
+            authenticate(&headers, b"{}", &secrets, TIME, Some(PATH)),
+            Some((ID, TIME))
+        );
+        assert!(authenticate(&headers, b"{}", &secrets, TIME, None).is_none());
+        assert!(authenticate(&headers, b"[]", &secrets, TIME, Some(PATH)).is_none());
+        assert!(authenticate(&headers, b"{}", &secrets, TIME + 121, Some(PATH)).is_none());
+        headers.append("x-agent-id", ID.parse().unwrap());
+        assert!(authenticate(&headers, b"{}", &secrets, TIME, Some(PATH)).is_none());
     }
 }

@@ -16,7 +16,7 @@ use osc_rest::{
     },
     presentation::{
         auth_http::{AppState, router},
-        heartbeat_http,
+        heartbeat_http, telemetry_http,
     },
 };
 use tracing_subscriber::{EnvFilter, filter::filter_fn, prelude::*};
@@ -61,6 +61,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Err(err) => return Err(err.into()),
     };
     let heartbeat_router = heartbeat_http::router(cache.clone(), &heartbeat_secrets)?;
+    let telemetry_scopes = match std::env::var("AGENT_TELEMETRY_SCOPES") {
+        Ok(value) => value,
+        Err(std::env::VarError::NotPresent) => String::new(),
+        Err(err) => return Err(err.into()),
+    };
+    let telemetry_router = telemetry_http::router(
+        tenant_pool.clone(),
+        cache.clone(),
+        &heartbeat_secrets,
+        &telemetry_scopes,
+    )?;
     let hris: Arc<dyn HrisPort> = Arc::new(HrisClient::new(hris_allowed_hosts)?);
     let mailer: Option<Arc<dyn MailPort>> =
         HttpEmailNotifier::from_env().map(|client| Arc::new(client) as Arc<dyn MailPort>);
@@ -81,7 +92,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         cache,
         storage: Arc::new(storage),
     });
-    let app = router(app_state).merge(heartbeat_router);
+    let app = router(app_state)
+        .merge(heartbeat_router)
+        .merge(telemetry_router);
 
     let address: SocketAddr = std::env::var("BIND_ADDR")
         .unwrap_or_else(|_| "0.0.0.0:8080".to_owned())

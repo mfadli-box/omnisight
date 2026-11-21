@@ -20,21 +20,53 @@ type HeartbeatWorker struct {
 }
 
 func (w HeartbeatWorker) Run(ctx context.Context) error {
-	for ctx.Err() == nil {
+	return runPeriodic(ctx, w.Interval, w.Logger, "heartbeat", func(ctx context.Context) error {
 		sample, err := w.Sampler.Sample(ctx)
-		if err == nil {
-			err = w.Sender.Heartbeat(ctx, sample)
+		if err != nil {
+			return err
 		}
+		return w.Sender.Heartbeat(ctx, sample)
+	})
+}
+
+type TelemetryCollector interface {
+	Collect(context.Context) (domain.HostMetrics, error)
+}
+
+type TelemetrySender interface {
+	Telemetry(context.Context, domain.HostMetrics) error
+}
+
+type TelemetryWorker struct {
+	Interval  time.Duration
+	Collector TelemetryCollector
+	Sender    TelemetrySender
+	Logger    *slog.Logger
+}
+
+func (w TelemetryWorker) Run(ctx context.Context) error {
+	return runPeriodic(ctx, w.Interval, w.Logger, "telemetry", func(ctx context.Context) error {
+		sample, err := w.Collector.Collect(ctx)
+		if err != nil {
+			return err
+		}
+		return w.Sender.Telemetry(ctx, sample)
+	})
+}
+
+func runPeriodic(ctx context.Context, interval time.Duration, logger *slog.Logger, event string, send func(context.Context) error) error {
+	for ctx.Err() == nil {
+		err := send(ctx)
 		if ctx.Err() != nil {
 			return nil
 		}
 		if err != nil {
-			w.Logger.WarnContext(ctx, "heartbeat_failed", "error", err.Error())
+			logger.WarnContext(ctx, event+"_failed", "error", err.Error())
 		} else {
-			w.Logger.DebugContext(ctx, "heartbeat_sent")
+			logger.DebugContext(ctx, event+"_sent")
 		}
 
-		timer := time.NewTimer(w.Interval)
+		timer := time.NewTimer(interval)
 		select {
 		case <-ctx.Done():
 			timer.Stop()

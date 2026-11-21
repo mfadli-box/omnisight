@@ -3,3 +3,5 @@ pub mod auth_http;
 pub mod heartbeat_http;
 mod modules_http;
 mod report_http;
+
+pub mod telemetry_http;

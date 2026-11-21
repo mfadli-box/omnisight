@@ -37,6 +37,7 @@ pub fn routes() -> Router<Arc<AppState>> {
     }
     router
         .route("/baas/v1/agents/status", get(agent_status))
+        .route("/baas/v1/nodes/{id}/metrics", get(super::telemetry_http::history))
         .route("/baas/v1/audit-logs", get(audit_logs))
         .route("/baas/v1/users", get(users).post(create_user))
         .route(

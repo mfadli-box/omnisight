@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { NodeTelemetry } from "./node-telemetry";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
 import { ResourcePanel, type Field } from "./resource-panel";
@@ -23,6 +25,8 @@ const statuses = [
 
 export function AgentStatus({ telemetry = false }: { telemetry?: boolean }) {
   const [status, setStatus] = useState("");
+  const opener = useRef<HTMLButtonElement>(null);
+  const [node, setNode] = useState<{ id: string; name: string }>();
   return <div className="space-y-4">
     <Card>
       <CardContent className="grid gap-2 p-4">
@@ -36,6 +40,14 @@ export function AgentStatus({ telemetry = false }: { telemetry?: boolean }) {
     <ResourcePanel readOnly title={telemetry ? "Heartbeat agent" : "Kesehatan node"}
       path={telemetry ? "agents/status" : "nodes"}
       columns={telemetry ? [...nodeColumns, ...heartbeatColumns] : nodeColumns}
+      rowAction={(row) => {
+        if (typeof row.id !== "string") return null;
+        const id = row.id;
+        const name = [row.display_name, row.node_code, row.hostname].find((label): label is string =>
+          typeof label === "string" && label.length > 0) ?? id;
+        return <Button variant="outline" size="sm" aria-label={`Riwayat ${name}`}
+          onClick={(event) => { opener.current = event.currentTarget; setNode({ id, name }); }}>Riwayat</Button>;
+      }}
       filter={status ? (row) => row.status === status : undefined}
       emptyMessage={status ? "Tidak ada node dengan status ini pada halaman aktif." : undefined}
       summarize={telemetry ? undefined : (rows) => <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -44,5 +56,6 @@ export function AgentStatus({ telemetry = false }: { telemetry?: boolean }) {
           <CardContent><p className="text-2xl font-semibold tabular-nums">{rows.filter((row) => row.status === value).length}</p></CardContent>
         </Card>)}
       </div>} />
+    {node && <NodeTelemetry key={node.id} {...node} close={() => { setNode(undefined); opener.current?.focus(); }} />}
   </div>;
 }

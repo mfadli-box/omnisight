@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"omnisight/osc_auto/internal/application"
+	"omnisight/osc_auto/internal/collector"
 	"omnisight/osc_auto/internal/config"
 	"omnisight/osc_auto/internal/domain"
 	"omnisight/osc_auto/internal/infrastructure/httpapi"
@@ -73,11 +74,16 @@ func run(path, command, service string, logger *slog.Logger) int {
 		}
 		nodeID = cfg.NodeID
 		executor = application.NewJobExecutor(jobs.New(sampler), cfg.AllowedServices)
-		runner = application.HeartbeatWorker{
-			Interval: cfg.Interval(),
-			Sampler:  sampler,
-			Sender:   transport.New(cfg.HubURL, nodeID, cfg.AgentSecret),
-			Logger:   logger,
+		client := transport.New(cfg.HubURL, nodeID, cfg.AgentSecret)
+		if cfg.TelemetryEnabled {
+			runner = application.TelemetryWorker{
+				Interval: cfg.Interval(), Collector: collector.Collector{Sampler: sampler},
+				Sender: client, Logger: logger,
+			}
+		} else {
+			runner = application.HeartbeatWorker{
+				Interval: cfg.Interval(), Sampler: sampler, Sender: client, Logger: logger,
+			}
 		}
 	}
 	if command != "" {
@@ -106,7 +112,7 @@ func run(path, command, service string, logger *slog.Logger) int {
 }
 
 func hasHeartbeatEnv() bool {
-	for _, name := range []string{"HUB_URL", "NODE_ID", "AGENT_SECRET", "POLL_INTERVAL_SEC"} {
+	for _, name := range []string{"HUB_URL", "NODE_ID", "AGENT_SECRET", "POLL_INTERVAL_SEC", "TELEMETRY_ENABLED"} {
 		if _, ok := os.LookupEnv(name); ok {
 			return true
 		}

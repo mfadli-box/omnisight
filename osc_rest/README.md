@@ -36,6 +36,8 @@ Token akses sesi berlaku 15 menit. Pencabutan sesi pemulihan menggunakan waterma
 - `POST /baas/v1/auth/mfa/reset-request`, `/reset-confirm`
 - `POST /baas/v1/users/{user_id}/mfa/reset`
 - `POST /baas/v1/auth/switch-company`, `GET /baas/v1/me/navigation`
+- `POST /baas/v1/agents/telemetry` untuk node dengan HMAC SHA-256, cakupan terdaftar, dan penyimpanan heartbeat Valkey.
+- `GET /baas/v1/nodes/{id}/metrics` untuk riwayat node dengan izin CT01 atau OP02. [Kontrak dan penerapan telemetri](../notes/20261121-01-beszel.md)
 - `POST /baas/v1/pam/sessions/authorize` (`OP01` create; MFA wajib dan step-up setelah 15 menit)
 - `POST/GET /baas/v1/sop-documents/{document_id}/attachment` (`KB01`; maksimal 20 MiB; PDF, DOCX, atau teks biasa). Alias `/sop/documents` juga tersedia.
 - `GET /baas/v1/reports/export-excel/{table_name}` (`RP01` view+create; allowlist: `osc_sop_document`, `osc_pam_session`, `osc_agent_node`, `osc_activity_log`)

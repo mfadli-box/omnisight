@@ -120,3 +120,5 @@ pub enum AuthError {
     #[error("internal operation failed")]
     Internal,
 }
+
+pub mod telemetry;

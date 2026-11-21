@@ -35,14 +35,15 @@ Jangan buka PostgreSQL, Valkey, S3 RustFS, atau port konsol RustFS ke internet p
 Jalankan perintah dari direktori utama repositori pada host terlindungi. Buat berkas environment milik root di luar repositori atau ekspor variabel dari secret manager. Variabel Compose wajib mencakup `POSTGRES_PASSWORD`, `POSTGRES_APP_PASSWORD`, `JWT_SECRET`, `MFA_ENCRYPTION_KEY`, `RUSTFS_ACCESS_KEY`, dan `RUSTFS_SECRET_KEY`. Atur juga `APP_ORIGIN`, `PUBLIC_APP_URL`, `HRIS_ALLOWED_HOSTS`, bucket/region RustFS, dan integrasi reset email sesuai kebutuhan. Jangan commit nilainya.
 
 1. Tinjau berkas Compose, Dockerfile, tag image, path volume, healthcheck, dan port yang dipublikasikan. Konfigurasi saat ini hanya mempublikasikan port web; tempatkan di balik ingress TLS.
-2. Jalankan PostgreSQL dan tunggu siap dengan `docker compose up -d --wait osc_base`. Pada instalasi baru, terapkan migrasi inti dan kebijakan RLS dengan role admin sebelum menyalakan REST.
+2. Jalankan PostgreSQL dan tunggu siap dengan `docker compose up -d --wait osc_base`. Pada instalasi baru, terapkan migrasi inti, kebijakan RLS, dan skema telemetri dengan role admin sebelum menyalakan REST.
 
    ```sh
-   cat osc_base/migrations/001_init_core.sql osc_base/migrations/002_rls_policies.sql |
+   cat osc_base/migrations/001_init_core.sql osc_base/migrations/002_rls_policies.sql \
+       osc_base/migrations/008_node_telemetry.sql |
      docker compose exec -T osc_base sh -c 'exec psql -X -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
    ```
 
-   Untuk upgrade, ikuti jalur migrasi yang sesuai dengan skema terpasang. [Catatan fondasi database](../../osc_base/notes/20261120-core-01-base.md)
+   Untuk upgrade, ikuti jalur migrasi skema terpasang lalu terapkan `008_node_telemetry.sql` sekali. Untuk agent, petakan `POST /baas/v1/agents/telemetry` di ingress TLS langsung ke `osc_rest:8080` dan teruskan tiga header HMAC serta byte payload persis seperti diterima. [Catatan fondasi database](../../osc_base/notes/20261120-core-01-base.md)
 
 3. Bangun dan jalankan layanan lainnya dengan `docker compose up -d --build`.
 4. Periksa kesehatan: `docker compose ps`; tinjau `docker compose logs --tail=100 osc_base osc_temp osc_save osc_rest osc_site` untuk kegagalan startup. Jangan aktifkan log debug yang memuat kredensial.
