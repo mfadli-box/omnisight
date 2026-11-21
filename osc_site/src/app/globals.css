@@ -1,38 +1,57 @@
 @import "tailwindcss";
 
 @theme inline {
-  --font-sans: var(--font-inter);
-  --font-display: var(--font-manrope);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
+  --color-surface: var(--surface);
   --color-muted: var(--muted);
   --color-border: var(--border);
   --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
   --color-accent: var(--accent);
-  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --font-display: Georgia, Cambria, serif;
 }
 
 :root {
-  --font-inter: Inter, ui-sans-serif, system-ui, sans-serif;
-  --font-manrope: Manrope, ui-sans-serif, system-ui, sans-serif;
-  --background: #f4f6f8;
-  --foreground: #15212b;
-  --card: #ffffff;
-  --muted: #74818a;
-  --border: #e2e8eb;
-  --primary: #0f766e;
-  --accent: #dff4ef;
-  --success: #15836d;
+  color-scheme: light;
+  --background: #f5f6f2;
+  --foreground: #19241e;
+  --card: #fcfdf9;
+  --surface: #eef0e9;
+  --muted: #536058;
+  --border: #dbe1d8;
+  --primary: #205846;
+  --primary-foreground: #ffffff;
+  --accent: #e0ede3;
+  --danger: #a12832;
+}
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #121a17;
+  --foreground: #e8f0e9;
+  --card: #18221e;
+  --surface: #24312b;
+  --muted: #a7b7ae;
+  --border: #334239;
+  --primary: #a3d6b5;
+  --primary-foreground: #112b1d;
+  --accent: #263c30;
+  --danger: #f8a5ac;
+}
+body { background: var(--background); color: var(--foreground); }
+::selection { background: var(--accent); color: var(--foreground); }
+
+@layer components {
+  .field-control {
+    @apply h-10 w-full rounded-lg border border-border bg-card text-sm text-foreground outline-none placeholder:text-muted focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 disabled:opacity-50 aria-invalid:border-danger;
+  }
+  .text-link { @apply rounded-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-primary; }
 }
 
-* { box-sizing: border-box; }
-html { min-height: 100%; background: var(--background); }
-body { margin: 0; color: var(--foreground); font-family: Arial, Helvetica, sans-serif; }
-button, input, select, textarea { font: inherit; }
-::selection { background: #bfe9dd; color: #102b2a; }
-
-.soft-grid {
-  background-image: radial-gradient(#c8d4d8 0.6px, transparent 0.6px);
-  background-size: 16px 16px;
+.login-grid {
+  background-image: linear-gradient(#c1dba61a 1px, transparent 1px), linear-gradient(90deg, #c1dba61a 1px, transparent 1px);
+  background-size: 40px 40px;
+  mask-image: linear-gradient(to top, black, transparent 94%);
 }

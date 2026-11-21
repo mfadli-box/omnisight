@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useNavigation } from "@/components/workspace/navigation-context";
+import { useNavigation } from "@/components/layout/navigation-context";
 
 export default function WorkspaceHome() {
   const { items, loading } = useNavigation();

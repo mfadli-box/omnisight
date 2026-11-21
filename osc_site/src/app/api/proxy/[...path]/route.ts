@@ -1,11 +1,14 @@
+import { proxyRequestSchema } from "@/services/proxy-validation";
+import { attachmentTypes } from "@/validations/sop.schema";
+import { reportTables } from "@/validations/report.schema";
 import { NextRequest, NextResponse } from "next/server";
 import {
   assertSameOrigin, backendError, backendRequest, jsonError, readBody, sessionToken, tokenHeaders,
-} from "@/lib/server/backend";
+} from "@/services/backend";
 
 const uuid = "[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}";
 const resources = "(?:nodes|pam/targets|sop-documents|companies|areas|stores|users)";
-const tables = "(?:osc_sop_document|osc_pam_session|osc_agent_node|osc_activity_log)";
+const tables = `(?:${Object.keys(reportTables).join("|")})`;
 const jsonRoutes = {
   GET: new RegExp(`^(?:public/companies|me/(?:navigation|contexts)|${resources}(?:/${uuid})?|agents/status|roles|company-menus|audit-logs|companies/${uuid}/connector)$`),
   POST: new RegExp(`^(?:${resources}|roles|pam/sessions/authorize|users/${uuid}/mfa/reset|reports/generate-pdf)$`),
@@ -15,11 +18,6 @@ const jsonRoutes = {
 };
 const attachment = new RegExp(`^sop-documents/${uuid}/attachment$`);
 const reportDownload = new RegExp(`^reports/(?:export-excel/${tables}|archives/${uuid})$`);
-const attachmentTypes = [
-  "application/pdf", "text/plain",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-];
-
 type Context = { params: Promise<{ path: string[] }> };
 
 async function proxy(request: NextRequest, { params }: Context) {
@@ -50,7 +48,7 @@ async function proxy(request: NextRequest, { params }: Context) {
   const bodyLimit = isUpload ? 20 * 1024 * 1024 : 300 * 1024;
   let body: ArrayBuffer | undefined;
   if (expectsBody) {
-    if (!contentType || !(isUpload ? attachmentTypes.includes(contentType) : contentType === "application/json")) {
+    if (!contentType || !(isUpload ? Object.values(attachmentTypes).some((type) => type === contentType) : contentType === "application/json")) {
       return jsonError(415, "UNSUPPORTED_MEDIA_TYPE", "Tipe konten tidak didukung.");
     }
     if (Number(request.headers.get("content-length")) > bodyLimit) {
@@ -62,6 +60,18 @@ async function proxy(request: NextRequest, { params }: Context) {
       return jsonError(400, "INVALID_REQUEST", "Body permintaan tidak dapat dibaca.");
     }
     if (!body) return jsonError(413, "REQUEST_TOO_LARGE", "Permintaan terlalu besar.");
+    if (!isUpload) {
+      const schema = proxyRequestSchema(method, path);
+      let input: unknown;
+      try {
+        input = JSON.parse(new TextDecoder().decode(body));
+      } catch {
+        return jsonError(400, "INVALID_REQUEST", "Format permintaan tidak valid.");
+      }
+      const validated = schema?.safeParse(input);
+      if (!validated?.success) return jsonError(400, "INVALID_INPUT", "Periksa kembali data yang dikirim.");
+      body = new TextEncoder().encode(JSON.stringify(validated.data)).buffer;
+    }
     headers.set("content-type", contentType);
   }
 

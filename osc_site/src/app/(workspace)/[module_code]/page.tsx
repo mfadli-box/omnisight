@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import ModuleWorkspace from "@/components/modules/module-workspace";
+import ModuleWorkspace from "@/components/features/module-workspace";
 
 const titles: Record<string, string> = {
   CT01: "Executive & SRE Control Tower", OP01: "PAM Bastion", OP02: "Monitoring & Agent Jobs",

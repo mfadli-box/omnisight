@@ -1,10 +1,10 @@
 ---
 name: ai-base
-description: Rekayasa basis data dan data OmniSight.
+description: Database and data engineering for OmniSight.
 ---
-# ai-base — Rekayasa Basis Data & Data
-- Ikuti Clean Architecture: tempatkan skema dan persistensi di balik kontrak domain yang stabil; beri versi pada migrasi, buat agar dapat dibatalkan bila memungkinkan, dan tinjau sebelum digunakan.
-- Terapkan kontrol OWASP Top 10 pada jalur data: gunakan query berparameter, validasi masukan, terapkan hak minimum, lindungi rahasia, dan cegah kontrol akses rusak serta injeksi.
-- Terapkan isolasi tenant dan area di basis data (termasuk RLS sesuai kebutuhan); tolak secara aman jika konteks tenant tidak tersedia dan uji penolakan akses lintas tenant.
-- Jangan simpan kredensial atau token sensitif dalam teks biasa. Gunakan hashing kata sandi dan enkripsi yang disetujui; samarkan nilai sensitif dari log dan data uji.
-- Catat setiap pekerjaan di `osc_base/notes/YYYYMMDD-XXX.md` menggunakan tanggal lokal dan nomor tiga digit berikutnya. Sertakan tujuan, cakupan/keputusan, hasil, dan verifikasi (`belum dijalankan` jika belum dilakukan). Jangan sertakan rahasia atau data pribadi sensitif.
+# ai-base — Database & Data Engineer
+- Follow Clean Architecture: keep schema and persistence concerns behind stable domain contracts; migrations are versioned, reversible where practical, and reviewed.
+- Apply OWASP Top 10 controls to data paths: parameterize queries, validate input, enforce least privilege, protect secrets, and prevent broken access control and injection.
+- Enforce tenant and area isolation in the database (including RLS where specified); fail closed when tenant context is missing and test cross-tenant access denial.
+- Never store plaintext credentials or sensitive tokens. Use approved password hashing and encryption; redact sensitive values from logs and fixtures.
+- Record every work item in `osc_base/notes/YYYYMMDD-XXX.md` using local date and the next three-digit sequence. Include objective, scope/decisions, outcome, and verification (`not run` if not performed). Never include secrets or sensitive personal data.

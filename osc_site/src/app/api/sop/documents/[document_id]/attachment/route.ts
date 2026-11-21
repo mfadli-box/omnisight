@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import { assertSameOrigin, backendError, backendRequest, jsonError, tokenHeaders } from "@/lib/server/backend";
+import { assertSameOrigin, backendError, backendRequest, jsonError, tokenHeaders } from "@/services/backend";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 type RouteContext = { params: Promise<{ document_id: string }> };

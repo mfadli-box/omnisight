@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import { backendRequest, jsonError, tokenHeaders } from "@/lib/server/backend";
+import { backendRequest, jsonError, tokenHeaders } from "@/services/backend";
 
 const TABLES = new Set(["osc_sop_document", "osc_pam_session", "osc_agent_node", "osc_activity_log"]);
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ table_name: string }> }) {

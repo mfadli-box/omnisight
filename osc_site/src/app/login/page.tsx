@@ -1,39 +1,36 @@
+import { Activity, Aperture, KeyRound, NotebookText } from "lucide-react";
 import type { Metadata } from "next";
-import LoginPanel from "@/components/auth/login-panel";
+import LoginPanel from "@/components/features/auth/login-panel";
+import { Card } from "@/components/ui/card";
 
 export const metadata: Metadata = { title: "Login" };
 
 export default function LoginPage() {
-  return <main className="relative min-h-screen overflow-hidden bg-[#edf3f1] px-4 py-8 sm:px-8 sm:py-12">
-    <div className="soft-grid pointer-events-none absolute inset-0 opacity-40" />
-    <div className="pointer-events-none absolute -right-28 -top-28 size-[30rem] rounded-full bg-teal-200/35 blur-3xl" />
-    <div className="pointer-events-none absolute -bottom-44 -left-36 size-[30rem] rounded-full bg-blue-100/70 blur-3xl" />
-    <div className="relative mx-auto grid min-h-[calc(100vh-4rem)] w-full max-w-6xl overflow-hidden rounded-[2rem] border border-white/80 bg-white shadow-[0_32px_100px_-50px_rgba(15,45,50,.5)] lg:grid-cols-[1.02fr_.98fr]">
-      <section className="relative hidden flex-col justify-between overflow-hidden bg-[#122c30] p-10 text-white lg:flex xl:p-14">
-        <div className="absolute inset-0 opacity-30" style={{ backgroundImage: "radial-gradient(circle at 1px 1px, #9ecbc0 1px, transparent 0)", backgroundSize: "24px 24px" }} />
-        <div className="absolute -right-24 top-24 size-96 rounded-full border border-teal-100/15" />
-        <div className="absolute -right-10 top-40 size-64 rounded-full border border-teal-100/15" />
-        <div className="relative z-10 flex items-center gap-3">
-          <div className="grid size-11 place-items-center rounded-2xl bg-teal-300 text-teal-950"><span className="text-lg font-black">O</span></div>
-          <div><div className="font-display text-lg font-bold tracking-tight">OmniSight</div><div className="text-[10px] font-semibold uppercase tracking-[.22em] text-teal-100/65">Operations intelligence</div></div>
-        </div>
-        <div className="relative z-10 max-w-lg pb-6">
-          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-teal-200/20 bg-teal-200/10 px-3 py-1.5 text-xs font-semibold text-teal-100"><span className="size-1.5 rounded-full bg-emerald-300" />Secure operations workspace</div>
-          <h1 className="font-display text-4xl font-semibold leading-[1.12] tracking-tight xl:text-5xl">Satu pandangan untuk operasi yang lebih <span className="text-teal-200">terkendali.</span></h1>
-          <p className="mt-5 max-w-md text-sm leading-7 text-slate-300">Pantau kesehatan store dan agent, amankan akses bastion, dan kelola prosedur operasional dalam satu ruang kerja.</p>
-          <div className="mt-10 grid grid-cols-3 gap-3">
-            {[{ value: "24/7", label: "Visibility" }, { value: "MFA", label: "Protected access" }, { value: "RLS", label: "Tenant boundary" }].map((item) => <div key={item.label} className="rounded-2xl border border-white/10 bg-white/[.04] p-4"><div className="font-display text-xl font-bold">{item.value}</div><div className="mt-1 text-[10px] uppercase tracking-wider text-slate-400">{item.label}</div></div>)}
-          </div>
-        </div>
-        <div className="relative z-10 flex items-center justify-between text-[11px] text-slate-400"><span>OmniSight · Internal platform</span><span>DevSecOps workspace</span></div>
-      </section>
-      <section className="flex items-center justify-center px-5 py-10 sm:px-12 lg:px-14">
-        <div className="w-full max-w-md">
-          <div className="mb-8 flex items-center gap-3 lg:hidden"><div className="grid size-10 place-items-center rounded-xl bg-teal-800 text-white"><span className="font-black">O</span></div><span className="font-display text-lg font-bold">OmniSight</span></div>
-          <LoginPanel />
-          <div className="mt-8 flex items-center justify-center gap-2 text-[11px] text-slate-400"><span className="size-1.5 rounded-full bg-emerald-500" />Sesi dilindungi dengan enkripsi dan kontrol akses tenant</div>
-        </div>
-      </section>
-    </div>
+  return <main className="grid min-h-dvh gap-4 p-4 lg:grid-cols-[1fr_1fr] xl:grid-cols-[1.12fr_1fr]">
+    <section className="relative hidden min-h-[650px] flex-col justify-between overflow-hidden rounded-2xl bg-[#142d22] p-12 text-[#edf0de] lg:flex xl:p-16">
+      <div className="login-grid pointer-events-none absolute inset-0" aria-hidden="true" />
+      <Brand />
+      <div className="relative max-w-xl">
+        <p className="font-display text-5xl leading-[1.05] tracking-tight xl:text-7xl">Pusat kendali operasi perusahaan</p>
+        <ul className="mt-8 grid max-w-md gap-3 border-t border-white/20 pt-5 text-sm text-[#cbd5bf]">
+          <li className="flex items-center gap-3"><Activity className="size-4 text-[#bdde9f]" />Pantau kesehatan node dan agent</li>
+          <li className="flex items-center gap-3"><KeyRound className="size-4 text-[#bdde9f]" />Kelola permintaan akses bastion</li>
+          <li className="flex items-center gap-3"><NotebookText className="size-4 text-[#bdde9f]" />Temukan SOP dan laporan operasional</li>
+        </ul>
+      </div>
+    </section>
+    <section className="flex min-w-0 items-center justify-center py-8 sm:px-8 lg:py-0">
+      <div className="w-full max-w-[460px]">
+        <div className="mb-6 text-primary lg:hidden"><Brand /></div>
+        <Card className="p-6 sm:p-10"><LoginPanel /></Card>
+      </div>
+    </section>
   </main>;
+}
+
+function Brand() {
+  return <div className="relative flex items-center gap-3 text-sm font-semibold tracking-wide">
+    <span className="grid size-9 place-items-center rounded-lg bg-[#cfdfac] text-[#172e23]"><Aperture className="size-5" /></span>
+    OmniSight
+  </div>;
 }
