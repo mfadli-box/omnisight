@@ -23,7 +23,7 @@ const statuses = [
   { value: "STALE", label: "Stale" }, { value: "PENDING", label: "Pending" }, { value: "DISABLED", label: "Disabled" },
 ];
 
-export function AgentStatus({ telemetry = false }: { telemetry?: boolean }) {
+export function AgentStatus({ telemetry = false, onComposeNode }: { telemetry?: boolean; onComposeNode?: (nodeId: string) => void }) {
   const [status, setStatus] = useState("");
   const opener = useRef<HTMLButtonElement>(null);
   const [node, setNode] = useState<{ id: string; name: string }>();
@@ -45,8 +45,12 @@ export function AgentStatus({ telemetry = false }: { telemetry?: boolean }) {
         const id = row.id;
         const name = [row.display_name, row.node_code, row.hostname].find((label): label is string =>
           typeof label === "string" && label.length > 0) ?? id;
-        return <Button variant="outline" size="sm" aria-label={`Riwayat ${name}`}
-          onClick={(event) => { opener.current = event.currentTarget; setNode({ id, name }); }}>Riwayat</Button>;
+        return <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" aria-label={`Riwayat ${name}`}
+          onClick={(event) => { opener.current = event.currentTarget; setNode({ id, name }); }}>Riwayat</Button>
+          {onComposeNode && <Button variant="outline" size="sm" aria-label={`Pilih ${name} untuk stack`}
+            onClick={() => onComposeNode(id)}>Pilih node</Button>}
+        </div>;
       }}
       filter={status ? (row) => row.status === status : undefined}
       emptyMessage={status ? "Tidak ada node dengan status ini pada halaman aktif." : undefined}

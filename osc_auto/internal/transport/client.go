@@ -67,21 +67,29 @@ func (c *Client) Telemetry(ctx context.Context, sample domain.HostMetrics) error
 }
 
 func (c *Client) send(ctx context.Context, path string, payload any) error {
+	response, err := c.post(ctx, path, payload)
+	if err != nil {
+		return err
+	}
+	return response.Body.Close()
+}
+
+func (c *Client) post(ctx context.Context, path string, payload any) (*http.Response, error) {
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return errors.New("agent payload is invalid")
+		return nil, errors.New("agent payload is invalid")
 	}
 	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
 	mac := hmac.New(sha256.New, c.secret)
-	if path == telemetryPath {
-		_, _ = io.WriteString(mac, telemetryPath+"\n")
+	if path != heartbeatPath {
+		_, _ = io.WriteString(mac, path+"\n")
 	}
 	_, _ = io.WriteString(mac, c.nodeID+"\n"+timestamp+"\n")
 	_, _ = mac.Write(body)
 
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, c.hubURL+path, bytes.NewReader(body))
 	if err != nil {
-		return errors.New("agent request could not be created")
+		return nil, errors.New("agent request could not be created")
 	}
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("X-Agent-Id", c.nodeID)
@@ -89,11 +97,11 @@ func (c *Client) send(ctx context.Context, path string, payload any) error {
 	request.Header.Set("X-Signature", hex.EncodeToString(mac.Sum(nil)))
 	response, err := c.http.Do(request)
 	if err != nil {
-		return errors.New("agent request failed")
+		return nil, errors.New("agent request failed")
 	}
-	defer response.Body.Close()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return fmt.Errorf("agent endpoint returned HTTP %d", response.StatusCode)
+		_ = response.Body.Close()
+		return nil, fmt.Errorf("agent endpoint returned HTTP %d", response.StatusCode)
 	}
-	return nil
+	return response, nil
 }

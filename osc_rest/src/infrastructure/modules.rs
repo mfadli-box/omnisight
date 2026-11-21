@@ -22,6 +22,21 @@ pub fn database_error(error: sqlx::Error) -> AuthError {
     }
 }
 
+pub async fn set_tenant_scope(
+    db: &mut PgConnection,
+    company_id: Uuid,
+    areas: &[Uuid],
+) -> Result<(), AuthError> {
+    let areas = areas
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join(",");
+    sqlx::query("SELECT set_config('app.current_company_id',$1,true),set_config('app.allowed_area_ids',$2,true)")
+        .bind(company_id.to_string()).bind(if areas.is_empty() { "{}".to_owned() } else { areas }).execute(db).await.map_err(database_error)?;
+    Ok(())
+}
+
 pub fn company(claims: &SessionClaims) -> Result<Uuid, AuthError> {
     claims.company_id.ok_or(AuthError::InvalidChallenge)
 }
@@ -104,10 +119,12 @@ impl Resource {
 
     fn projection(self) -> &'static str {
         match self {
-            Self::Nodes => "(to_jsonb(t) - ARRAY['agent_secret_hash','credential_ref'])
+            Self::Nodes => {
+                "(to_jsonb(t) - ARRAY['agent_secret_hash','credential_ref'])
                 || jsonb_build_object('status', CASE
                     WHEN t.status='ONLINE' AND t.last_seen_at <= now() - interval '15 minutes'
-                    THEN 'STALE' ELSE t.status END)",
+                    THEN 'STALE' ELSE t.status END)"
+            }
             Self::Targets => "to_jsonb(t) - 'credential_ref'",
             Self::Companies => {
                 "to_jsonb(t) - ARRAY['hris_login_url','ad_ldap_url','oidc_tenant_id']"

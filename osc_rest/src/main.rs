@@ -4,6 +4,7 @@ use base64::{
     Engine,
     engine::general_purpose::{STANDARD, STANDARD_NO_PAD, URL_SAFE_NO_PAD},
 };
+use hmac::{Hmac, Mac};
 use osc_rest::{
     application::{
         auth::AuthService,
@@ -16,7 +17,7 @@ use osc_rest::{
     },
     presentation::{
         auth_http::{AppState, router},
-        heartbeat_http, telemetry_http,
+        heartbeat_http, ops_http, telemetry_http,
     },
 };
 use tracing_subscriber::{EnvFilter, filter::filter_fn, prelude::*};
@@ -85,14 +86,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         encryption_key,
     ));
     let storage = osc_rest::infrastructure::storage::RustFsStorage::from_env().await?;
+    let mut ops_key = Hmac::<sha2::Sha256>::new_from_slice(&encryption_key)?;
+    ops_key.update(b"omnisight:ops:encryption:v1");
     let app_state = Arc::new(AppState {
+        ops_key: ops_key.finalize().into_bytes().into(),
         auth,
         tokens,
         tenant_pool,
         cache,
         storage: Arc::new(storage),
     });
+    let agent_ops =
+        ops_http::agent_routes(app_state.clone(), &heartbeat_secrets, &telemetry_scopes)?;
     let app = router(app_state)
+        .merge(agent_ops)
         .merge(heartbeat_router)
         .merge(telemetry_router);
 

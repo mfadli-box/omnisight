@@ -102,6 +102,26 @@ impl AuthService {
             .await
     }
 
+    pub async fn step_up_deadline(
+        &self,
+        claims: &SessionClaims,
+    ) -> Result<chrono::DateTime<chrono::Utc>, AuthError> {
+        let at = self
+            .cache
+            .step_up_at(claims.jti)
+            .await?
+            .ok_or(AuthError::StepUpRequired)?;
+        let now = chrono::Utc::now().timestamp_millis();
+        if !(now.saturating_sub(900_000)..=now).contains(&at) {
+            return Err(AuthError::StepUpRequired);
+        }
+        chrono::DateTime::from_timestamp_millis(at + 900_000)
+            .map(|deadline| {
+                deadline.min(chrono::DateTime::from_timestamp(claims.exp, 0).unwrap_or(deadline))
+            })
+            .ok_or(AuthError::StepUpRequired)
+    }
+
     pub async fn require_admin_step_up(&self, claims: &SessionClaims) -> Result<(), AuthError> {
         self.require_step_up(claims, None)
             .await

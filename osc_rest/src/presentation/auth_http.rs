@@ -25,6 +25,7 @@ use crate::{
 
 pub struct AppState {
     pub auth: Arc<AuthService>,
+    pub ops_key: [u8; 32],
     pub tokens: Arc<TokenService>,
     pub tenant_pool: PgPool,
     pub cache: Arc<crate::infrastructure::redis_cache::RedisCache>,
@@ -37,6 +38,10 @@ pub struct TenantTransaction {
     pub transaction: StdArc<Mutex<Option<Transaction<'static, Postgres>>>>,
     pub uploaded_objects: StdArc<Mutex<Vec<String>>>,
 }
+
+// The terminal uses this for error responses whose only write is a denial audit.
+#[derive(Clone)]
+pub(super) struct CommitAudit;
 
 #[derive(Deserialize)]
 pub struct LoginRequest {
@@ -97,6 +102,7 @@ struct Meta {
 
 pub fn router(state: Arc<AppState>) -> Router {
     let protected = super::modules_http::routes()
+        .merge(super::ops_http::routes())
         .route("/baas/v1/auth/mfa/setup", post(setup_mfa))
         .route("/baas/v1/auth/mfa/enable", post(enable_mfa))
         .route("/baas/v1/auth/mfa/disable", post(disable_mfa))
@@ -298,21 +304,7 @@ async fn tenant_auth(
         Ok(tx) => tx,
         Err(_) => return ApiError(AuthError::DependencyUnavailable).into_response(),
     };
-    let areas = claims
-        .allowed_area_ids
-        .iter()
-        .map(ToString::to_string)
-        .collect::<Vec<_>>()
-        .join(",");
-    let allowed_area_ids = if areas.is_empty() {
-        "{}"
-    } else {
-        areas.as_str()
-    };
-    if sqlx::query("SELECT set_config('app.current_company_id',$1,true), set_config('app.allowed_area_ids',$2,true)")
-        .bind(company_id.to_string())
-        .bind(allowed_area_ids)
-        .execute(&mut *tx)
+    if modules::set_tenant_scope(&mut tx, company_id, &claims.allowed_area_ids)
         .await
         .is_err()
     {
@@ -326,13 +318,13 @@ async fn tenant_auth(
     };
     request.extensions_mut().insert(tenant.clone());
     let response = next.run(request).await;
-    // Transaksi hanya berlaku untuk satu request. Operasi HTTP yang gagal di-rollback.
+    // Transaksi hanya berlaku untuk satu request. Operasi HTTP yang gagal di-rollback kecuali pencatatan penolakan akses.
     // Handler hanya boleh mengambilnya melalui mutex bersama ini dan tidak boleh melakukan commit.
     let mut guard = tenant.transaction.lock().await;
     let Some(tx) = guard.take() else {
         return ApiError(AuthError::Internal).into_response();
     };
-    if response.status().is_success() {
+    if response.status().is_success() || response.extensions().get::<CommitAudit>().is_some() {
         if tx.commit().await.is_ok() {
             return response;
         }

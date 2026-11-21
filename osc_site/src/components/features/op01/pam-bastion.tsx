@@ -11,6 +11,7 @@ import { apiData, jsonRequest, message } from "@/services/api";
 import { pamFormSchema, pamProtocolSchema, pamSessionSchema } from "@/validations/pam.schema";
 import { Feedback, FormField } from "../shared/form-feedback";
 import { ResourcePanel, type Field } from "../shared/resource-panel";
+import { WebTerminal } from "./web-terminal";
 
 const columns: Field[] = [
   { key: "display_name", label: "Nama target" }, { key: "target_code", label: "Kode" },
@@ -22,8 +23,8 @@ const fields: Field[] = [
 ];
 
 export function PamBastion() {
-  return <ResourcePanel title="Target bastion" path="pam/targets" columns={columns} fields={fields}
-    archiveLabel="Nonaktifkan" rowAction={(row) => <PamSession targetId={String(row.id)} />} />;
+  return <div className="space-y-4"><ResourcePanel title="Target bastion" path="pam/targets" columns={columns} fields={fields}
+    archiveLabel="Nonaktifkan" rowAction={(row) => <PamSession targetId={String(row.id)} />} /><WebTerminal /></div>;
 }
 
 function PamSession({ targetId }: { targetId: string }) {

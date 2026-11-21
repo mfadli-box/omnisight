@@ -56,6 +56,19 @@ impl RedisCache {
         Ok(accepted == 1)
     }
 
+    pub async fn reserve_ops_claim(&self, node: Uuid, nonce: Uuid) -> Result<bool, AuthError> {
+        let result: Option<String> = redis::cmd("SET")
+            .arg(format!("osc:agent:ops:claim:{node}:{nonce}"))
+            .arg("1")
+            .arg("NX")
+            .arg("EX")
+            .arg(241)
+            .query_async(&mut self.connection().await?)
+            .await
+            .map_err(|_| AuthError::DependencyUnavailable)?;
+        Ok(result.is_some())
+    }
+
     pub async fn agent_heartbeats(
         &self,
         node_ids: &[Uuid],

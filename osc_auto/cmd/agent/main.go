@@ -13,6 +13,7 @@ import (
 	"omnisight/osc_auto/internal/collector"
 	"omnisight/osc_auto/internal/config"
 	"omnisight/osc_auto/internal/domain"
+	"omnisight/osc_auto/internal/executor"
 	"omnisight/osc_auto/internal/infrastructure/httpapi"
 	"omnisight/osc_auto/internal/infrastructure/jobs"
 	"omnisight/osc_auto/internal/infrastructure/state"
@@ -48,7 +49,7 @@ func run(path, command, service string, logger *slog.Logger) int {
 	sampler := telemetry.NewSampler()
 	var nodeID string
 	var runner lifecycle.Runner
-	var executor *application.JobExecutor
+	var diagnostics *application.JobExecutor
 	if config.IsLegacy(path) {
 		cfg, key, err := config.Load(path)
 		if err != nil {
@@ -56,7 +57,7 @@ func run(path, command, service string, logger *slog.Logger) int {
 			return 2
 		}
 		nodeID = cfg.NodeID
-		executor = application.NewJobExecutor(jobs.New(sampler), cfg.AllowedServices)
+		diagnostics = application.NewJobExecutor(jobs.New(sampler), cfg.AllowedServices)
 		if command == "" {
 			store, err := state.Open(cfg.StateDir)
 			if err != nil {
@@ -64,7 +65,7 @@ func run(path, command, service string, logger *slog.Logger) int {
 				return 2
 			}
 			api := httpapi.New(cfg.APIURL, nodeID, cfg.NodeToken)
-			runner = application.NewAgent(nodeID, cfg.Interval(), key, sampler, api, store, store, store, executor, logger)
+			runner = application.NewAgent(nodeID, cfg.Interval(), key, sampler, api, store, store, store, diagnostics, logger)
 		}
 	} else {
 		cfg, err := config.LoadHeartbeat(path)
@@ -73,7 +74,7 @@ func run(path, command, service string, logger *slog.Logger) int {
 			return 2
 		}
 		nodeID = cfg.NodeID
-		executor = application.NewJobExecutor(jobs.New(sampler), cfg.AllowedServices)
+		diagnostics = application.NewJobExecutor(jobs.New(sampler), cfg.AllowedServices)
 		client := transport.New(cfg.HubURL, nodeID, cfg.AgentSecret)
 		if cfg.TelemetryEnabled {
 			runner = application.TelemetryWorker{
@@ -85,6 +86,15 @@ func run(path, command, service string, logger *slog.Logger) int {
 				Interval: cfg.Interval(), Sampler: sampler, Sender: client, Logger: logger,
 			}
 		}
+		if cfg.OpsEnabled {
+			ops := application.OpsWorker{
+				API: client, Executor: diagnostics, DockerStatus: executor.DockerStatus, Logger: logger,
+			}
+			if cfg.ComposeRoot != "" {
+				ops.Compose = executor.Compose{Root: cfg.ComposeRoot}
+			}
+			runner = workers{monitor: runner, ops: ops}
+		}
 	}
 	if command != "" {
 		job := domain.Job{Command: command}
@@ -93,7 +103,7 @@ func run(path, command, service string, logger *slog.Logger) int {
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 		defer cancel()
-		output, err := executor.ExecuteDiagnostic(ctx, job)
+		output, err := diagnostics.ExecuteDiagnostic(ctx, job)
 		if output != "" {
 			fmt.Println(output)
 		}
@@ -112,10 +122,25 @@ func run(path, command, service string, logger *slog.Logger) int {
 }
 
 func hasHeartbeatEnv() bool {
-	for _, name := range []string{"HUB_URL", "NODE_ID", "AGENT_SECRET", "POLL_INTERVAL_SEC", "TELEMETRY_ENABLED"} {
+	for _, name := range []string{"HUB_URL", "NODE_ID", "AGENT_SECRET", "POLL_INTERVAL_SEC", "TELEMETRY_ENABLED", "OPS_ENABLED", "COMPOSE_ROOT"} {
 		if _, ok := os.LookupEnv(name); ok {
 			return true
 		}
 	}
 	return false
+}
+
+type workers struct {
+	monitor lifecycle.Runner
+	ops     lifecycle.Runner
+}
+
+func (w workers) Run(ctx context.Context) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	result := make(chan error, 1)
+	go func() { result <- w.ops.Run(ctx); cancel() }()
+	err := w.monitor.Run(ctx)
+	cancel()
+	return errors.Join(err, <-result)
 }

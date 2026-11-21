@@ -52,15 +52,16 @@ export function assertSameOrigin(request: NextRequest) {
   }
 }
 
-export async function backendRequest(path: string, init: RequestInit = {}) {
+export async function backendRequest(path: string, init: RequestInit = {}, timeoutMs = 15_000) {
   const base = process.env.INTERNAL_API_URL || process.env.BACKEND_URL;
   if (!base) throw new Error("BACKEND_UNAVAILABLE");
   const url = new URL(`/baas/v1/${path.replace(/^\/+/, "")}`, base).toString();
+  const timeout = AbortSignal.timeout(timeoutMs);
   return fetch(url, {
     ...init,
     cache: "no-store",
     redirect: "manual",
-    signal: AbortSignal.timeout(15_000),
+    signal: init.signal ? AbortSignal.any([init.signal, timeout]) : timeout,
     headers: new Headers(init.headers),
   });
 }

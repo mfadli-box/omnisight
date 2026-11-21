@@ -25,6 +25,8 @@ type HeartbeatConfig struct {
 	AgentSecret      string   `yaml:"agent_secret"`
 	PollIntervalSec  int      `yaml:"poll_interval_sec"`
 	TelemetryEnabled bool     `yaml:"telemetry_enabled"`
+	OpsEnabled       bool     `yaml:"ops_enabled"`
+	ComposeRoot      string   `yaml:"compose_root"`
 	AllowedServices  []string `yaml:"allowed_services"`
 }
 
@@ -52,7 +54,7 @@ func LoadHeartbeat(path string) (HeartbeatConfig, error) {
 	}
 
 	for name, target := range map[string]*string{
-		"HUB_URL": &cfg.HubURL, "NODE_ID": &cfg.NodeID, "AGENT_SECRET": &cfg.AgentSecret,
+		"HUB_URL": &cfg.HubURL, "NODE_ID": &cfg.NodeID, "AGENT_SECRET": &cfg.AgentSecret, "COMPOSE_ROOT": &cfg.ComposeRoot,
 	} {
 		if value, ok := os.LookupEnv(name); ok {
 			*target = value
@@ -64,14 +66,21 @@ func LoadHeartbeat(path string) (HeartbeatConfig, error) {
 			return HeartbeatConfig{}, errors.New("POLL_INTERVAL_SEC must be an integer")
 		}
 	}
-	if value, ok := os.LookupEnv("TELEMETRY_ENABLED"); ok {
-		cfg.TelemetryEnabled, err = strconv.ParseBool(value)
-		if err != nil {
-			return HeartbeatConfig{}, errors.New("TELEMETRY_ENABLED must be a boolean")
+	for name, target := range map[string]*bool{
+		"TELEMETRY_ENABLED": &cfg.TelemetryEnabled, "OPS_ENABLED": &cfg.OpsEnabled,
+	} {
+		if value, ok := os.LookupEnv(name); ok {
+			*target, err = strconv.ParseBool(value)
+			if err != nil {
+				return HeartbeatConfig{}, errors.New(name + " must be a boolean")
+			}
 		}
 	}
-	if cfg.TelemetryEnabled && !nodeUUID.MatchString(cfg.NodeID) {
-		return HeartbeatConfig{}, errors.New("telemetry requires a canonical lowercase node UUID")
+	if (cfg.TelemetryEnabled || cfg.OpsEnabled) && !nodeUUID.MatchString(cfg.NodeID) {
+		return HeartbeatConfig{}, errors.New("telemetry and OPS require a canonical lowercase node UUID")
+	}
+	if cfg.ComposeRoot != "" && (!cfg.OpsEnabled || !filepath.IsAbs(cfg.ComposeRoot)) {
+		return HeartbeatConfig{}, errors.New("compose_root requires OPS enabled and an absolute local path")
 	}
 	if err := validateURL(cfg.HubURL, "hub_url"); err != nil {
 		return HeartbeatConfig{}, err

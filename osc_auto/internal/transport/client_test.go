@@ -5,10 +5,12 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"omnisight/osc_auto/internal/domain"
 )
@@ -31,6 +33,9 @@ func TestSignedAgentRequests(t *testing.T) {
 		}},
 		{"telemetry", "/baas/v1/agents/telemetry", "/baas/v1/agents/telemetry\n", func(client *Client) error {
 			return client.Telemetry(context.Background(), domain.HostMetrics{CPUPct: 30})
+		}},
+		{"ops output", eventPath, eventPath + "\n", func(client *Client) error {
+			return client.OpsOutput(context.Background(), "test-job", 1, "test output")
 		}},
 	} {
 		t.Run(route.name, func(t *testing.T) {
@@ -57,5 +62,40 @@ func TestSignedAgentRequests(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+	}
+}
+
+func TestOpsClaimBindsSignedJobToCurrentRequest(t *testing.T) {
+	const node = "5b1cd41c-fc12-4d9a-add5-b77a12ce2434"
+	const key = "test-secret-for-agent-signing-only"
+	for _, valid := range []bool{true, false} {
+		client := New("https://hub.example.com", node, key)
+		client.http.Transport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
+			defer r.Body.Close()
+			var request struct {
+				Nonce string `json:"nonce"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+				return nil, err
+			}
+			if !valid {
+				request.Nonce = "deadbeef"
+			}
+			payload, err := json.Marshal(domain.OpsJob{ID: "test-job", NodeID: node, Nonce: request.Nonce,
+				Action: "terminal", ExpiresAt: time.Now().Add(time.Minute)})
+			if err != nil {
+				return nil, err
+			}
+			mac := hmac.New(sha256.New, []byte(key))
+			_, _ = io.WriteString(mac, "osc:ops:job\n"+string(payload))
+			body, err := json.Marshal(map[string]string{"payload": string(payload), "signature": hex.EncodeToString(mac.Sum(nil))})
+			if err != nil {
+				return nil, err
+			}
+			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(string(body)))}, nil
+		})
+		if job, err := client.ClaimOps(t.Context(), true); valid != (err == nil && job != nil) {
+			t.Fatalf("claim acceptance does not match request binding: %v", err)
+		}
 	}
 }

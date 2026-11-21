@@ -1,7 +1,7 @@
 "use client";
 
-import { AgentStatus } from "../shared/agent-status";
+import { ComposeStacks } from "./compose-stacks";
 
 export function AgentMonitoring() {
-  return <AgentStatus telemetry />;
+  return <ComposeStacks />;
 }

@@ -1,3 +1,4 @@
+pub mod ops_http;
 mod admin_http;
 pub mod auth_http;
 pub mod heartbeat_http;

@@ -22,13 +22,14 @@ docker network inspect blackbox >/dev/null 2>&1 ||
 ```
 
 Untuk volume database baru, jalankan PostgreSQL terlebih dahulu. Terapkan
-migrasi inti, kebijakan RLS, migrasi telemetri, dan seed demo sebelum menunggu healthcheck API.
+migrasi inti, kebijakan RLS, migrasi telemetri dan Compose, lalu seed demo sebelum menunggu healthcheck API.
 
 ```sh
 docker compose up -d --wait osc_base
 for sql in osc_base/migrations/001_init_core.sql \
            osc_base/migrations/002_rls_policies.sql \
            osc_base/migrations/008_node_telemetry.sql \
+           osc_base/migrations/009_compose_stacks.sql \
            osc_base/seeds/001_seed_demo.sql; do
   docker compose exec -T osc_base sh -c \
     'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1' < "$sql" || break

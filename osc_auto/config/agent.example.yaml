@@ -4,3 +4,5 @@ agent_secret: ""
 poll_interval_sec: 30
 telemetry_enabled: false
 allowed_services: []
+ops_enabled: false
+compose_root: ""
