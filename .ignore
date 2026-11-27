@@ -1,0 +1,4 @@
+coverage/
+osc_base/init/04_seed.sql
+osc_docs/assets/
+*.log

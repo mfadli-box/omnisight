@@ -1,0 +1,219 @@
+version: '3.8'
+
+volumes:
+  xbase:
+    driver: local
+  xtemp:
+    driver: local
+  xlogs:
+    driver: local
+  xsave:
+    driver: local
+
+networks:
+  blackbox:
+    name: blackbox
+    external: true
+    # driver: bridge
+    # ipam:
+      # config:
+        # - subnet: 172.99.66.0/24
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # ---------------------------------------------------------------------------
+  # 1. PostgreSQL (Master Data & Structured Relational Data)
+  # ---------------------------------------------------------------------------
+  osc_base:
+    image: postgres:18-alpine
+    container_name: osc_base
+    logging: *default-logging
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-omnisight}
+      POSTGRES_USER: ${POSTGRES_USER:-osc}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in environment}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?Set POSTGRES_APP_PASSWORD for non-superuser API role}
+    ports:
+      - "36661:5432"
+    volumes:
+      - xbase:/var/lib/postgresql/data
+      - ./osc_base/init/001_runtime_role.sh:/docker-entrypoint-initdb.d/001_runtime_role.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      blackbox:
+        ipv4_address: 172.99.66.1
+
+  # ---------------------------------------------------------------------------
+  # 2. Valkey (In-Memory Cache, Rate Limiting & Session Management)
+  # ---------------------------------------------------------------------------
+  osc_temp:
+    image: valkey/valkey:8-alpine
+    container_name: osc_temp
+    logging: *default-logging
+    ports:
+      - "36662:6379"
+    command: ["valkey-server", "--appendonly", "yes"]
+    volumes:
+      - xtemp:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      blackbox:
+        ipv4_address: 172.99.66.2
+
+  # ---------------------------------------------------------------------------
+  # 3. MongoDB (Raw Telemetry Payloads & Unstructured Log Storage)
+  # ---------------------------------------------------------------------------
+  osc_logs:
+    image: mongo:7-jammy
+    container_name: osc_logs
+    logging: *default-logging
+    ports:
+      - "36666:27017"
+    environment:
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE:-omnisight}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-osc_admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?Set MONGO_ROOT_PASSWORD in environment}
+    volumes:
+      - xlogs:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      blackbox:
+        ipv4_address: 172.99.66.6
+
+  # ---------------------------------------------------------------------------
+  # 4. RustFS (Object Storage / Asset & Document Files)
+  # ---------------------------------------------------------------------------
+  osc_save:
+    image: rustfs/rustfs:latest
+    container_name: osc_save
+    logging: *default-logging
+    ports:
+      - "36663:9000"
+    environment:
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:?Set RUSTFS_ACCESS_KEY in environment}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:?Set RUSTFS_SECRET_KEY in environment}
+    volumes:
+      - xsave:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9000/health/ready >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      blackbox:
+        ipv4_address: 172.99.66.3
+
+  # ---------------------------------------------------------------------------
+  # 5. Rust REST Backend Service (osc_rest)
+  # ---------------------------------------------------------------------------
+  osc_rest:
+    build: ./osc_rest
+    container_name: osc_rest
+    logging: *default-logging
+    ports:
+      - "36664:8080"
+    environment:
+      DATABASE_URL: postgres://omnisight_app:${POSTGRES_APP_PASSWORD:?Set POSTGRES_APP_PASSWORD}@osc_base:5432/${POSTGRES_DB:-omnisight}
+      CACHE_URL: redis://osc_temp:6379
+      MONGO_URL: mongodb://${MONGO_ROOT_USER:-osc_admin}:${MONGO_ROOT_PASSWORD}@osc_logs:27017/${MONGO_INITDB_DATABASE:-omnisight}?authSource=admin
+      AGENT_HEARTBEAT_SECRETS: ${AGENT_HEARTBEAT_SECRETS:-}
+      AGENT_TELEMETRY_SCOPES: ${AGENT_TELEMETRY_SCOPES:-}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET to at least 32 random bytes}
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:?Set MFA_ENCRYPTION_KEY to base64 for exactly 32 random bytes}
+      HRIS_ALLOWED_HOSTS: ${HRIS_ALLOWED_HOSTS:-hris.intranet.local}
+      EMAIL_API_ENDPOINT: ${EMAIL_API_ENDPOINT:-}
+      EMAIL_API_TOKEN: ${EMAIL_API_TOKEN:-}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:3000}
+      RUSTFS_ENDPOINT: http://osc_save:9000
+      RUSTFS_BUCKET: ${RUSTFS_BUCKET:-omnisight}
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:?Set RUSTFS_ACCESS_KEY in environment}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:?Set RUSTFS_SECRET_KEY in environment}
+      RUSTFS_REGION: ${RUSTFS_REGION:-us-east-1}
+      CT02_AUDIT_KEY: ${CT02_AUDIT_KEY:-}
+      CT02_SERVER_ID: ${CT02_SERVER_ID:-}
+      COMPOSE_PROJECT_NAME: ${COMPOSE_PROJECT_NAME:-omnisight}
+      STORE_ACCOUNT_ENCRYPTION_KEY: ${STORE_ACCOUNT_ENCRYPTION_KEY:?Set a dedicated base64-encoded 32-byte store vault key}
+      SNMP_ENCRYPTION_KEY: ${SNMP_ENCRYPTION_KEY:?Set a dedicated base64-encoded 32-byte SNMP key}
+    volumes:
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+        bind:
+          create_host_path: false
+    depends_on:
+      osc_base: {condition: service_healthy}
+      osc_temp: {condition: service_healthy}
+      osc_logs: {condition: service_healthy}
+      osc_save: {condition: service_healthy}
+    expose: ["8080"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:8080/baas/v1/public/companies"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      blackbox:
+        ipv4_address: 172.99.66.4
+
+  # ---------------------------------------------------------------------------
+  # 6. Next.js Frontend Application (osc_site)
+  # ---------------------------------------------------------------------------
+  osc_site:
+    build: ./osc_site
+    container_name: osc_site
+    logging: *default-logging
+    ports:
+      - "36665:3000"
+    environment:
+      INTERNAL_API_URL: http://osc_rest:8080
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:36665}
+    depends_on:
+      osc_rest: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      blackbox:
+        ipv4_address: 172.99.66.5
+
+  # ---------------------------------------------------------------------------
+  # 7. Golang SRE Agent / Scheduler (osc_auto)
+  # ---------------------------------------------------------------------------
+  osc_auto:
+    build: ./osc_auto
+    container_name: osc_auto
+    logging: *default-logging
+    network_mode: host
+    environment:
+      HUB_URL: http://127.0.0.1:36664
+      NODE_ID: ${AGENT_NODE_ID:?Set AGENT_NODE_ID in environment}
+      AGENT_SECRET: ${AGENT_SECRET:?Set AGENT_SECRET in environment}
+      TELEMETRY_ENABLED: ${AGENT_TELEMETRY_ENABLED:-false}
+    depends_on:
+      osc_rest: {condition: service_healthy}
+    restart: unless-stopped
