@@ -6,20 +6,20 @@ target_model: gpt-6.2-astra
 reasoning_effort: low
 token_optimization: true
 ---
-# Task: Execute CM01 QA & Security Test Suite with Fast Pre-Check Guard
+# Task: Create & Execute CM01 QA & Security Test Suite
 
 ## Fast Pre-Check (Token-Saving Guard)
 ```bash
-test -s osc_docs/test_flows/CM01-F.py && echo "TEST_SCRIPT_OK" || echo "TEST_SCRIPT_MISSING"
-python3 osc_docs/test_flows/CM01-F.py > /dev/null 2>&1 && echo "ALL_TESTS_PASSED" || echo "TESTS_FAILED"
+test -s osc_docs/test_flows/CM01-F.py && echo "TEST_FLOWS_OK" || echo "TEST_FLOWS_MISSING"
+test -s osc_docs/test_guard/CM01-G.py && echo "TEST_GUARD_OK" || echo "TEST_GUARD_MISSING"
+python3 -m unittest osc_docs/test_flows/CM01-F.py > /dev/null 2>&1 && echo "FLOWS_PASSED" || echo "FLOWS_FAILED"
+python3 -m unittest osc_docs/test_guard/CM01-G.py > /dev/null 2>&1 && echo "GUARD_PASSED" || echo "GUARD_FAILED"
 ```
-- **Jika PASSED**: `STOP & FAST EXIT` ("Pengujian QA & Security CM01 (CM01-F.py) 7/7 PASSED.").
-- **Jika FAILED**: Diagnosa & perbaiki handler di `osc_rest`.
 
 ## Objective & Scope
-1. Eksekusi `python3 CM01-F.py`.
-2. Validasi 7 skenario: Argon2id Local Auth, HRIS XML Parsing, Auto-Sync Backup Password, HRIS Rejection (Status 0), Fallback Recovery (>3s), TOTP MFA, dan Anti-XXE/SSRF Protection.
+1. Buat skrip `osc_docs/test_flows/CM01-F.py` untuk menguji 7 skenario utama: Argon2id Local Auth, HRIS XML Parsing, Auto-Sync Backup Password, HRIS Rejection, Fallback Recovery Mode, TOTP MFA, dan JWT Token.
+2. Buat skrip `osc_docs/test_guard/CM01-G.py` untuk menguji proteksi XXE DTD Expansion & SSRF pada HTTP Client HRIS.
 
 ## Acceptance Criteria
-- [ ] 7/7 Unit Test PASSED.
+- [ ] Seluruh skenario pengujian fungsional dan keamanan auth 100% PASSED.
 - [ ] Documented at `osc_docs/notes/MP-CM01-QA.md`.

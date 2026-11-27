@@ -6,19 +6,20 @@ target_model: gpt-6.2-astra
 reasoning_effort: low
 token_optimization: true
 ---
-# Task: Execute Docker Stack Command Injection Prevention Guard Test Suite
+# Task: Create & Execute CT01 Docker Stack Security Guard Test Suite
 
 ## Fast Pre-Check (Token-Saving Guard)
 ```bash
-test -s osc_docs/test_guard/CT01-G.py && echo "TEST_EXISTS" || echo "TEST_MISSING"
-python3 -m unittest osc_docs/test_guard/CT01-G.py > /dev/null 2>&1 && echo "ALL_TESTS_PASSED" || echo "TESTS_FAILED"
+test -s osc_docs/test_flows/CT01-F.py && echo "TEST_FLOWS_OK" || echo "TEST_FLOWS_MISSING"
+test -s osc_docs/test_guard/CT01-G.py && echo "TEST_GUARD_OK" || echo "TEST_GUARD_MISSING"
+python3 -m unittest osc_docs/test_flows/CT01-F.py > /dev/null 2>&1 && echo "FLOWS_PASSED" || echo "FLOWS_FAILED"
+python3 -m unittest osc_docs/test_guard/CT01-G.py > /dev/null 2>&1 && echo "GUARD_PASSED" || echo "GUARD_FAILED"
 ```
 
 ## Objective & Scope
-1. Eksekusi `CT01-G.py`.
-2. Uji pencegahan Command Injection pada parser `docker-compose.yml` & Docker Socket execution.
-3. Pastikan karakter berbahaya (`|`, `;`, `&`, `` ` ``) pada masukan stack name / env var ditolak dengan aman.
+1. Buat skrip `osc_docs/test_flows/CT01-F.py` untuk menguji deployment stack Docker Compose.
+2. Buat skrip `osc_docs/test_guard/CT01-G.py` untuk menguji pencegahan Command Injection pada Socket Docker API.
 
 ## Acceptance Criteria
-- [ ] Celah Command Injection pada Docker API Engine 100% tertutup (PASSED).
+- [ ] Deployment stack berjalan sukses dan proteksi Command Injection 100% PASSED.
 - [ ] Documented at `osc_docs/notes/MP-CT01-QA.md`.

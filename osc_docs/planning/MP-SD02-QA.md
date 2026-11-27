@@ -6,7 +6,7 @@ target_model: gpt-6.2-astra
 reasoning_effort: low
 token_optimization: true
 ---
-# Task: Execute SLA Breach Detection & Automated Escalation Test Suite
+# Task: Create & Execute SD02 SLA Breach Detection & Escalation Test Suite
 
 ## Fast Pre-Check (Token-Saving Guard)
 ```bash
@@ -15,10 +15,9 @@ python3 -m unittest osc_docs/test_flows/SD02-F.py > /dev/null 2>&1 && echo "ALL_
 ```
 
 ## Objective & Scope
-1. Eksekusi `SD02-F.py`.
-2. Validasi penghitungan waktu resolusi tiket berdasarkan matriks SLA (`dat_sla_policy`).
-3. Verifikasi pemicu otomatis ubah status `is_sla_breached = TRUE` dan penerbitan notifikasi eskalasi ketika batas waktu terlampaui.
+1. Buat skrip `osc_docs/test_flows/SD02-F.py` untuk menguji kalkulasi batas waktu resolusi tiket (`dat_sla_policy`).
+2. Memvalidasi penandaan `is_sla_breached = TRUE` dan audit log di `log_sla_breach_audit`.
 
 ## Acceptance Criteria
-- [ ] Deteksi SLA Breach dan eskalasi otomatis terverifikasi akurat (PASSED).
+- [ ] Deteksi SLA breach dan eskalasi otomatis berjalan presisi.
 - [ ] Documented at `osc_docs/notes/MP-SD02-QA.md`.

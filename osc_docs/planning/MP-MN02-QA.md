@@ -1,12 +1,12 @@
 ---
 code: MP-MN02-QA
-module: MN02 (Synthetic Uptime, Ping & SSL Checker)
+module: MN02 (Synthetic Uptime & SSL Checker)
 owner: ai-docs
 target_model: gpt-6.2-astra
 reasoning_effort: low
 token_optimization: true
 ---
-# Task: Execute Synthetic Probe & SSL Expiration Warning QA Test Suite
+# Task: Create & Execute MN02 Synthetic Uptime & SSL Expiry Test Suite
 
 ## Fast Pre-Check (Token-Saving Guard)
 ```bash
@@ -15,10 +15,9 @@ python3 -m unittest osc_docs/test_flows/MN02-F.py > /dev/null 2>&1 && echo "ALL_
 ```
 
 ## Objective & Scope
-1. Eksekusi `MN02-F.py`.
-2. Validasi probe ketersediaan target (HTTP 200/301, TCP Port, ICMP Ping).
-3. Verifikasi pemicu peringatan otomatis ketika masa berlaku sertifikat SSL/TLS mendekati threshold kedaluwarsa (`ssl_warn_days` & `ssl_crit_days`).
+1. Buat skrip `osc_docs/test_flows/MN02-F.py` untuk memvalidasi probe ketersediaan target (HTTP, TCP, Ping).
+2. Menguji pemicu peringatan otomatis ketika masa berlaku sertifikat SSL mendekati threshold kedaluwarsa.
 
 ## Acceptance Criteria
-- [ ] Deteksi Uptime dan pemicu SSL warning berfungsi akurat (PASSED).
+- [ ] Healthcheck target dan SSL warning trigger terbukti presisi.
 - [ ] Documented at `osc_docs/notes/MP-MN02-QA.md`.

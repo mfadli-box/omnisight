@@ -109,7 +109,7 @@ async fn login(
     let (role, mfa, _) = grant(&auth.db, user, input.company_id).await?;
     let recovery = matches!(proof, CredentialProof::Recovery);
     if !mfa {
-        return session(&auth, user, input.company_id, role, recovery);
+        return session(&auth, user, input.company_id, role, recovery).await;
     }
     let now = Instant::now();
     let mut pending = auth.challenges.lock().unwrap();
@@ -181,6 +181,7 @@ async fn verify_mfa(State(auth): State<Arc<Auth>>, Json(input): Json<Verify>) ->
         role,
         challenge.recovery,
     )
+    .await
 }
 
 fn timestamp() -> u64 {
@@ -212,10 +213,20 @@ fn valid_otp(secret: &str, otp: &str, now: u64) -> bool {
     })
 }
 
-fn session(auth: &Auth, user: Uuid, company: Uuid, role: Uuid, recovery: bool) -> Reply {
+async fn session(auth: &Auth, user: Uuid, company: Uuid, role: Uuid, recovery: bool) -> Reply {
     let now = timestamp();
-    let claims =
-        json!({"user_id":user,"company_id":company,"role_id":role,"iat":now,"exp":now+3600});
+    let permissions: serde_json::Value = sqlx::query_scalar(
+        "SELECT COALESCE(jsonb_object_agg(m.sub_module_code, jsonb_build_object(
+            'can_create', p.can_create, 'can_read', p.can_read, 'can_update', p.can_update,
+            'can_delete', p.can_delete, 'can_execute', p.can_execute)), '{}'::jsonb)
+         FROM dat_permission p JOIN dat_menu m ON m.menu_id = p.menu_id AND m.is_active
+         WHERE p.role_id = $1",
+    )
+    .bind(role)
+    .fetch_one(&auth.db)
+    .await
+    .map_err(|_| StatusCode::SERVICE_UNAVAILABLE)?;
+    let claims = json!({"user_id":user,"company_id":company,"role_id":role,"permissions":permissions,"iat":now,"exp":now+3600});
     let token = encode(&Header::default(), &claims, &auth.signing_key)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(Json(

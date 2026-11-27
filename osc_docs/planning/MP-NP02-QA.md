@@ -6,7 +6,7 @@ target_model: gpt-6.2-astra
 reasoning_effort: low
 token_optimization: true
 ---
-# Task: Execute IPAM Subnet Calculation & Rogue Device Detection Test Suite
+# Task: Create & Execute NP02 IPAM Subnet Calculation & Rogue IP Test Suite
 
 ## Fast Pre-Check (Token-Saving Guard)
 ```bash
@@ -15,10 +15,9 @@ python3 -m unittest osc_docs/test_flows/NP02-F.py > /dev/null 2>&1 && echo "ALL_
 ```
 
 ## Objective & Scope
-1. Eksekusi `NP02-F.py`.
-2. Validasi manipulasi subnet CIDR/INET PostgreSQL (cek IP overlap & validasi gateway).
-3. Verifikasi deteksi *Rogue IP* (perangkat yang terhubung tanpa registrasi resmi) dan penandaan status `STALE`/`RESERVED`.
+1. Buat skrip `osc_docs/test_flows/NP02-F.py` untuk memvalidasi kalkulasi subnet CIDR/INET PostgreSQL.
+2. Verifikasi deteksi Rogue IP (perangkat asing) dan alokasi IP real-time di `trx_ip_allocation`.
 
 ## Acceptance Criteria
-- [ ] Kalkulasi subnet & deteksi perangkat asing berjalan presisi (PASSED).
+- [ ] Kalkulasi subnet dan deteksi Rogue IP berjalan presisi.
 - [ ] Documented at `osc_docs/notes/MP-NP02-QA.md`.

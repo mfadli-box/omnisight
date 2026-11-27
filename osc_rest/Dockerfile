@@ -1,7 +1,7 @@
 # ==============================================================================
-# Stage 1: Cargo Chef / Builder Stage
+# Stage 1: Rust Builder Stage
 # ==============================================================================
-FROM rust:1.82-alpine AS builder
+FROM rust:1.99.1-alpine3.23 AS builder
 
 # Install dependensi sistem untuk kompilasi Rust (OpenSSL & Build Essentials)
 RUN apk add --no-cache musl-dev openssl-dev openssl-libs-static pkgconfig git
@@ -10,22 +10,20 @@ WORKDIR /app
 
 # Copy manifes dependensi terlebih dahulu untuk optimasi Docker layer caching
 COPY Cargo.toml Cargo.lock ./
-RUN mkdir src && echo "fn main() {}" > src/main.rs
-RUN cargo build --release
-RUN rm -rf src
+RUN mkdir src && touch src/main.rs && cargo fetch --locked && rm src/main.rs
 
 # Copy seluruh source code backend Rust
 COPY src ./src
 COPY notes ./notes
 
 # Kompilasi binary rilis akhir
-RUN cargo build --release --bin osc_rest && \
-    strip target/release/osc_rest
+RUN cargo build --locked --release --bin osc-rest && \
+    strip target/release/osc-rest
 
 # ==============================================================================
 # Stage 2: Runtime Minimal SecOps Stage
 # ==============================================================================
-FROM alpine:3.20 AS runner
+FROM alpine:3.23 AS runner
 
 # Install sertifikat SSL/TLS & tzdata
 RUN apk add --no-cache ca-certificates tzdata curl && \
@@ -35,7 +33,7 @@ RUN apk add --no-cache ca-certificates tzdata curl && \
 WORKDIR /app
 
 # Copy binary dari builder stage
-COPY --from=builder /app/target/release/osc_rest /usr/local/bin/osc_rest
+COPY --from=builder /app/target/release/osc-rest /usr/local/bin/osc_rest
 
 # Set kepemilikan berkas ke non-root user
 USER oscuser:oscgroup
