@@ -7,7 +7,7 @@ use axum::{
 };
 use base64::{engine::general_purpose::STANDARD, Engine};
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use uuid::Uuid;
@@ -21,7 +21,7 @@ pub enum Action {
     Execute,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Permissions {
     pub can_create: bool,
     pub can_read: bool,
@@ -42,7 +42,7 @@ impl Permissions {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct TenantContext {
     pub user_id: Uuid,
     pub company_id: Uuid,
@@ -60,7 +60,7 @@ pub(crate) struct Claims {
     pub(crate) company_id: Uuid,
     pub(crate) role_id: Uuid,
     pub(crate) exp: i64,
-    permissions: Option<HashMap<String, Permissions>>,
+    permissions: HashMap<String, Permissions>,
 }
 
 #[derive(Clone)]
@@ -119,9 +119,8 @@ impl RbacState {
         claims: &Claims,
         area_id: Option<Uuid>,
     ) -> Result<Option<Permissions>, sqlx::Error> {
-        let claimed = claims.permissions.as_ref().and_then(|p| p.get(self.module));
-        let token_allows =
-            |action| claims.permissions.is_none() || claimed.is_some_and(|p| p.allows(action));
+        let claimed = claims.permissions.get(self.module);
+        let token_allows = |action| claimed.is_some_and(|p| p.allows(action));
         let row = sqlx::query_as::<_, (bool, bool, bool, bool, bool)>(
             "SELECT p.can_create AND $7, p.can_read AND $8, p.can_update AND $9,
                     p.can_delete AND $10, p.can_execute AND $11

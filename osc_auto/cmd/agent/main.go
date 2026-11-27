@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"time"
 
+	"omnisight/osc_auto/internal/config"
 	"omnisight/osc_auto/src/collector"
 )
 
@@ -16,13 +17,19 @@ func run(ctx context.Context) error {
 	if endpoint == "" {
 		return fmt.Errorf("OMNISIGHT_TELEMETRY_URL is required")
 	}
+	tenantEndpoint := os.Getenv("OMNISIGHT_TENANT_CONFIG_URL")
+	if tenantEndpoint == "" {
+		return fmt.Errorf("OMNISIGHT_TENANT_CONFIG_URL is required")
+	}
 	identityCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	identity, err := resolveIdentity(identityCtx)
 	cancel()
 	if err != nil {
 		return fmt.Errorf("resolve agent identity: %w", err)
 	}
-	sender := collector.Sender{Endpoint: endpoint, AgentID: identity.AgentID, Secret: []byte(identity.AgentToken)}
+	poller := &config.Poller{Endpoint: tenantEndpoint, AgentID: identity.AgentID, Token: identity.AgentToken}
+	go poller.Run(ctx, func(err error) { log.Printf("tenant context refresh failed: %v", err) })
+	sender := collector.Sender{Endpoint: endpoint, AgentID: identity.AgentID, Secret: []byte(identity.AgentToken), Tenant: poller}
 	collectAndSend := func() {
 		requestCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()

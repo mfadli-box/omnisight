@@ -21,6 +21,7 @@ import (
 	"github.com/shirou/gopsutil/v4/disk"
 	"github.com/shirou/gopsutil/v4/mem"
 	"github.com/shirou/gopsutil/v4/net"
+	"omnisight/osc_auto/internal/config"
 )
 
 // Metrics contains host-wide, cumulative network counters and current resource use.
@@ -34,9 +35,14 @@ type Metrics struct {
 }
 
 type Payload struct {
-	AgentID   string    `json:"agent_id"`
-	Timestamp time.Time `json:"timestamp"`
-	Metrics   Metrics   `json:"metrics"`
+	AgentID     string    `json:"agent_id"`
+	CompanyID   string    `json:"company_id"`
+	AreaID      string    `json:"area_id"`
+	StoreID     string    `json:"store_id"`
+	CompanyCode string    `json:"company_code"`
+	AreaCode    string    `json:"area_code"`
+	Timestamp   time.Time `json:"timestamp"`
+	Metrics     Metrics   `json:"metrics"`
 }
 
 // Collect measures the host. diskPath selects the filesystem to report.
@@ -99,11 +105,19 @@ type Sender struct {
 	AgentID  string
 	Secret   []byte
 	Client   *http.Client
+	Tenant   *config.Poller
 }
 
 func (s Sender) Send(ctx context.Context, metrics Metrics) error {
 	if s.AgentID == "" || len(s.Secret) == 0 {
 		return errors.New("agent ID and secret are required")
+	}
+	if s.Tenant == nil {
+		return errors.New("tenant context is required")
+	}
+	tenant, ok := s.Tenant.Current()
+	if !ok || tenant.AgentID != s.AgentID {
+		return errors.New("tenant context unavailable or stale")
 	}
 	u, err := url.Parse(s.Endpoint)
 	if err != nil || u.Host == "" || u.Scheme != "https" || u.User != nil {
@@ -112,7 +126,11 @@ func (s Sender) Send(ctx context.Context, metrics Metrics) error {
 	if u.RawQuery != "" || u.Fragment != "" {
 		return errors.New("telemetry endpoint must not contain query or fragment")
 	}
-	body, err := json.Marshal(Payload{AgentID: s.AgentID, Timestamp: time.Now().UTC(), Metrics: metrics})
+	body, err := json.Marshal(Payload{
+		AgentID: s.AgentID, CompanyID: tenant.CompanyID, AreaID: tenant.AreaID,
+		StoreID: tenant.StoreID, CompanyCode: tenant.CompanyCode, AreaCode: tenant.AreaCode,
+		Timestamp: time.Now().UTC(), Metrics: metrics,
+	})
 	if err != nil {
 		return fmt.Errorf("encode telemetry: %w", err)
 	}

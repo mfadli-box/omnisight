@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { MFAModal } from "@/components/auth/MFAModal";
 import { useTenant } from "@/components/auth/TenantContext";
-import { SearchableCombobox } from "@/components/ui/searchable-combobox";
+import { SearchableCombobox } from "@/components/cm/SearchableCombobox";
 import { authenticate, loadCompanies } from "@/services/auth";
 import { loginSchema, type Login, type Company } from "@/validations/auth.schema";
 

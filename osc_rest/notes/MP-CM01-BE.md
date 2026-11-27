@@ -20,4 +20,4 @@ Login HRIS berhasil memakai mekanisme pembaruan Argon2id yang sudah ada. Status 
 - `passed` — dua unit test Rust pada modul autentikasi terisolasi, meliputi XML dan keputusan fallback.
 - `passed` — uji integrasi rute autentikasi dengan PostgreSQL 18.7 dan HRIS tiruan. Skenario mencakup tanda tangan dan claims JWT, pembaruan hash, status 0, timeout tiga detik, XML rusak, HTTP 503, password cadangan salah, akses perusahaan, MFA dan penggunaan ulang tantangan, serta login lokal.
 - `passed` — pemeriksaan format Rust pada berkas logika autentikasi.
-- `not run` — skenario dalam `osc_docs/test_flows/CM01-F.py`. Pemanggilan Python gagal karena berkas tidak tersedia.
+- `passed` — seluruh tujuh skenario `osc_docs/test_flows/CM01-F.py` pada 28 November 2026.

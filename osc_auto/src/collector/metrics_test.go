@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"omnisight/osc_auto/internal/config"
 	"testing"
 	"time"
 )
@@ -15,6 +16,10 @@ import (
 func TestSendSignatureAndInvalidSignature(t *testing.T) {
 	secret := []byte("test-only-secret")
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v1/agent/tenant-context" {
+			_, _ = w.Write([]byte(`{"agent_id":"host-a","company_id":"11111111-1111-1111-1111-111111111111","area_id":"22222222-2222-2222-2222-222222222222","store_id":"33333333-3333-3333-3333-333333333333","company_code":"ACME","area_code":"WEST"}`))
+			return
+		}
 		if r.Method != http.MethodPost || r.Header.Get("Content-Type") != "application/json" {
 			t.Error("unexpected request method or content type")
 			w.WriteHeader(http.StatusBadRequest)
@@ -27,7 +32,7 @@ func TestSendSignatureAndInvalidSignature(t *testing.T) {
 			return
 		}
 		var payload Payload
-		if err := json.Unmarshal(body, &payload); err != nil || payload.AgentID != "host-a" || time.Since(payload.Timestamp) > time.Minute {
+		if err := json.Unmarshal(body, &payload); err != nil || payload.AgentID != "host-a" || payload.CompanyCode != "ACME" || payload.AreaCode != "WEST" || payload.CompanyID == "" || payload.AreaID == "" || payload.StoreID == "" || time.Since(payload.Timestamp) > time.Minute {
 			t.Error("invalid telemetry payload")
 			w.WriteHeader(http.StatusBadRequest)
 			return
@@ -36,7 +41,11 @@ func TestSendSignatureAndInvalidSignature(t *testing.T) {
 	}))
 	defer server.Close()
 
-	sender := Sender{Endpoint: server.URL, AgentID: "host-a", Secret: secret, Client: server.Client()}
+	poller := &config.Poller{Endpoint: server.URL + "/api/v1/agent/tenant-context", AgentID: "host-a", Token: "agent-token", Client: server.Client()}
+	if err := poller.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	sender := Sender{Endpoint: server.URL, AgentID: "host-a", Secret: secret, Client: server.Client(), Tenant: poller}
 	if err := sender.Send(context.Background(), Metrics{CPUPercent: 25}); err != nil {
 		t.Fatalf("valid signature rejected: %v", err)
 	}

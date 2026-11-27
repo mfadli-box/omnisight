@@ -1,5 +1,6 @@
 pub mod api {
     pub mod auth;
+    pub mod tenant;
 }
 pub mod application;
 pub mod domain {

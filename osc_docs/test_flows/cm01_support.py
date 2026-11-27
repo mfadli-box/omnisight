@@ -62,7 +62,7 @@ class CM01Case(unittest.TestCase):
             cur.execute('INSERT INTO dat_company(company_id,company_code,company_name) VALUES (%s,%s,%s)', (cls.company, cls.username[:20], 'QA'))
             cur.execute('INSERT INTO dat_area(area_id,company_id,area_code,area_name) VALUES (%s,%s,%s,%s)', (cls.area, cls.company, 'QA', 'QA'))
             cur.execute('INSERT INTO dat_user(user_id,username,email,password_hash,mfa_secret) VALUES (%s,%s,%s,%s,%s)', (cls.user, cls.username, cls.username+'@example.invalid', cls.hasher.hash(cls.password), cls.secret))
-            cur.execute('INSERT INTO dat_employee(user_id,employee_nik,full_name,home_company_id,home_area_id) VALUES (%s,%s,%s,%s,%s)', (cls.user, cls.username, 'QA', cls.company, cls.area))
+            cur.execute('INSERT INTO dat_employee(user_id,employee_nik,full_name,home_company_id,home_area_id) VALUES (%s,%s,%s,%s,%s)', (cls.user, cls.user.hex[:30], 'QA', cls.company, cls.area))
             cur.execute('INSERT INTO dat_role(role_id,role_code,role_name) VALUES (%s,%s,%s)', (cls.role, cls.username[:30], 'QA'))
             cur.execute('INSERT INTO trx_user_company(user_id,company_id,role_id) VALUES (%s,%s,%s)', (cls.user, cls.company, cls.role))
         binary = ROOT / 'osc_rest/target/debug/osc-rest'
