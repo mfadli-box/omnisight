@@ -41,10 +41,18 @@ services:
     ports:
       - "36661:5432"
     volumes:
-      - xbase:/var/lib/postgresql/data
-      - ./osc_base/init/001_runtime_role.sh:/docker-entrypoint-initdb.d/001_runtime_role.sh:ro
+      - xbase:/var/lib/postgresql
+      - ./osc_base/init/01_dat.sql:/opt/omnisight/init/01_dat.sql:ro
+      - ./osc_base/init/02_tsx.sql:/opt/omnisight/init/02_tsx.sql:ro
+      - ./osc_base/init/03_log.sql:/opt/omnisight/init/03_log.sql:ro
+      - ./osc_base/init/00_bootstrap.sh:/docker-entrypoint-initdb.d/00_bootstrap.sh:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -h localhost -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test:
+        - CMD-SHELL
+        - >-
+          PGPASSWORD="$${POSTGRES_APP_PASSWORD}" PGCONNECT_TIMEOUT=3
+          psql --no-psqlrc --host=127.0.0.1 --username=omnisight_app --dbname="$${POSTGRES_DB}"
+          --command='SELECT 1 FROM public.dat_company LIMIT 0' >/dev/null
       interval: 10s
       timeout: 5s
       retries: 5
@@ -191,11 +199,6 @@ services:
       APP_ORIGIN: ${APP_ORIGIN:-http://localhost:36665}
     depends_on:
       osc_rest: {condition: service_healthy}
-    healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
-      interval: 20s
-      timeout: 5s
-      retries: 3
     restart: unless-stopped
     networks:
       blackbox:
@@ -210,10 +213,9 @@ services:
     logging: *default-logging
     network_mode: host
     environment:
-      HUB_URL: http://127.0.0.1:36664
-      NODE_ID: ${AGENT_NODE_ID:?Set AGENT_NODE_ID in environment}
-      AGENT_SECRET: ${AGENT_SECRET:?Set AGENT_SECRET in environment}
-      TELEMETRY_ENABLED: ${AGENT_TELEMETRY_ENABLED:-false}
+      OMNISIGHT_TELEMETRY_URL: ${OMNISIGHT_TELEMETRY_URL:-}
+      OMNISIGHT_AGENT_ID: ${AGENT_NODE_ID:?Set AGENT_NODE_ID in environment}
+      OMNISIGHT_AGENT_SECRET: ${AGENT_SECRET:?Set AGENT_SECRET in environment}
     depends_on:
       osc_rest: {condition: service_healthy}
     restart: unless-stopped

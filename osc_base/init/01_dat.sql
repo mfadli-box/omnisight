@@ -677,12 +677,12 @@ CREATE TABLE IF NOT EXISTS dat_directus_config (
 -- ==============================================================================
 
 CREATE OR REPLACE FUNCTION trg_set_dat_updated_at()
-RETURNS TRIGGER AS 10
+RETURNS TRIGGER AS $function$
 BEGIN
     NEW.updated_at = CURRENT_TIMESTAMP;
     RETURN NEW;
 END;
-10 LANGUAGE plpgsql;
+$function$ LANGUAGE plpgsql;
 
 CREATE TRIGGER set_updated_at_dat_company BEFORE UPDATE ON dat_company FOR EACH ROW EXECUTE FUNCTION trg_set_dat_updated_at();
 CREATE TRIGGER set_updated_at_dat_area BEFORE UPDATE ON dat_area FOR EACH ROW EXECUTE FUNCTION trg_set_dat_updated_at();

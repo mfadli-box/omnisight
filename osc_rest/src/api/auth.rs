@@ -6,7 +6,7 @@ use crate::{
 use axum::{
     extract::{ConnectInfo, DefaultBodyLimit, State},
     http::StatusCode,
-    routing::post,
+    routing::{get, post},
     Json, Router,
 };
 use base64::{engine::general_purpose::STANDARD, Engine};
@@ -57,6 +57,7 @@ pub fn router(db: PgPool, secret: &str, hosts: &str) -> Result<Router, &'static 
         .route("/login", post(login))
         .route("/mfa/verify", post(verify_mfa));
     Ok(Router::new()
+        .route("/baas/v1/public/companies", get(list_companies))
         .nest("/api/v1/auth", routes.clone())
         .nest("/baas/v1/auth", routes)
         .layer(DefaultBodyLimit::max(8192))
@@ -76,6 +77,22 @@ struct Verify {
 }
 
 type Reply = Result<Json<Value>, StatusCode>;
+
+async fn list_companies(State(auth): State<Arc<Auth>>) -> Reply {
+    let query = sqlx::query_as::<_, (Uuid, String)>(
+        "SELECT company_id, company_name FROM dat_company WHERE is_active
+         ORDER BY company_name, company_id",
+    );
+    let companies = tokio::time::timeout(Duration::from_secs(3), query.fetch_all(&auth.db))
+        .await
+        .map_err(|_| StatusCode::SERVICE_UNAVAILABLE)?
+        .map_err(|_| StatusCode::SERVICE_UNAVAILABLE)?;
+    let data: Vec<_> = companies
+        .into_iter()
+        .map(|(company_id, company_name)| json!({"company_id": company_id, "company_name": company_name}))
+        .collect();
+    Ok(Json(json!({"data": data})))
+}
 
 async fn login(
     State(auth): State<Arc<Auth>>,

@@ -476,7 +476,7 @@ CREATE TABLE IF NOT EXISTS trx_ticket_attachment (
 CREATE TABLE IF NOT EXISTS trx_ticket_sla_tracker (
     tracker_id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     ticket_id           UUID NOT NULL REFERENCES trx_ticket_issue(id) ON DELETE CASCADE,
-    policy_id           UUID NOT NULL REFERENCES dat_sla_policy(policy_id) ON DELETE RESTRICT,
+    policy_id           UUID NOT NULL REFERENCES dat_sla_policy(sla_id) ON DELETE RESTRICT,
     response_due_at     TIMESTAMPTZ NOT NULL,
     resolution_due_at   TIMESTAMPTZ NOT NULL,
     is_response_breached BOOLEAN NOT NULL DEFAULT FALSE,
@@ -580,12 +580,12 @@ CREATE INDEX IF NOT EXISTS idx_trx_summary_monthly_period ON trx_summary_monthly
 
 -- Automatic Updated At Trigger Function
 CREATE OR REPLACE FUNCTION trg_set_trx_updated_at()
-RETURNS TRIGGER AS 10
+RETURNS TRIGGER AS $function$
 BEGIN
     NEW.updated_at = CURRENT_TIMESTAMP;
     RETURN NEW;
 END;
-10 LANGUAGE plpgsql;
+$function$ LANGUAGE plpgsql;
 
 -- Apply Triggers for Updated At
 CREATE TRIGGER set_updated_at_trx_container_stack BEFORE UPDATE ON trx_container_stack FOR EACH ROW EXECUTE FUNCTION trg_set_trx_updated_at();

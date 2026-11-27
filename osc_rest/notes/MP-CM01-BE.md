@@ -6,6 +6,7 @@ Memverifikasi kredensial memakai HRIS perusahaan penempatan, memperbarui hash ca
 
 ## Scope/Keputusan
 
+`GET /baas/v1/public/companies` membaca perusahaan aktif dan hanya mengembalikan ID serta nama. Batas waktu query tiga detik. Kegagalan akses database ditangani dengan HTTP 503.
 - Adaptor `reqwest` memakai batas waktu total tiga detik, daftar host `HRIS_ALLOWED_HOSTS`, HTTPS untuk host jaringan dan batas respons 16 KiB. HTTP hanya tersedia pada alamat IP loopback yang diizinkan. Klien menonaktifkan pengalihan dan proksi.
 - Parser `quick-xml` membaca elemen `string` dalam namespace `App.Login` dan menolak DTD. Kesalahan konfigurasi menutup akses. Gangguan transport, HTTP 5xx, atau XML yang tidak dapat diproses memicu pemeriksaan hash cadangan.
 - Rute login dan verifikasi MFA tersedia di bawah `/api/v1/auth` dan `/baas/v1/auth`. JWT HS256 memuat identitas pengguna, perusahaan operasional dan role dari pemberian akses. Token HRIS tetap internal.
